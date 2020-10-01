@@ -1,23 +1,35 @@
 use bencher::Bencher;
 
+use super::handlers::{
+    handle_read_sync,
+    handle_write_sync,
+};
+
 use std::thread;
 use std::sync::mpsc;
+use std::net::{TcpListener, TcpStream};
 
 pub fn bench_write(b: &mut Bencher) {
-    let (tx, rx) = sync_channel(0);
+    const ADDR: &str = "127.0.0.1:12345";
+    let (tx, rx) = mpsc::sync_channel(0);
     thread::spawn(move || {
-        const ADDR: &str = "127.0.0.1:12345";
         let listener = TcpListener::bind(ADDR)
-            .expect("failed to listen on " + ADDR);
-        for stream in listener.incoming() {
-            // make this identical for each test
-            handle_client(stream?);
+            .expect("failed to listen on addr");
+        tx.send(()).unwrap();
+        for stream in listener.incoming().take(100) {
+            let stream = stream
+                .expect("failed to create new TCP stream");
+            handle_read_sync(stream)
+                .expect("failed to read");
         }
         tx.send(()).unwrap();
     });
+    rx.recv().unwrap();
     b.iter(|| {
-        // placeholder
-        x += 1;
+        let stream = TcpStream::connect(ADDR)
+            .expect("failed to connect to addr");
+        handle_write_sync(stream)
+            .expect("failed to write");
     });
     rx.recv().unwrap()
 }

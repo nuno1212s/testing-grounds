@@ -1,3 +1,5 @@
+pub mod handlers;
+
 mod tcp_sync;
 
 use bencher::{benchmark_group, benchmark_main};
