@@ -1,6 +1,7 @@
 pub mod params;
 pub mod handlers;
 
+mod udp_sync;
 mod tcp_sync;
 
 fn main() {
@@ -12,6 +13,8 @@ fn main() {
         "help" => usage(0),
         "tcp:sync:client" => tcp_sync::client(),
         "tcp:sync:server" => tcp_sync::server(),
+        "udp:sync:client" => udp_sync::client(),
+        "udp:sync:server" => udp_sync::server(),
         _ => Err("Invalid backend; try \"help\".".into()),
     };
     result.unwrap_or_else(|e| {
@@ -25,5 +28,8 @@ fn usage(code: i32) -> ! {
     eprintln!("");
     eprintln!("  - tcp:sync:client");
     eprintln!("  - tcp:sync:server");
+    eprintln!("");
+    eprintln!("  - udp:sync:client");
+    eprintln!("  - udp:sync:server");
     std::process::exit(code)
 }
