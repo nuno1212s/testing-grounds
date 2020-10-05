@@ -1,3 +1,4 @@
+pub mod params;
 pub mod handlers;
 
 mod tcp_sync;
