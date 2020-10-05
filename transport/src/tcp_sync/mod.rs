@@ -17,5 +17,9 @@ pub fn server() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn client() -> Result<(), Box<dyn std::error::Error>> {
+    for _ in 0..CONNS {
+        let stream = TcpStream::connect(ADDR)?;
+        handle_write_sync(stream)?;
+    }
     Ok(())
 }
