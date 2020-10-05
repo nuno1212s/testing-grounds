@@ -1,0 +1,42 @@
+import sys
+import time
+import subprocess
+
+def run_server(suite):
+    try:
+        print('Starting server...')
+        return subprocess.Popen(['./target/release/transport', f'{suite}:server'])
+    except FileNotFoundError:
+        print('Error! Run "cargo build --release" first.')
+        exit(1)
+
+def run_client(suite):
+    try:
+        print('Starting client...')
+        return subprocess.Popen(['./target/release/transport', f'{suite}:client'])
+    except FileNotFoundError:
+        print('Error! Run "cargo build --release" first.')
+        exit(1)
+
+def main():
+    try:
+        suite = sys.argv[1]
+    except IndexError:
+        try:
+            subprocess.run(['./target/release/transport', 'help'])
+            print()
+            print('Omit the last ":{client,server}" bit.')
+        except FileNotFoundError:
+            print('Error! Run "cargo build --release" first.')
+        finally:
+            exit(1)
+    server = run_server(suite)
+    time.sleep(1)
+    t = time.monotonic()
+    client = run_client(suite)
+    client.wait()
+    print(f'Client took {time.monotonic() - t} seconds to finish.')
+    server.wait()
+
+if __name__ == '__main__':
+    main()
