@@ -8,10 +8,7 @@ fn main() {
         None => usage(1),
     };
     let result = match arg.as_ref() {
-        "help" => {
-            usage(0);
-            Ok(())
-        },
+        "help" => usage(0),
         "tcp:sync:client" => tcp_sync::client(),
         "tcp:sync:server" => tcp_sync::server(),
         _ => Err("Invalid backend; try \"help\".".into()),
