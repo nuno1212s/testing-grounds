@@ -36,8 +36,8 @@ def main():
     time.sleep(1)
     t = time.monotonic()
     client = run_client(suite)
-    client.wait()
-    print(f'Client took {time.monotonic() - t} seconds to finish.')
+    if client.wait() == 0:
+        print(f'Client took {time.monotonic() - t} seconds to finish.')
     server.wait()
 
 if __name__ == '__main__':
