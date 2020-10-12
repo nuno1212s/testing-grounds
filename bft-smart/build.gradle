@@ -12,9 +12,29 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 
+configurations {
+    // Configuration that holds jars to include in the jar
+    extraLibs
+}
+
 dependencies {
-    //implementation 'com.google.guava:guava:29.0-jre'
     implementation 'com.github.bft-smart:library:v1.2'
+    extraLibs group: 'com.github.bft-smart', name: 'library', version: 'v1.2'
+
+    implementation 'commons-codec:commons-codec:1.15'
+    extraLibs group: 'commons-codec', name: 'commons-codec', version: '1.15'
+
+    implementation 'io.netty:netty-all:4.1.52.Final'
+    extraLibs group: 'io.netty', name: 'netty-all', version: '4.1.52.Final'
+
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+    extraLibs group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
+
+    implementation 'org.slf4j:slf4j-log4j12:1.7.30'
+    extraLibs group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.30'
+
+    // Assemble all deps into the final jar
+    configurations.compile.extendsFrom(configurations.extraLibs)
 }
 
 application {
@@ -27,5 +47,8 @@ jar {
             "Class-Path": configurations.compile.collect { it.getName() }.join(' '),
             "Main-Class": application.mainClassName
         )
+    }
+    from {
+        configurations.extraLibs.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }
