@@ -1,29 +1,57 @@
 #!/usr/bin/env python3
 
+import os
 import subprocess
 
-def run_replica(id):
-    try:
+class Node(object):
+    def __init__(self, id):
         print(f'Starting replica {id}...')
-        return subprocess.Popen(['java', '-jar', './build/libs/bft-smart.jar', 'server', f'{id}'])
-    except FileNotFoundError:
-        print('Error! Run "./gradlew build" first.')
-        exit(1)
+        self.proc = subprocess.Popen( \
+            args=f'java -jar ./build/libs/bft-smart.jar {self.kind()} {id}'.split(' '))
 
-def run_client(id):
-    try:
-        print(f'Starting client {id}...')
-        return subprocess.Popen(['java', '-jar', './build/libs/bft-smart.jar', 'client', f'{id}'])
-    except FileNotFoundError:
-        print('Error! Run "./gradlew build" first.')
-        exit(1)
+    def kind(self):
+        raise NotImplementedError
+
+    def terminate(self):
+        self.proc.terminate()
+
+class Replica(Node):
+    def kind(self):
+        return 'server'
+
+class Client(Node):
+    def kind(self):
+        return 'client'
+
+    def wait(self):
+        self.proc.wait()
+        self.terminate(self)
 
 def main():
-    replicas = list(map(run_replica, range(4)))
-    client = run_client(5)
-    client.wait()
-    for r in replicas:
-        r.wait()
+    # create dir for logs
+    try:
+        os.mkdir('log')
+    except FileExistsError:
+        ...
+
+    # start replicas
+    try:
+        replicas = list(map(Replica, range(4)))
+    except FileNotFoundError:
+        print('Error! Run "./gradlew build" first.')
+        return
+
+    # start client
+    try:
+        client = Client(1001)
+        client.wait()
+    except FileNotFoundError:
+        print('Error! Run "./gradlew build" first.')
+    except KeyboardInterrupt:
+        ...
+    finally:
+        for replica in replicas:
+            replica.terminate()
 
 if __name__ == '__main__':
     main()
