@@ -18,6 +18,9 @@ class Node(object):
         self.proc.wait()
         print(f'Shut down {self.kind()} {self.id}...')
 
+    def wait(self):
+        self.proc.wait()
+
 class Replica(Node):
     def kind(self):
         return 'server'
@@ -25,9 +28,6 @@ class Replica(Node):
 class Client(Node):
     def kind(self):
         return 'client'
-
-    def wait(self):
-        self.proc.wait()
 
 def main():
     # create dir for logs
