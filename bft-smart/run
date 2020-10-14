@@ -5,7 +5,8 @@ import subprocess
 
 class Node(object):
     def __init__(self, id):
-        print(f'Starting replica {id}...')
+        print(f'Starting {self.kind()} {id}...')
+        self.id = id
         self.proc = subprocess.Popen( \
             args=f'java -jar ./build/libs/bft-smart.jar {self.kind()} {id}'.split(' '))
 
@@ -14,6 +15,8 @@ class Node(object):
 
     def terminate(self):
         self.proc.terminate()
+        self.proc.wait()
+        print(f'Shut down {self.kind()} {self.id}...')
 
 class Replica(Node):
     def kind(self):
@@ -25,7 +28,6 @@ class Client(Node):
 
     def wait(self):
         self.proc.wait()
-        self.terminate(self)
 
 def main():
     # create dir for logs
@@ -48,8 +50,10 @@ def main():
     except FileNotFoundError:
         print('Error! Run "./gradlew build" first.')
     except KeyboardInterrupt:
-        ...
+        client.terminate()
     finally:
+        print('Client shut down...')
+        print('Shutting down replicas...')
         for replica in replicas:
             replica.terminate()
 
