@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+
+import subprocess
+
+def run_replica(id):
+    try:
+        print(f'Starting replica {id}...')
+        return subprocess.Popen(['java', '-jar', './build/libs/bft-smart.jar', 'server', f'{id}'])
+    except FileNotFoundError:
+        print('Error! Run "./gradlew build" first.')
+        exit(1)
+
+def run_client(id):
+    try:
+        print(f'Starting client {id}...')
+        return subprocess.Popen(['java', '-jar', './build/libs/bft-smart.jar', 'client', f'{id}'])
+    except FileNotFoundError:
+        print('Error! Run "./gradlew build" first.')
+        exit(1)
+
+def main():
+    replicas = list(map(run_replica, range(4)))
+    client = run_client(5)
+    client.wait()
+    for r in replicas:
+        r.wait()
+
+if __name__ == '__main__':
+    main()
