@@ -6,3 +6,6 @@ build
 
 # Ignore log files from replicas and clients
 log
+
+# Ignore current view
+config/currentView
