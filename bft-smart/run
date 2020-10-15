@@ -4,12 +4,15 @@ import os
 import shutil
 import subprocess
 
+from time import sleep
+
 class Node(object):
     def __init__(self, id):
         print(f'Starting {self.kind()} {id}...')
         self.id = id
         self.proc = subprocess.Popen( \
             args=f'java -jar ./build/libs/bft-smart-all.jar {self.kind()} {id}'.split(' '))
+        sleep(1)
 
     def kind(self):
         raise NotImplementedError
