@@ -48,7 +48,7 @@ def main():
     try:
         replicas = list(map(Replica, range(4)))
     except FileNotFoundError:
-        print('Error! Run "./gradlew build" first.')
+        print('Error! Run "./gradlew shadowJar" first.')
         return
 
     # start client
@@ -56,7 +56,7 @@ def main():
         client = Client(1001)
         client.wait()
     except FileNotFoundError:
-        print('Error! Run "./gradlew build" first.')
+        print('Error! Run "./gradlew shadowJar" first.')
     except KeyboardInterrupt:
         client.terminate()
     finally:
