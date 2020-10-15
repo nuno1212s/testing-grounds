@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import subprocess
 
 class Node(object):
@@ -8,7 +9,7 @@ class Node(object):
         print(f'Starting {self.kind()} {id}...')
         self.id = id
         self.proc = subprocess.Popen( \
-            args=f'java -jar ./build/libs/bft-smart.jar {self.kind()} {id}'.split(' '))
+            args=f'java -jar ./build/libs/bft-smart-all.jar {self.kind()} {id}'.split(' '))
 
     def kind(self):
         raise NotImplementedError
@@ -34,6 +35,13 @@ def main():
     try:
         os.mkdir('log')
     except FileExistsError:
+        shutil.rmtree('log')
+        os.mkdir('log')
+
+    # remove view file
+    try:
+        os.remove('config/currentView')
+    except FileNotFoundError:
         ...
 
     # start replicas
