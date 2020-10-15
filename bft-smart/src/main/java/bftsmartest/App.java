@@ -1,6 +1,9 @@
 package bftsmartest;
 
 import java.io.IOException;
+import java.security.Security;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import bftsmartest.map.MapServer;
 import bftsmartest.map.MapInteractiveClient;
@@ -23,6 +26,8 @@ public class App {
             System.err.println("Failed to create log file.");
             System.exit(1);
         }
+
+        Security.addProvider(new BouncyCastleProvider());
 
         switch (args[0]) {
         case "client":
