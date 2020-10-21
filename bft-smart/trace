@@ -1,0 +1,25 @@
+#!/bin/sh
+
+PID=$1
+SLEEP=${2:-0.030}
+DEST=/tmp/stackdumps
+
+new_name() {
+    date +%s.%N
+}
+
+main() {
+    if [ -z $PID ]; then
+        echo Usage: $0 '<jvm pid> [<interval>]' >&2
+        exit 1
+    fi
+    rm -rf $DEST
+    mkdir $DEST
+    while true; do
+        (jstack -l $PID | lz4 > $DEST/$(new_name) 2>/dev/null) &
+        sleep $SLEEP
+    done
+}
+
+trap 'exit 0' INT TERM
+main
