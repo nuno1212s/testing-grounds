@@ -23,7 +23,7 @@ macro_rules! test {
             }
             counter
         }).expect("Failed to run test case!");
-        println!("{} per second", ops_per_sec(ops));
+        println!("  --> {} ops per second", ops_per_sec(ops));
     }}
 }
 
@@ -31,24 +31,42 @@ fn main() {
     sodiumoxide::init()
         .expect("Failed to init sodiumoxide!");
 
-    println!("Generating new key pair (using sodiumoxide)...");
-    let (_, sodium_sk) = sed::gen_keypair();
+    println!("* Generating new key pair (using sodiumoxide)...");
+    let (sodium_pk, sodium_sk) = sed::gen_keypair();
 
-    println!("Converting sodiumoxide key to hacl key...");
-    let hacl_sk = into_owned_key(&sodium_sk.0[..32])
-        .map(hed::SecretKey)
-        .expect("Invalid key length?!");
+    println!("* Converting sodiumoxide keys to hacl keys...");
+    let (hacl_pk, hacl_sk) = {
+        let (pk, sk) = into_owned_key(&sodium_sk.0);
+        (hed::PublicKey(pk), hed::SecretKey(sk))
+    };
 
     let sk = sodium_sk.clone();
     test! {
-        msg: "Testing throughput of sodiumoxide signatures... ",
+        msg: "* Testing throughput of sodiumoxide signatures...",
         op: sed::sign_detached(MSG.as_ref(), &sk)
     };
 
     let sk = hacl_sk.clone();
     test! {
-        msg: "Testing throughput of hacl signatures... ",
+        msg: "* Testing throughput of hacl signatures...",
         op: sk.signature(MSG.as_ref())
+    };
+
+    let pk = sodium_pk.clone();
+    let sig = sed::sign_detached(MSG.as_ref(), &sodium_sk);
+    test! {
+        msg: "* Testing throughput of sodiumoxide verifying...",
+        op: assert_eq!(sed::verify_detached(&sig, MSG.as_ref(), &pk), true)
+    };
+
+    let pk = hacl_pk.clone();
+    let sig = hacl_sk.signature(MSG.as_ref());
+    test! {
+        msg: "* Testing throughput of sodiumoxide verifying...",
+        op: {
+            let pk = pk.clone();
+            assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+        }
     };
 }
 
@@ -68,11 +86,10 @@ where
     handle.join()
 }
 
-fn into_owned_key(s: &[u8]) -> Option<[u8; 32]> {
-    if s.len() != 32 {
-        return None;
-    }
-    let mut keybuf = [0; 32];
-    keybuf.copy_from_slice(s);
-    Some(keybuf)
+fn into_owned_key(s: &[u8; 64]) -> ([u8; 32], [u8; 32]) {
+    let mut pkbuf = [0; 32];
+    let mut skbuf = [0; 32];
+    pkbuf.copy_from_slice(&s[32..]);
+    skbuf.copy_from_slice(&s[..32]);
+    (pkbuf, skbuf)
 }
