@@ -62,7 +62,7 @@ fn main() {
     let pk = hacl_pk.clone();
     let sig = hacl_sk.signature(MSG.as_ref());
     test! {
-        msg: "* Testing throughput of sodiumoxide verifying...",
+        msg: "* Testing throughput of hacl verifying...",
         op: {
             let pk = pk.clone();
             assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
