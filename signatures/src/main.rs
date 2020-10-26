@@ -24,7 +24,7 @@ fn main() {
         .map(hed::SecretKey)
         .expect("Invalid key length?!");
 
-    print!("Testing throughput of sodiumoxide... ");
+    print!("Testing throughput of sodiumoxide signatures... ");
     let sk = sodium_sk.clone();
     let sigs = testcase(move |quit| {
         let mut counter = 0;
@@ -37,7 +37,7 @@ fn main() {
     .expect("Failed to run test case!");
     println!("{} per second", sigs_per_sec(sigs));
 
-    print!("Testing throughput of hacl... ");
+    print!("Testing throughput of hacl signatures... ");
     let sk = hacl_sk.clone();
     let sigs = testcase(move |quit| {
         let mut counter = 0;
