@@ -12,6 +12,21 @@ const SECS: u64 = 5;
 const TIME: Duration = Duration::from_secs(SECS);
 const MSG: &str = "test12345";
 
+macro_rules! test {
+    (msg: $msg:expr, op: $op:expr) => {{
+        println!($msg);
+        let ops = testcase(move |quit| {
+            let mut counter = 0;
+            while !quit.load(Ordering::Relaxed) {
+                let _result = $op;
+                counter += 1;
+            }
+            counter
+        }).expect("Failed to run test case!");
+        println!("{} per second", ops_per_sec(ops));
+    }}
+}
+
 fn main() {
     sodiumoxide::init()
         .expect("Failed to init sodiumoxide!");
@@ -24,35 +39,21 @@ fn main() {
         .map(hed::SecretKey)
         .expect("Invalid key length?!");
 
-    print!("Testing throughput of sodiumoxide signatures... ");
     let sk = sodium_sk.clone();
-    let sigs = testcase(move |quit| {
-        let mut counter = 0;
-        while !quit.load(Ordering::Relaxed) {
-            let _signature = sed::sign_detached(MSG.as_ref(), &sk);
-            counter += 1;
-        }
-        counter
-    })
-    .expect("Failed to run test case!");
-    println!("{} per second", sigs_per_sec(sigs));
+    test! {
+        msg: "Testing throughput of sodiumoxide signatures... ",
+        op: sed::sign_detached(MSG.as_ref(), &sk)
+    };
 
-    print!("Testing throughput of hacl signatures... ");
     let sk = hacl_sk.clone();
-    let sigs = testcase(move |quit| {
-        let mut counter = 0;
-        while !quit.load(Ordering::Relaxed) {
-            let _signature = sk.signature(MSG.as_ref());
-            counter += 1;
-        }
-        counter
-    })
-    .expect("Failed to run test case!");
-    println!("{} per second", sigs_per_sec(sigs));
+    test! {
+        msg: "Testing throughput of hacl signatures... ",
+        op: sk.signature(MSG.as_ref())
+    };
 }
 
-fn sigs_per_sec(sigs: u64) -> f64 {
-    (sigs as f64) / (SECS as f64)
+fn ops_per_sec(ops: u64) -> f64 {
+    (ops as f64) / (SECS as f64)
 }
 
 fn testcase<F>(job: F) -> thread::Result<u64>
