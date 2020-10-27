@@ -4,6 +4,10 @@ pub mod handlers;
 
 mod tcp_sync;
 
+macro_rules! doit {
+    ($f:expr) => { $f() }
+}
+
 fn main() {
     let arg = match std::env::args().nth(1) {
         Some(arg) => arg,
@@ -11,8 +15,18 @@ fn main() {
     };
     let result = match arg.as_ref() {
         "help" => usage(0),
-        "tcp:sync:client" => tcp_sync::client(),
-        "tcp:sync:server" => tcp_sync::server(),
+        "tcp:sync:client" => doit!(|| {
+            let clients = params::ADDRS
+                .iter()
+                .skip(1)
+                .map(|addr| tcp_sync::C::connect_server(addr))
+                .collect()?;
+            handlers::client_test1_sync(clients);
+        }),
+        "tcp:sync:server" => doit!(|| {
+            let server = tcp_sync::S::listen_clients(params::LADDR)?;
+            handlers::server_test1_sync(server)
+        }),
         _ => Err("Invalid backend; try \"help\".".into()),
     };
     result.unwrap_or_else(|e| {

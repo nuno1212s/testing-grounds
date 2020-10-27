@@ -1,19 +1,21 @@
 use std::io::{self, Read, Write};
 use futures::io::{AsyncRead, AsyncWrite};
 
-pub trait Client: Read + Write {
+pub trait Client: Read + Write
+where
+    Self: Sized,
+{
     type Addr;
 
     fn connect_server(addr: Self::Addr) -> io::Result<Self>;
 }
 
-pub trait Server: Read + Write {
-    type Addr;
+pub trait Server
+where
+    Self: Sized,
+{
     type Client: Client;
 
-    fn listen_clients(addr: Self::Addr) -> io::Result<Self>
-    where
-        Self::Addr == Self::Client::Addr;
-
+    fn listen_clients(addr: <<Self as Server>::Client as Client>::Addr) -> io::Result<Self>;
     fn accept_client(&self) -> io::Result<Self::Client>;
 }
