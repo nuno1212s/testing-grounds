@@ -4,6 +4,8 @@ pub mod handlers;
 
 mod tcp_sync;
 
+use nodes::{Client, Server};
+
 macro_rules! doit {
     ($f:expr) => { $f() }
 }
@@ -16,12 +18,14 @@ fn main() {
     let result = match arg.as_ref() {
         "help" => usage(0),
         "tcp:sync:client" => doit!(|| {
-            let clients = params::ADDRS
+            let clients: Result<Vec<_>, _> = params::ADDRS
                 .iter()
                 .skip(1)
                 .map(|addr| tcp_sync::C::connect_server(addr))
-                .collect()?;
-            handlers::client_test1_sync(clients);
+                .collect();
+            let ops = handlers::client_test1_sync(clients?)?;
+            println!("{} requests per second", ops);
+            Ok(())
         }),
         "tcp:sync:server" => doit!(|| {
             let server = tcp_sync::S::listen_clients(params::LADDR)?;

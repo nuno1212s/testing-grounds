@@ -20,13 +20,13 @@ pub fn server_test1_sync<S: Server>(mut server: S) -> Rs<()> {
     Ok(())
 }
 
-pub fn client_test1_sync<C: Client>(mut clients: Vec<C>) -> Rs<f64> {
+pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<f64> {
     let ops = testcase(move |quit| {
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
-            for c in clients.iter_mut() {
-                handle_write_sync(c);
-                handle_read_sync(c);
+            for mut c in clients.iter_mut() {
+                handle_write_sync(&mut c);
+                handle_read_sync(&mut c);
             }
             counter += 1;
         }
@@ -68,7 +68,7 @@ where
     let handle = thread::spawn(|| job(quit_clone));
     thread::sleep(params::TIME);
     quit.store(true, Ordering::Relaxed);
-    handle.join()
+    handle.join().map_err(|_| "Join failed!".into())
 }
 
 fn ops_per_sec(ops: u64) -> f64 {
