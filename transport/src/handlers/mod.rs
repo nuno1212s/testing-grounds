@@ -13,8 +13,8 @@ pub type Rs<T> = Result<T, Box<dyn std::error::Error>>;
 
 pub fn server_test1_sync<S: Server>(server: S) -> Rs<()> {
     while let Ok(mut client) = server.accept_client() {
-        handle_read_sync(&mut client)?;
-        handle_write_sync(&mut client)?;
+        read_sync(&mut client)?;
+        write_sync(&mut client)?;
     }
     Ok(())
 }
@@ -24,8 +24,8 @@ pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             for mut c in clients.iter_mut() {
-                handle_write_sync(&mut c).ok()?;
-                handle_read_sync(&mut c).ok()?;
+                write_sync(&mut c).ok()?;
+                read_sync(&mut c).ok()?;
             }
             counter += 1;
         }
@@ -34,25 +34,25 @@ pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<
     .map(ops_per_sec)
 }
 
-fn handle_read_sync<R: Read>(mut r: R) -> Rs<()> {
+fn read_sync<R: Read>(mut r: R) -> Rs<()> {
     let mut buf = [0_u8; params::BUFSIZ];
     r.read(&mut buf[..])?;
     Ok(())
 }
 
-fn handle_write_sync<W: Write>(mut w: W) -> Rs<()> {
+fn write_sync<W: Write>(mut w: W) -> Rs<()> {
     let mut buf = [0_u8; params::BUFSIZ];
     w.write(&mut buf[..])?;
     Ok(())
 }
 
-//async fn handle_read_async<R: AsyncRead + Unpin>(mut r: R) -> Rs<()> {
+//async fn read_async<R: AsyncRead + Unpin>(mut r: R) -> Rs<()> {
 //    let mut buf = [0_u8; params::BUFSIZ];
 //    r.read(&mut buf[..]).await?;
 //    Ok(())
 //}
 //
-//async fn handle_write_async<W: AsyncWrite + Unpin>(mut w: W) -> Rs<()> {
+//async fn write_async<W: AsyncWrite + Unpin>(mut w: W) -> Rs<()> {
 //    let mut buf = [0_u8; params::BUFSIZ];
 //    w.write(&mut buf[..]).await?;
 //    Ok(())
