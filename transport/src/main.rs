@@ -1,3 +1,4 @@
+pub mod nodes;
 pub mod params;
 pub mod handlers;
 

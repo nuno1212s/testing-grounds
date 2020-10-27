@@ -1,23 +1,30 @@
-use super::params;
-use super::handlers::{
-    handle_read_sync,
-    handle_write_sync,
-};
+use super::nodes;
 
 use std::net::{TcpListener, TcpStream};
 
-pub fn server() -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind(params::ADDR)?;
-    for stream in listener.incoming().take(params::CONNS) {
-        handle_read_sync(stream?)?;
+pub struct Client(TcpStream);
+pub struct Server(TcpListener);
+
+impl nodes::Client for Client {
+    type Addr = &str;
+
+    fn connect_server(addr: Self::Addr) -> io::Result<Self> {
+        TcpStream::connect(addr).map(Client)
     }
-    Ok(())
 }
 
-pub fn client() -> Result<(), Box<dyn std::error::Error>> {
-    for _ in 0..params::CONNS {
-        let stream = TcpStream::connect(params::ADDR)?;
-        handle_write_sync(stream)?;
+impl nodes::Server for Server {
+    type Addr = &str;
+    type Client = Client;
+
+    fn listen_clients(addr: Self::Addr) -> io::Result<Self>
+    where
+        Self::Addr == Self::Client::Addr
+    {
+        TcpListener::bind(addr).map(Server)
     }
-    Ok(())
+
+    fn accept_client(&self) -> io::Result<Self::Client> {
+        self.0.accept().map(|(client, _)| Client(client))
+    }
 }
