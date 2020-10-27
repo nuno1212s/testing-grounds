@@ -1,4 +1,5 @@
+use std::time::Duration;
+
 pub const BUFSIZ: usize = 4096;
-pub const CONNS: usize = 100000;
-pub const ADDR: &str = "127.0.0.1:12345";
-pub const ADDR2: &str = "127.0.0.1:12346";
+pub const SECS: u64 = 5;
+pub const TIME: Duration = Duration::from_secs(SECS);
