@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use futures::io::{AsyncRead, AsyncWrite};
+//use futures::io::{AsyncRead, AsyncWrite}; TODO: async traits
 
 pub trait Client: Read + Write
 where
