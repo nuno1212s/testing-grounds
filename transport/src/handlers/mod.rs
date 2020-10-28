@@ -41,6 +41,7 @@ where
 pub fn server_test2_sync<S>(server: S) -> Rs<f64>
 where
     S: 'static + Server + Send,
+    <S as Server>::Client: 'static + Send,
 {
     testcase(move |ready, quit| {
         // synchronization phase
@@ -54,10 +55,11 @@ where
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             match server.accept_client() {
-                Ok(mut c) => {
-                    write_sync(&mut c).ok()?;
-                    read_sync(&mut c).ok()?;
-                },
+                Ok(mut c) => thread::spawn(move || {
+                    write_sync(&mut c)
+                        .and_then(|_| read_sync(&mut c))
+                        .map_err(|_| ())
+                }),
                 _ => continue,
             };
             counter += 1;
