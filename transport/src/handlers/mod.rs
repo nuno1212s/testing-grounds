@@ -3,6 +3,7 @@ use std::thread;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
+    mpsc::{sync_channel, SyncSender},
 };
 
 use super::params;
@@ -23,7 +24,7 @@ pub fn client_test1_sync<C>(mut clients: Vec<C>) -> Rs<f64>
 where
     C: 'static + Client + Send,
 {
-    testcase(move |quit| {
+    testcase(move |_ready, quit| {
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             for mut c in clients.iter_mut() {
@@ -41,7 +42,7 @@ pub fn server_test2_sync<S>(server: S) -> Rs<f64>
 where
     S: 'static + Server + Send,
 {
-    testcase(move |quit| {
+    testcase(move |ready, quit| {
         // synchronization phase
         {
             let mut c = server.accept_client().ok()?;
@@ -49,6 +50,7 @@ where
             read_sync(&mut c).ok()?;
         }
         // first client connected, proceed with test
+        ready.send(()).ok()?;
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             match server.accept_client() {
@@ -103,11 +105,13 @@ fn write_sync<W: Write>(mut w: W) -> Rs<()> {
 
 fn testcase<F>(job: F) -> Rs<u64>
 where
-    F: 'static + Send + FnOnce(Arc<AtomicBool>) -> Option<u64>
+    F: 'static + Send + FnOnce(SyncSender<()>, Arc<AtomicBool>) -> Option<u64>
 {
+    let (tx, rx) = sync_channel(0);
     let quit = Arc::new(AtomicBool::new(false));
     let quit_clone = quit.clone();
-    let handle = thread::spawn(|| job(quit_clone));
+    let handle = thread::spawn(|| job(tx, quit_clone));
+    rx.recv()?; // ready to start test
     thread::sleep(params::TIME);
     quit.store(true, Ordering::Relaxed);
     handle
