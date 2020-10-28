@@ -19,7 +19,10 @@ pub fn server_test1_sync<S: Server>(server: S) -> Rs<()> {
     Ok(())
 }
 
-pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<f64> {
+pub fn client_test1_sync<C>(mut clients: Vec<C>) -> Rs<f64>
+where
+    C: 'static + Client + Send,
+{
     testcase(move |quit| {
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
@@ -34,12 +37,15 @@ pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<
     .map(ops_per_sec)
 }
 
-pub fn server_test2_sync<S: Server>(server: S) -> Rs<()> {
+pub fn server_test2_sync<S>(server: S) -> Rs<f64>
+where
+    S: 'static + Server + Send,
+{
     testcase(move |quit| {
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             match server.accept_client() {
-                Ok(mut client) => {
+                Ok(mut c) => {
                     write_sync(&mut c).ok()?;
                     read_sync(&mut c).ok()?;
                 },
@@ -52,14 +58,14 @@ pub fn server_test2_sync<S: Server>(server: S) -> Rs<()> {
     .map(ops_per_sec)
 }
 
-pub fn client_test2_sync<C, F>(f: F) -> Rs<f64>
+pub fn client_test2_sync<C, F>(f: F) -> Rs<()>
 where
     C: 'static + Client + Send,
     F: Fn() -> Rs<C>,
 {
-    while let Ok(mut client) = f() {
-        read_sync(&mut client)?;
-        write_sync(&mut client)?;
+    while let Ok(mut c) = f() {
+        read_sync(&mut c)?;
+        write_sync(&mut c)?;
     }
     Ok(())
 }
