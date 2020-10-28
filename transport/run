@@ -17,10 +17,10 @@ run() {
 
 case $TEST_CASE in
     update)
-        run -t -p $N1 'cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N2 'cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N3 'cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N4 'cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N1 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N2 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N3 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N4 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
         ;;
     1)
         echo Not implemented yet...
