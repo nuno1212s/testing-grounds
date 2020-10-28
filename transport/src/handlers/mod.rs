@@ -42,6 +42,13 @@ where
     S: 'static + Server + Send,
 {
     testcase(move |quit| {
+        // synchronization phase
+        {
+            let mut c = server.accept_client().ok()?;
+            write_sync(&mut c).ok()?;
+            read_sync(&mut c).ok()?;
+        }
+        // first client connected, proceed with test
         let mut counter = 0;
         while !quit.load(Ordering::Relaxed) {
             match server.accept_client() {

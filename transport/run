@@ -28,6 +28,7 @@ case $TEST_CASE in
     2)
         run -p $N1 env TEST=1 \
             ./tg/transport/target/release/transport ${BACKEND}:server &
+        sleep 1
         run -p $N2 env TEST=1 \
             ./tg/transport/target/release/transport ${BACKEND}:client &
         wait
