@@ -1,0 +1,39 @@
+#!/bin/sh
+
+USER=tcarvalho
+HOST=ssh.dcc.fc.up.pt
+
+N1=34016
+N2=34017
+N3=34018
+N4=34019
+
+TEST_CASE=$1
+BACKEND=$2
+
+run() {
+    ssh $USER@$HOST $@
+}
+
+case $TEST_CASE in
+    update)
+        run -t -p $N1 'cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N2 'cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N3 'cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N4 'cd ./tg/transport/ && git pull && cargo build --release'
+        ;;
+    1)
+        echo Not implemented yet...
+        ;;
+    2)
+        run -p $N1 env TEST=1 \
+            ./testing-grounds/transport/target/release/transport ${BACKEND}:server &
+        run -p $N2 env TEST=1 \
+            ./testing-grounds/transport/target/release/transport ${BACKEND}:client &
+        wait
+        ;;
+    *)
+        echo Usage: $0 '<test id>' '<backend>' >&2
+        exit 1
+        ;;
+esac
