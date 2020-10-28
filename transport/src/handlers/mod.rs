@@ -34,6 +34,36 @@ pub fn client_test1_sync<C: 'static + Client + Send>(mut clients: Vec<C>) -> Rs<
     .map(ops_per_sec)
 }
 
+pub fn server_test2_sync<S: Server>(server: S) -> Rs<()> {
+    testcase(move |quit| {
+        let mut counter = 0;
+        while !quit.load(Ordering::Relaxed) {
+            match server.accept_client() {
+                Ok(mut client) => {
+                    write_sync(&mut c).ok()?;
+                    read_sync(&mut c).ok()?;
+                },
+                _ => continue,
+            };
+            counter += 1;
+        }
+        Some(counter)
+    })
+    .map(ops_per_sec)
+}
+
+pub fn client_test2_sync<C, F>(f: F) -> Rs<f64>
+where
+    C: 'static + Client + Send,
+    F: Fn() -> Rs<C>,
+{
+    while let Ok(mut client) = f() {
+        read_sync(&mut client)?;
+        write_sync(&mut client)?;
+    }
+    Ok(())
+}
+
 fn read_sync<R: Read>(mut r: R) -> Rs<()> {
     let mut buf = [0_u8; params::BUFSIZ];
     r.read(&mut buf[..])?;
