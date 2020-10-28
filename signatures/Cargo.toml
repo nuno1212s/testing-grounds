@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 hacl-star = "0.1.0"
-hacl-star-gcc = { git = "https://github.com/ditto-bft/rust-hacl-star" }
+#hacl-star-gcc = { git = "https://github.com/ditto-bft/rust-hacl-star" }
 sodiumoxide = "0.2.6"
