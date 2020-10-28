@@ -13,10 +13,21 @@ macro_rules! doit {
 fn main() {
     let arg = match std::env::args().nth(1) {
         Some(arg) => arg,
-        None => usage(1),
+        None => usage(),
     };
-    let result = match arg.as_ref() {
-        "help" => usage(0),
+    let result = match std::env::var("TEST").as_ref().map(String::as_ref) {
+        Ok("1") => kind_1(&arg),
+        Ok("2") => kind_2(&arg),
+        _ => usage(),
+    };
+    result.unwrap_or_else(|e| {
+        eprintln!("Something went wrong: {}", e);
+        std::process::exit(1);
+    });
+}
+
+fn kind_1(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match arg {
         "tcp:sync:client" => doit!(|| {
             let clients: Result<Vec<_>, _> = params::ADDRS
                 .iter()
@@ -32,17 +43,18 @@ fn main() {
             handlers::server_test1_sync(server)
         }),
         _ => Err("Invalid backend; try \"help\".".into()),
-    };
-    result.unwrap_or_else(|e| {
-        eprintln!("Something went wrong: {}", e);
-        std::process::exit(1);
-    });
+    }
 }
 
-fn usage(code: i32) -> ! {
-    eprintln!("Available backends: ");
+fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
+fn usage() -> ! {
+    eprintln!("Available backends:");
+    eprintln!("  - tcp:sync:{{client, server}}");
     eprintln!("");
-    eprintln!("  - tcp:sync:client");
-    eprintln!("  - tcp:sync:server");
-    std::process::exit(code)
+    eprintln!("Available test kinds:");
+    eprintln!("  - 1 / 2");
+    std::process::exit(1)
 }
