@@ -42,12 +42,30 @@ fn kind_1(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
             let server = tcp_sync::S::listen_clients(params::LADDR)?;
             handlers::server_test1_sync(server)
         }),
-        _ => Err("Invalid backend; try \"help\".".into()),
+        _ => invalid_backend(),
     }
 }
 
 fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
-    Ok(())
+    match arg {
+        "tcp:sync:client" => {
+            handlers::client_test2_sync(|| {
+                let client = tcp_sync::C::connect_server(params::N1)?;
+                Ok(client)
+            })
+        },
+        "tcp:sync:server" => doit!(|| {
+            let server = tcp_sync::S::listen_clients(params::LADDR)?;
+            let ops = handlers::server_test2_sync(server)?;
+            println!("{} requests per second", ops);
+            Ok(())
+        }),
+        _ => invalid_backend(),
+    }
+}
+
+fn invalid_backend() -> Result<(), Box<dyn std::error::Error>> {
+    Err("Invalid backend; try \"help\".".into())
 }
 
 fn usage() -> ! {
