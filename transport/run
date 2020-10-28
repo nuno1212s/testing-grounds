@@ -27,9 +27,9 @@ case $TEST_CASE in
         ;;
     2)
         run -p $N1 env TEST=1 \
-            ./testing-grounds/transport/target/release/transport ${BACKEND}:server &
+            ./tg/transport/target/release/transport ${BACKEND}:server &
         run -p $N2 env TEST=1 \
-            ./testing-grounds/transport/target/release/transport ${BACKEND}:client &
+            ./tg/transport/target/release/transport ${BACKEND}:client &
         wait
         ;;
     *)
