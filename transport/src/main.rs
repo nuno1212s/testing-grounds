@@ -1,9 +1,9 @@
 pub mod nodes;
 pub mod params;
+pub mod runtime;
 pub mod handlers;
 
-mod tcp_sync;
-
+use nodes::tcp_sync;
 use nodes::{Client, Server};
 
 macro_rules! doit {
