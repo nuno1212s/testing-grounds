@@ -3,6 +3,8 @@ use std::io::{self, Read, Write};
 use async_trait::async_trait;
 use futures::io::{AsyncRead, AsyncWrite};
 
+pub mod tcp_sync;
+
 pub trait Client: Read + Write + Sized {
     type Addr;
 
