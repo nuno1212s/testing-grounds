@@ -8,7 +8,7 @@ use std::sync::{
 
 use super::params;
 use super::nodes::{Client, Server};
-//use futures::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use futures::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 
 pub type Rs<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -93,17 +93,17 @@ fn write_sync<W: Write>(mut w: W) -> Rs<()> {
     Ok(())
 }
 
-//async fn read_async<R: AsyncRead + Unpin>(mut r: R) -> Rs<()> {
-//    let mut buf = [0_u8; params::BUFSIZ];
-//    r.read(&mut buf[..]).await?;
-//    Ok(())
-//}
-//
-//async fn write_async<W: AsyncWrite + Unpin>(mut w: W) -> Rs<()> {
-//    let mut buf = [0_u8; params::BUFSIZ];
-//    w.write(&mut buf[..]).await?;
-//    Ok(())
-//}
+async fn read_async<R: AsyncRead + Unpin>(mut r: R) -> Rs<()> {
+    let mut buf = [0_u8; params::BUFSIZ];
+    r.read(&mut buf[..]).await?;
+    Ok(())
+}
+
+async fn write_async<W: AsyncWrite + Unpin>(mut w: W) -> Rs<()> {
+    let mut buf = [0_u8; params::BUFSIZ];
+    w.write(&mut buf[..]).await?;
+    Ok(())
+}
 
 fn testcase<F>(job: F) -> Rs<u64>
 where
