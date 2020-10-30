@@ -9,7 +9,7 @@ use std::sync::{
 
 use super::params;
 use super::runtime;
-use super::nodes::{Client, Server};
+use super::nodes::{Client, Server, AsyncClient, AsyncServer};
 use futures_timer::Delay;
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
@@ -90,29 +90,29 @@ where
     Ok(())
 }
 
-//pub fn client_test2_async<R, C, F>(_runtime: R, f: F) -> Rs<()>
-//where
-//    R: runtime::Runtime,
-//    C: 'static + Client + Send,
-//    N: Future<Output = C>,
-//    F: Fn() -> N,
-//{
-//    R::block_on(
-//        let (mut tx, mut rx) = mpsc::channel(32);
-//        R::spawn(async move {
-//            while let Some(mut c) = rx.next().await {
-//                asd
-//            }
-//            Some(TaskOutput::None)
-//        });
-//        while let Ok(mut c) = f().await {
-//            tx.send(jk
-//            read_sync(&mut c)?;
-//            write_sync(&mut c)?;
-//        }
-//        Ok(())
-//    )
-//}
+pub fn client_test2_async<R, C, N, F>(_runtime: R, f: F) -> Rs<()>
+where
+    R: runtime::Runtime,
+    C: 'static + AsyncClient + Send + Unpin,
+    N: Future<Output = Rs<C>>,
+    F: Fn() -> N,
+{
+    R::block_on(async move {
+        // limit number of active connections
+        let (mut tx, mut rx) = mpsc::channel(32);
+        R::spawn(async move {
+            while let Some(mut c) = rx.next().await {
+                read_async(&mut c).await.ok()?;
+                write_async(&mut c).await.ok()?;
+            }
+            Some(0)
+        });
+        while let Ok(mut c) = f().await {
+            tx.send(c).await;
+        }
+        Ok(())
+    })
+}
 
 fn read_sync<R: Read>(mut r: R) -> Rs<()> {
     let mut buf = [0_u8; params::BUFSIZ];
