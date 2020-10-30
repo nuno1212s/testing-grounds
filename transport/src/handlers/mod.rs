@@ -87,6 +87,22 @@ where
     Ok(())
 }
 
+//pub fn client_test2_async<R, C, F>(_runtime: R, f: F) -> Rs<()>
+//where
+//    R: runtime::Runtime,
+//    C: 'static + Client + Send,
+//    N: Future<Output = C>,
+//    F: Fn() -> N,
+//{
+//    R::block_on(
+//        while let Ok(mut c) = f().await {
+//            read_sync(&mut c)?;
+//            write_sync(&mut c)?;
+//        }
+//        Ok(())
+//    )
+//}
+
 fn read_sync<R: Read>(mut r: R) -> Rs<()> {
     let mut buf = [0_u8; params::BUFSIZ];
     r.read(&mut buf[..])?;
