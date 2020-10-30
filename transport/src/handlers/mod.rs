@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 use std::future::Future;
-use std::pin::Pin;
 use std::thread;
 use std::sync::{
     Arc,
@@ -133,7 +132,7 @@ fn testcase_async<F, R, T>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
 where
     R: runtime::Runtime,
     T: 'static + Send + Future<Output = Option<runtime::TaskOutput>>,
-    F: 'static + Send + FnOnce(Sender<()>, Arc<AtomicBool>) -> T,
+    F: 'static + Send + Unpin + FnOnce(Sender<()>, Arc<AtomicBool>) -> T,
 {
     R::block_on(async move {
         let (tx, rx) = oneshot::channel();
