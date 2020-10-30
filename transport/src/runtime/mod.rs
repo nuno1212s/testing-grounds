@@ -4,7 +4,7 @@ use futures::channel::oneshot;
 
 pub mod tokio;
 
-pub type TaskOutput = Option<u64>;
+pub type TaskOutput = u64;
 
 // should use THREADS env var to configure thread pool
 pub trait Runtime {

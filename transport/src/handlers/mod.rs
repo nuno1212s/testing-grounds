@@ -11,6 +11,9 @@ use super::params;
 use super::runtime;
 use super::nodes::{Client, Server};
 use futures_timer::Delay;
+use futures::channel::mpsc;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use futures::channel::oneshot::{self, Sender};
 use futures::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 
@@ -95,7 +98,15 @@ where
 //    F: Fn() -> N,
 //{
 //    R::block_on(
+//        let (mut tx, mut rx) = mpsc::channel(32);
+//        R::spawn(async move {
+//            while let Some(mut c) = rx.next().await {
+//                asd
+//            }
+//            Some(TaskOutput::None)
+//        });
 //        while let Ok(mut c) = f().await {
+//            tx.send(jk
 //            read_sync(&mut c)?;
 //            write_sync(&mut c)?;
 //        }
