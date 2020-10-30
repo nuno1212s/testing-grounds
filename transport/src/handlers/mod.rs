@@ -93,7 +93,7 @@ where
 pub fn server_test2_async<S, R>(_runtime: R, server: S) -> Rs<f64>
 where
     R: runtime::Runtime,
-    S: 'static + AsyncServer + Send + Unpin,
+    S: 'static + AsyncServer + Send + Sync + Unpin,
     <S as AsyncServer>::Client: 'static + Send + Unpin,
 {
     testcase_async(_runtime, move |ready, quit| async move {
