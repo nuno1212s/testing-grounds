@@ -129,10 +129,11 @@ where
         .and_then(|opt| opt.ok_or_else(|| "Thread ran into a problem.".into()))
 }
 
-fn testcase_async<F, R>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
+fn testcase_async<F, R, T>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
 where
     R: runtime::Runtime,
-    F: 'static + Send + FnOnce(Sender<()>, Arc<AtomicBool>) -> Pin<Box<dyn Future<Output = Option<runtime::TaskOutput>>>>,
+    T: 'static + Send + Future<Output = Option<runtime::TaskOutput>>,
+    F: 'static + Send + FnOnce(Sender<()>, Arc<AtomicBool>) -> T,
 {
     R::block_on(async move {
         let (tx, rx) = oneshot::channel();
