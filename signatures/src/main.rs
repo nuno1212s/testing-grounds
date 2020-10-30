@@ -1,4 +1,3 @@
-//use std::mem;
 use std::thread;
 use std::time::Duration;
 use std::sync::{
@@ -6,8 +5,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use hacl_star::ed25519 as hed;
-//use hacl_star_gcc::ed25519 as ged;
+//use hacl_star::ed25519 as hed;
+use hacl_star_gcc::ed25519 as ged;
 use sodiumoxide::crypto::sign::ed25519 as sed;
 
 const SECS: u64 = 5;
@@ -37,13 +36,16 @@ fn main() {
     let (sodium_pk, sodium_sk) = sed::gen_keypair();
 
     println!("* Converting sodiumoxide keys to hacl keys...");
-    let (hacl_pk, hacl_sk) = {
-        let (pk, sk) = into_owned_key(&sodium_sk.0);
-        (hed::PublicKey(pk), hed::SecretKey(sk))
-    };
-    //let (hacl_gcc_pk, hacl_gcc_sk): (ged::PublicKey, ged::SecretKey) = unsafe {
-    //    (mem::transmute(hacl_pk.clone()), mem::transmute(hacl_sk.clone()))
+    //let (hacl_pk, hacl_sk) = {
+    //    let sk = hed::SecretKey(into_owned_key(&sodium_sk));
+    //    let pk = sk.get_public();
+    //    (pk, sk)
     //};
+    let (hacl_gcc_pk, hacl_gcc_sk) = {
+        let sk = ged::SecretKey(into_owned_key(&sodium_sk));
+        let pk = sk.get_public();
+        (pk, sk)
+    };
 
     let sk = sodium_sk.clone();
     test! {
@@ -51,17 +53,17 @@ fn main() {
         op: sed::sign_detached(MSG.as_ref(), &sk)
     };
 
-    let sk = hacl_sk.clone();
-    test! {
-        msg: "* Testing throughput of hacl signatures...",
-        op: sk.signature(MSG.as_ref())
-    };
-
-    //let sk = hacl_gcc_sk.clone();
+    //let sk = hacl_sk.clone();
     //test! {
-    //    msg: "* Testing throughput of hacl-gcc signatures...",
+    //    msg: "* Testing throughput of hacl signatures...",
     //    op: sk.signature(MSG.as_ref())
     //};
+
+    let sk = hacl_gcc_sk.clone();
+    test! {
+        msg: "* Testing throughput of hacl-gcc signatures...",
+        op: sk.signature(MSG.as_ref())
+    };
 
     let pk = sodium_pk.clone();
     let sig = sed::sign_detached(MSG.as_ref(), &sodium_sk);
@@ -70,22 +72,22 @@ fn main() {
         op: assert_eq!(sed::verify_detached(&sig, MSG.as_ref(), &pk), true)
     };
 
-    let pk = hacl_pk.clone();
-    let sig = hacl_sk.signature(MSG.as_ref());
-    test! {
-        msg: "* Testing throughput of hacl verifying...",
-        op: {
-            let pk = pk.clone();
-            assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
-        }
-    };
-
-    //let pk = hacl_gcc_pk.clone();
-    //let sig = hacl_gcc_sk.signature(MSG.as_ref());
+    //let pk = hacl_pk.clone();
+    //let sig = hacl_sk.signature(MSG.as_ref());
     //test! {
-    //    msg: "* Testing throughput of hacl-gcc verifying...",
-    //    op: assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+    //    msg: "* Testing throughput of hacl verifying...",
+    //    op: {
+    //        let pk = pk.clone();
+    //        assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+    //    }
     //};
+
+    let pk = hacl_gcc_pk.clone();
+    let sig = hacl_gcc_sk.signature(MSG.as_ref());
+    test! {
+        msg: "* Testing throughput of hacl-gcc verifying...",
+        op: assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+    };
 }
 
 fn ops_per_sec(ops: u64) -> f64 {
@@ -104,10 +106,8 @@ where
     handle.join()
 }
 
-fn into_owned_key(s: &[u8; 64]) -> ([u8; 32], [u8; 32]) {
-    let mut pkbuf = [0; 32];
+fn into_owned_key(sed::SecretKey(ref s): &sed::SecretKey) -> [u8; 32] {
     let mut skbuf = [0; 32];
-    pkbuf.copy_from_slice(&s[32..]);
     skbuf.copy_from_slice(&s[..32]);
-    (pkbuf, skbuf)
+    skbuf
 }
