@@ -3,7 +3,7 @@ use std::future::Future;
 use std::thread;
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     mpsc::{sync_channel, SyncSender},
 };
 
@@ -90,33 +90,37 @@ where
     Ok(())
 }
 
-pub fn server_test2_async<S>(server: S) -> Rs<f64>
+pub fn server_test2_async<S, R>(_runtime: R, server: S) -> Rs<f64>
 where
-    S: 'static + Server + Send,
-    <S as Server>::Client: 'static + Send,
+    R: runtime::Runtime,
+    S: 'static + AsyncServer + Send + Unpin,
+    <S as AsyncServer>::Client: 'static + Send + Unpin,
 {
-    testcase(move |ready, quit| {
+    testcase_async(_runtime, move |ready, quit| async move {
         // synchronization phase
         {
-            let mut c = server.accept_client().ok()?;
-            write_sync(&mut c).ok()?;
-            read_sync(&mut c).ok()?;
+            let mut c = server.accept_client_async().await.ok()?;
+            write_async(&mut c).await.ok()?;
+            read_async(&mut c).await.ok()?;
         }
         // first client connected, proceed with test
         ready.send(()).ok()?;
-        let mut counter = 0;
+        let counter = Arc::new(AtomicU64::new(0));
         while !quit.load(Ordering::Relaxed) {
-            match server.accept_client() {
-                Ok(mut c) => thread::spawn(move || {
-                    write_sync(&mut c)
-                        .and_then(|_| read_sync(&mut c))
-                        .map_err(|_| ())
-                }),
+            match server.accept_client_async().await {
+                Ok(mut c) => {
+                    let counter = Arc::clone(&counter);
+                    R::spawn(async move {
+                        write_async(&mut c).await.ok()?;
+                        read_async(&mut c).await.ok()?;
+                        counter.fetch_add(1, Ordering::Relaxed);
+                        Some(0)
+                    });
+                },
                 _ => continue,
             };
-            counter += 1;
         }
-        Some(counter)
+        Some(counter.load(Ordering::Relaxed))
     })
     .map(ops_per_sec)
 }
@@ -195,7 +199,7 @@ where
     R::block_on(async move {
         let (tx, rx) = oneshot::channel();
         let quit = Arc::new(AtomicBool::new(false));
-        let quit_clone = quit.clone();
+        let quit_clone = Arc::clone(&quit);
         let handle = R::spawn(job(tx, quit_clone));
         rx.await?; // ready to start test
         let timer = Delay::new(params::TIME);
