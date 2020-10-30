@@ -2,10 +2,7 @@ use std::future::Future;
 use async_trait::async_trait;
 use futures::channel::oneshot;
 
-pub enum TaskOutput {
-    None,
-    Counter(u64),
-}
+pub type TaskOutput = Option<u64>;
 
 // should use THREADS env var to configure thread pool
 pub trait Runtime {
