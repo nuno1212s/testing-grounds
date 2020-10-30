@@ -2,7 +2,6 @@ use std::future::Future;
 
 use super::TaskOutput;
 use lazy_static::lazy_static;
-use futures::channel::oneshot;
 
 pub struct Runtime;
 

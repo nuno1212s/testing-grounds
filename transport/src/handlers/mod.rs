@@ -142,8 +142,8 @@ where
             }
             Some(0)
         });
-        while let Ok(mut c) = f().await {
-            tx.send(c).await;
+        while let Ok(c) = f().await {
+            tx.send(c).await?;
         }
         Ok(())
     })
