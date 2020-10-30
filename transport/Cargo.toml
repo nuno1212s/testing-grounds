@@ -5,5 +5,8 @@ authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
 edition = "2018"
 
 [dependencies]
+tokio = "0.3.2"
 futures = "0.3.7"
+futures-timer = "3.0.2"
 async-trait = "0.1.41"
+lazy_static = "1.4.0"

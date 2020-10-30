@@ -1,4 +1,6 @@
 use std::io::{Read, Write};
+use std::future::Future;
+use std::pin::Pin;
 use std::thread;
 use std::sync::{
     Arc,
@@ -7,7 +9,10 @@ use std::sync::{
 };
 
 use super::params;
+use super::runtime;
 use super::nodes::{Client, Server};
+use futures_timer::Delay;
+use futures::channel::oneshot::{self, Sender};
 use futures::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 
 pub type Rs<T> = Result<T, Box<dyn std::error::Error>>;
@@ -120,6 +125,24 @@ where
         .join()
         .map_err(|_| "Thread join failed.".into())
         .and_then(|opt| opt.ok_or_else(|| "Thread ran into a problem.".into()))
+}
+
+fn testcase_async<F, R>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
+where
+    R: runtime::Runtime,
+    F: 'static + Send + FnOnce(Sender<()>, Arc<AtomicBool>) -> Pin<Box<dyn Future<Output = Option<runtime::TaskOutput>>>>,
+{
+    R::block_on(async move {
+        let (tx, rx) = oneshot::channel();
+        let quit = Arc::new(AtomicBool::new(false));
+        let quit_clone = quit.clone();
+        let handle = R::spawn(job(tx, quit_clone));
+        rx.await?; // ready to start test
+        let timer = Delay::new(params::TIME);
+        timer.await;
+        quit.store(true, Ordering::Relaxed);
+        handle.await.ok_or_else(|| "Thread join failed.".into())
+    })
 }
 
 fn ops_per_sec(ops: u64) -> f64 {
