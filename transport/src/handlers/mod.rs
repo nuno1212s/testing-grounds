@@ -205,7 +205,7 @@ where
         let timer = Delay::new(params::TIME);
         timer.await;
         quit.store(true, Ordering::Relaxed);
-        handle.await.ok_or_else(|| "Thread join failed.".into())
+        handle.await.ok_or_else(|| "Task join failed.".into())
     })
 }
 
