@@ -17,6 +17,7 @@ use futures::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 
 pub type Rs<T> = Result<T, Box<dyn std::error::Error>>;
 
+// TODO: fix test1
 pub fn server_test1_sync<S: Server>(server: S) -> Rs<()> {
     while let Ok(mut client) = server.accept_client() {
         read_sync(&mut client)?;
@@ -25,6 +26,7 @@ pub fn server_test1_sync<S: Server>(server: S) -> Rs<()> {
     Ok(())
 }
 
+// TODO: fix test1
 pub fn client_test1_sync<C>(mut clients: Vec<C>) -> Rs<f64>
 where
     C: 'static + Client + Send,
