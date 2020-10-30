@@ -90,6 +90,37 @@ where
     Ok(())
 }
 
+pub fn server_test2_async<S>(server: S) -> Rs<f64>
+where
+    S: 'static + Server + Send,
+    <S as Server>::Client: 'static + Send,
+{
+    testcase(move |ready, quit| {
+        // synchronization phase
+        {
+            let mut c = server.accept_client().ok()?;
+            write_sync(&mut c).ok()?;
+            read_sync(&mut c).ok()?;
+        }
+        // first client connected, proceed with test
+        ready.send(()).ok()?;
+        let mut counter = 0;
+        while !quit.load(Ordering::Relaxed) {
+            match server.accept_client() {
+                Ok(mut c) => thread::spawn(move || {
+                    write_sync(&mut c)
+                        .and_then(|_| read_sync(&mut c))
+                        .map_err(|_| ())
+                }),
+                _ => continue,
+            };
+            counter += 1;
+        }
+        Some(counter)
+    })
+    .map(ops_per_sec)
+}
+
 pub fn client_test2_async<R, C, N, F>(_runtime: R, f: F) -> Rs<()>
 where
     R: runtime::Runtime,
