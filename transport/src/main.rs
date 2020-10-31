@@ -91,6 +91,7 @@ fn invalid_backend() -> Result<(), Box<dyn std::error::Error>> {
 fn usage() -> ! {
     eprintln!("Available backends:");
     eprintln!("  - tcp:sync:{{client, server}}");
+    eprintln!("  - tcp:tokio:{{client, server}}");
     eprintln!("");
     eprintln!("Available test kinds:");
     eprintln!("  - 1 / 2");
