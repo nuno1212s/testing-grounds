@@ -4,18 +4,16 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Poll, Context};
 
-use tokio::net::{TcpListener, TcpStream};
-
 use async_trait::async_trait;
+use tokio::net::{TcpListener, TcpStream};
 use futures::io::{AsyncRead, AsyncWrite};
-use futures::compat::{
-    Compat01As03,
-    AsyncRead01CompatExt,
-    AsyncWrite01CompatExt,
+use tokio_util::compat::{
+    Compat,
+    Tokio02AsyncReadCompatExt,
 };
 
-pub struct C(Compat01As03<TcpStream>);
-pub struct S(Compat01As03<TcpListener>);
+pub struct C(Compat<TcpStream>);
+pub struct S(TcpListener);
 
 impl AsyncRead for C {
     fn poll_read(
@@ -46,17 +44,17 @@ impl AsyncWrite for C {
         Pin::new(&mut self.0).poll_flush(cx)
     }
 
-    fn poll_shutdown(
+    fn poll_close(
         mut self: Pin<&mut Self>, 
         cx: &mut Context<'_>
     ) -> Poll<io::Result<()>>
     {
-        Pin::new(&mut self.0).poll_shutdown(cx)
+        Pin::new(&mut self.0).poll_close(cx)
     }
 }
 
 #[async_trait]
-impl AsyncClient for C {
+impl nodes::AsyncClient for C {
     type Addr = &'static str;
 
     async fn connect_server_async(addr: Self::Addr) -> io::Result<Self> {
@@ -67,17 +65,17 @@ impl AsyncClient for C {
 }
 
 #[async_trait]
-impl AsyncServer for S {
+impl nodes::AsyncServer for S {
     type Client = C;
 
-    async fn listen_clients_async(addr: <<Self as AsyncServer>::Client as AsyncClient>::Addr) -> io::Result<Self> {
+    async fn listen_clients_async(addr: <<Self as nodes::AsyncServer>::Client as nodes::AsyncClient>::Addr) -> io::Result<Self> {
         TcpListener::bind(addr)
             .await
-            .map(|s| S(s.compat()))
+            .map(S)
     }
 
     async fn accept_client_async(&self) -> io::Result<Self::Client> {
-        self.get_ref()
+        self.0
             .accept()
             .await
             .map(|(c, _)| C(c.compat()))

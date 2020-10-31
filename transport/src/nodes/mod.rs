@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use futures::io::{AsyncRead, AsyncWrite};
 
 pub mod tcp_sync;
+pub mod tcp_tokio;
 
 pub trait Client: Read + Write + Sized {
     type Addr;
@@ -19,14 +20,14 @@ pub trait Server: Sized {
 }
 
 #[async_trait]
-pub trait AsyncClient: AsyncRead + AsyncWrite + Sized {
+pub trait AsyncClient: Send + AsyncRead + AsyncWrite + Sized {
     type Addr;
 
     async fn connect_server_async(addr: Self::Addr) -> io::Result<Self>;
 }
 
 #[async_trait]
-pub trait AsyncServer: Sized {
+pub trait AsyncServer: Send + Sized {
     type Client: AsyncClient;
 
     async fn listen_clients_async(addr: <<Self as AsyncServer>::Client as AsyncClient>::Addr) -> io::Result<Self>;

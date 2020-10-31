@@ -4,7 +4,11 @@ pub mod runtime;
 pub mod handlers;
 
 use nodes::tcp_sync;
-use nodes::{Client, Server};
+use nodes::tcp_tokio;
+use nodes::{
+    Client, Server,
+    AsyncClient, AsyncServer,
+};
 
 macro_rules! doit {
     ($f:expr) => { $f() }
@@ -60,6 +64,12 @@ fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
             println!("{} requests per second", ops);
             Ok(())
         }),
+        "tcp:tokio:client" => {
+            handlers::client_test2_async(runtime::tokio::Runtime, || async {
+                let client = tcp_tokio::C::connect_server_async(params::N1).await?;
+                Ok(client)
+            })
+        },
         _ => invalid_backend(),
     }
 }
