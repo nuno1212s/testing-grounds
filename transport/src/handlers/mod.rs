@@ -135,7 +135,7 @@ where
 {
     R::block_on(async move {
         // limit number of active connections
-        let (mut tx, mut rx) = mpsc::channel(32);
+        let (mut tx, mut rx) = mpsc::channel(1_000_000);
         R::spawn(async move {
             while let Some(mut c) = rx.next().await {
                 read_async(&mut c).await.ok()?;
