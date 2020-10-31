@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "0.3.2", features = ["full"] }
-futures = "0.3.7"
+futures = { version = "0.3.7", features = ["compat", "io-compat"] }
 futures-timer = "3.0.2"
 async-trait = "0.1.41"
 lazy_static = "1.4.0"
