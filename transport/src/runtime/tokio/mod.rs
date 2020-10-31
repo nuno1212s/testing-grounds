@@ -19,6 +19,7 @@ lazy_static! {
             .worker_threads(num_threads)
             .thread_name("tokio-worker")
             .thread_stack_size(2 * 1024 * 1024)
+            .enable_all()
             .build()
             .unwrap()
     };
