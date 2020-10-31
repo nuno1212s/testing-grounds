@@ -9,6 +9,10 @@ use nodes::{
     Client, Server,
     AsyncClient, AsyncServer,
 };
+use runtime::{
+    Runtime,
+    tokio::Runtime as TRuntime,
+};
 
 macro_rules! doit {
     ($f:expr) => { $f() }
@@ -70,6 +74,12 @@ fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
                 Ok(client)
             })
         },
+        "tcp:tokio:server" => TRuntime::block_on(async {
+            let server = tcp_tokio::S::listen_clients_async(params::LADDR).await?;
+            let ops = handlers::server_test2_async(TRuntime, server).await?;
+            println!("{} requests per second", ops);
+            Ok(())
+        }),
         _ => invalid_backend(),
     }
 }

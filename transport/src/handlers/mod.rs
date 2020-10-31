@@ -90,7 +90,7 @@ where
     Ok(())
 }
 
-pub fn server_test2_async<S, R>(_runtime: R, server: S) -> Rs<f64>
+pub async fn server_test2_async<S, R>(_runtime: R, server: S) -> Rs<f64>
 where
     R: runtime::Runtime,
     S: 'static + AsyncServer + Send + Sync + Unpin,
@@ -122,6 +122,7 @@ where
         }
         Some(counter.load(Ordering::Relaxed))
     })
+    .await
     .map(ops_per_sec)
 }
 
@@ -190,23 +191,21 @@ where
         .and_then(|opt| opt.ok_or_else(|| "Thread ran into a problem.".into()))
 }
 
-fn testcase_async<F, R, T>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
+async fn testcase_async<F, R, T>(_runtime: R, job: F) -> Rs<runtime::TaskOutput>
 where
     R: runtime::Runtime,
     T: 'static + Send + Future<Output = Option<runtime::TaskOutput>>,
     F: 'static + Send + Unpin + FnOnce(Sender<()>, Arc<AtomicBool>) -> T,
 {
-    R::block_on(async move {
-        let (tx, rx) = oneshot::channel();
-        let quit = Arc::new(AtomicBool::new(false));
-        let quit_clone = Arc::clone(&quit);
-        let handle = R::spawn(job(tx, quit_clone));
-        rx.await?; // ready to start test
-        let timer = Delay::new(params::TIME);
-        timer.await;
-        quit.store(true, Ordering::Relaxed);
-        handle.await.ok_or_else(|| "Task join failed.".into())
-    })
+    let (tx, rx) = oneshot::channel();
+    let quit = Arc::new(AtomicBool::new(false));
+    let quit_clone = Arc::clone(&quit);
+    let handle = R::spawn(job(tx, quit_clone));
+    rx.await?; // ready to start test
+    let timer = Delay::new(params::TIME);
+    timer.await;
+    quit.store(true, Ordering::Relaxed);
+    handle.await.ok_or_else(|| "Task join failed.".into())
 }
 
 fn ops_per_sec(ops: u64) -> f64 {
