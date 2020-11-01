@@ -6,7 +6,7 @@ use async_std::task;
 pub struct Runtime;
 
 impl Runtime {
-    fn init() {
+    pub fn init() {
         match std::env::var("THREADS").as_ref() {
             Ok(ref n) => std::env::set_var("ASYNC_STD_THREAD_COUNT", &n),
             _ => (),
