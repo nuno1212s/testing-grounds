@@ -5,6 +5,7 @@ use futures::io::{AsyncRead, AsyncWrite};
 
 pub mod tcp_sync;
 pub mod tcp_tokio;
+pub mod tcp_async_std;
 
 pub trait Client: Read + Write + Sized {
     type Addr;
