@@ -5,6 +5,7 @@ authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
 edition = "2018"
 
 [dependencies]
+async-std = "1.6.5"
 tokio = { version = "0.3.2", features = ["full"] }
 tokio-util = { version = "0.5.0", features = ["compat"] }
 futures = "0.3.7"

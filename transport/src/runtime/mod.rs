@@ -1,6 +1,7 @@
 use std::future::Future;
 
 pub mod tokio;
+pub mod async_std;
 
 pub type TaskOutput = u64;
 
