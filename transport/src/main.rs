@@ -110,6 +110,7 @@ fn usage() -> ! {
     eprintln!("Available backends:");
     eprintln!("  - tcp:sync:{{client, server}}");
     eprintln!("  - tcp:tokio:{{client, server}}");
+    eprintln!("  - tcp:async_std:{{client, server}}");
     eprintln!("");
     eprintln!("Available test kinds:");
     eprintln!("  - 1 / 2");
