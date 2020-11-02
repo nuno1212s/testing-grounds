@@ -63,7 +63,7 @@ func server() {
 }
 
 func client() {
-    sem := make(chan net.Conn)
+    sem := make(chan net.Conn, 100)
     go func() {
         for {
             conn := <-sem
