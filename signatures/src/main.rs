@@ -5,6 +5,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use sodiumoxide::crypto::auth::hmacsha256 as smac;
+
 //use hacl_star::ed25519 as hed;
 use hacl_star_gcc::ed25519 as ged;
 use sodiumoxide::crypto::sign::ed25519 as sed;
@@ -32,6 +34,9 @@ fn main() {
     sodiumoxide::init()
         .expect("Failed to init sodiumoxide!");
 
+    println!("* Generating HMAC key (using sodiumoxide)...");
+    let sodium_hmac_key = smac::gen_key();
+
     println!("* Generating new key pair (using sodiumoxide)...");
     let (sodium_pk, sodium_sk) = sed::gen_keypair();
 
@@ -45,6 +50,12 @@ fn main() {
         let sk = ged::SecretKey(into_owned_key(&sodium_sk));
         let pk = sk.get_public();
         (pk, sk)
+    };
+
+    let sk = sodium_hmac_key.clone();
+    test! {
+        msg: "* Testing throughput of sodiumoxide hmac signatures...",
+        op: smac::authenticate(MSG.as_ref(), &sk)
     };
 
     let sk = sodium_sk.clone();
@@ -65,11 +76,18 @@ fn main() {
         op: sk.signature(MSG.as_ref())
     };
 
+    let pk = sodium_hmac_key.clone();
+    let sig = smac::authenticate(MSG.as_ref(), &sodium_hmac_key);
+    test! {
+        msg: "* Testing throughput of sodiumoxide hmac verifying...",
+        op: assert!(smac::verify(&sig, MSG.as_ref(), &pk))
+    };
+
     let pk = sodium_pk.clone();
     let sig = sed::sign_detached(MSG.as_ref(), &sodium_sk);
     test! {
         msg: "* Testing throughput of sodiumoxide verifying...",
-        op: assert_eq!(sed::verify_detached(&sig, MSG.as_ref(), &pk), true)
+        op: assert!(sed::verify_detached(&sig, MSG.as_ref(), &pk))
     };
 
     //let pk = hacl_pk.clone();
@@ -78,7 +96,7 @@ fn main() {
     //    msg: "* Testing throughput of hacl verifying...",
     //    op: {
     //        let pk = pk.clone();
-    //        assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+    //        assert!(pk.verify(MSG.as_ref(), &sig))
     //    }
     //};
 
@@ -86,7 +104,7 @@ fn main() {
     let sig = hacl_gcc_sk.signature(MSG.as_ref());
     test! {
         msg: "* Testing throughput of hacl-gcc verifying...",
-        op: assert_eq!(pk.verify(MSG.as_ref(), &sig), true)
+        op: assert!(pk.verify(MSG.as_ref(), &sig))
     };
 }
 
