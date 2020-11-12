@@ -15,8 +15,6 @@ use ring::{signature as red, signature::KeyPair};
 const SECS: u64 = 5;
 const TIME: Duration = Duration::from_secs(SECS);
 
-const MSG: [u8; 4096] = [0; 4096];
-
 macro_rules! test {
     (msg: $msg:expr, op: $op:expr) => {{
         println!($msg);
@@ -35,6 +33,12 @@ macro_rules! test {
 fn main() {
     sodiumoxide::init()
         .expect("Failed to init sodiumoxide!");
+
+    let msg_size = std::env::args()
+        .nth(1)
+        .and_then(|x| x.parse().ok())
+        .unwrap_or(1024);
+    let msg_original = vec![0; msg_size];
 
     println!("* Generating HMAC key (using sodiumoxide)...");
     let sodium_hmac_key = smac::gen_key();
@@ -55,73 +59,81 @@ fn main() {
     };
 
     let sk = sodium_hmac_key.clone();
+    let msg_cloned = msg_original.clone();
     test! {
         msg: "* Testing throughput of sodiumoxide hmac signatures...",
-        op: smac::authenticate(MSG.as_ref(), &sk)
+        op: smac::authenticate(msg_cloned.as_ref(), &sk)
     };
 
     let sk = sodium_sk.clone();
+    let msg_cloned = msg_original.clone();
     test! {
         msg: "* Testing throughput of sodiumoxide signatures...",
-        op: sed::sign_detached(MSG.as_ref(), &sk)
+        op: sed::sign_detached(msg_cloned.as_ref(), &sk)
     };
 
     //let sk = hacl_sk.clone();
     //test! {
     //    msg: "* Testing throughput of hacl signatures...",
-    //    op: sk.signature(MSG.as_ref())
+    //    op: sk.signature(msg_cloned.as_ref())
     //};
 
     let sk = hacl_gcc_sk.clone();
+    let msg_cloned = msg_original.clone();
     test! {
         msg: "* Testing throughput of hacl-gcc signatures...",
-        op: sk.signature(MSG.as_ref())
+        op: sk.signature(msg_cloned.as_ref())
     };
 
     let sk = red::Ed25519KeyPair::from_seed_unchecked(&sodium_sk.0[..32]).unwrap();
+    let msg_cloned = msg_original.clone();
     test! {
         msg: "* Testing throughput of ring signatures...",
-        op: sk.sign(MSG.as_ref())
+        op: sk.sign(msg_cloned.as_ref())
     };
 
     let pk = sodium_hmac_key.clone();
-    let sig = smac::authenticate(MSG.as_ref(), &sodium_hmac_key);
+    let msg_cloned = msg_original.clone();
+    let sig = smac::authenticate(msg_cloned.as_ref(), &sodium_hmac_key);
     test! {
         msg: "* Testing throughput of sodiumoxide hmac verifying...",
-        op: assert!(smac::verify(&sig, MSG.as_ref(), &pk))
+        op: assert!(smac::verify(&sig, msg_cloned.as_ref(), &pk))
     };
 
     let pk = sodium_pk.clone();
-    let sig = sed::sign_detached(MSG.as_ref(), &sodium_sk);
+    let msg_cloned = msg_original.clone();
+    let sig = sed::sign_detached(msg_cloned.as_ref(), &sodium_sk);
     test! {
         msg: "* Testing throughput of sodiumoxide verifying...",
-        op: assert!(sed::verify_detached(&sig, MSG.as_ref(), &pk))
+        op: assert!(sed::verify_detached(&sig, msg_cloned.as_ref(), &pk))
     };
 
     //let pk = hacl_pk.clone();
-    //let sig = hacl_sk.signature(MSG.as_ref());
+    //let sig = hacl_sk.signature(msg_cloned.as_ref());
     //test! {
     //    msg: "* Testing throughput of hacl verifying...",
     //    op: {
     //        let pk = pk.clone();
-    //        assert!(pk.verify(MSG.as_ref(), &sig))
+    //        assert!(pk.verify(msg_cloned.as_ref(), &sig))
     //    }
     //};
 
     let pk = hacl_gcc_pk.clone();
-    let sig = hacl_gcc_sk.signature(MSG.as_ref());
+    let msg_cloned = msg_original.clone();
+    let sig = hacl_gcc_sk.signature(msg_cloned.as_ref());
     test! {
         msg: "* Testing throughput of hacl-gcc verifying...",
-        op: assert!(pk.verify(MSG.as_ref(), &sig))
+        op: assert!(pk.verify(msg_cloned.as_ref(), &sig))
     };
 
+    let msg_cloned = msg_original.clone();
     let sk = red::Ed25519KeyPair::from_seed_unchecked(&sodium_sk.0[..32]).unwrap();
     let pk = sk.public_key().clone();
     let pk = red::UnparsedPublicKey::new(&red::ED25519, pk);
-    let sig = sk.sign(MSG.as_ref());
+    let sig = sk.sign(msg_cloned.as_ref());
     test! {
         msg: "* Testing throughput of ring verifying...",
-        op: assert!(pk.verify(MSG.as_ref(), sig.as_ref()).is_ok())
+        op: assert!(pk.verify(msg_cloned.as_ref(), sig.as_ref()).is_ok())
     };
 }
 
