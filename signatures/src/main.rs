@@ -46,6 +46,9 @@ fn main() {
     println!("* Generating new key pair (using sodiumoxide)...");
     let (sodium_pk, sodium_sk) = sed::gen_keypair();
 
+    println!("* Generating new key pair (using openssl)...");
+    let openssl_sk = openssl::pkey::PKey::<openssl::pkey::Private>::generate_ed25519().unwrap();
+
     println!("* Converting sodiumoxide keys to hacl keys...");
     //let (hacl_pk, hacl_sk) = {
     //    let sk = hed::SecretKey(into_owned_key(&sodium_sk));
@@ -92,6 +95,13 @@ fn main() {
         op: sk.sign(msg_cloned.as_ref())
     };
 
+    let sk = openssl_sk.clone();
+    let msg_cloned = msg_original.clone();
+    test! {
+        msg: "* Testing throughput of openssl signatures...",
+        op: openssl_sign(&sk, msg_cloned.as_ref())
+    };
+
     let pk = sodium_hmac_key.clone();
     let msg_cloned = msg_original.clone();
     let sig = smac::authenticate(msg_cloned.as_ref(), &sodium_hmac_key);
@@ -135,6 +145,26 @@ fn main() {
         msg: "* Testing throughput of ring verifying...",
         op: assert!(pk.verify(msg_cloned.as_ref(), sig.as_ref()).is_ok())
     };
+
+    let pk = openssl_sk.clone();
+    let msg_cloned = msg_original.clone();
+    let sig = openssl_sign(&pk, msg_cloned.as_ref());
+    test! {
+        msg: "* Testing throughput of openssl verifying...",
+        op: assert!(openssl_verify(&pk, msg_cloned.as_ref(), &sig))
+    };
+}
+
+fn openssl_sign(sk: &openssl::pkey::PKey<openssl::pkey::Private>, data: &[u8]) -> [u8; 64] {
+    let mut signature = [0; 64];
+    let mut signer = openssl::sign::Signer::new_without_digest(sk).unwrap();
+    signer.sign_oneshot(&mut signature[..], data).unwrap();
+    signature
+}
+
+fn openssl_verify(sk: &openssl::pkey::PKey<openssl::pkey::Private>, data: &[u8], sig: &[u8; 64]) -> bool {
+    let mut verifier = openssl::sign::Verifier::new_without_digest(sk).unwrap();
+    verifier.verify_oneshot(&sig[..], data).unwrap()
 }
 
 fn ops_per_sec(ops: u64) -> f64 {
