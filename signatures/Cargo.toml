@@ -8,3 +8,4 @@ edition = "2018"
 #hacl-star = "0.1.0"
 hacl-star-gcc = { git = "https://github.com/ditto-bft/rust-hacl-star" }
 sodiumoxide = "0.2.6"
+ring = "0.16.15"

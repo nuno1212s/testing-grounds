@@ -1,5 +1,3 @@
-//TODO: https://briansmith.org/rustdoc/ring/signature/index.html
-
 use std::thread;
 use std::time::Duration;
 use std::sync::{
@@ -12,10 +10,12 @@ use sodiumoxide::crypto::auth::hmacsha256 as smac;
 //use hacl_star::ed25519 as hed;
 use hacl_star_gcc::ed25519 as ged;
 use sodiumoxide::crypto::sign::ed25519 as sed;
+use ring::{signature as red, signature::KeyPair};
 
 const SECS: u64 = 5;
 const TIME: Duration = Duration::from_secs(SECS);
-const MSG: &str = "test12345";
+
+const MSG: [u8; 4096] = [0; 4096];
 
 macro_rules! test {
     (msg: $msg:expr, op: $op:expr) => {{
@@ -78,6 +78,12 @@ fn main() {
         op: sk.signature(MSG.as_ref())
     };
 
+    let sk = red::Ed25519KeyPair::from_seed_unchecked(&sodium_sk.0[..32]).unwrap();
+    test! {
+        msg: "* Testing throughput of ring signatures...",
+        op: sk.sign(MSG.as_ref())
+    };
+
     let pk = sodium_hmac_key.clone();
     let sig = smac::authenticate(MSG.as_ref(), &sodium_hmac_key);
     test! {
@@ -107,6 +113,15 @@ fn main() {
     test! {
         msg: "* Testing throughput of hacl-gcc verifying...",
         op: assert!(pk.verify(MSG.as_ref(), &sig))
+    };
+
+    let sk = red::Ed25519KeyPair::from_seed_unchecked(&sodium_sk.0[..32]).unwrap();
+    let pk = sk.public_key().clone();
+    let pk = red::UnparsedPublicKey::new(&red::ED25519, pk);
+    let sig = sk.sign(MSG.as_ref());
+    test! {
+        msg: "* Testing throughput of ring verifying...",
+        op: assert!(pk.verify(MSG.as_ref(), sig.as_ref()).is_ok())
     };
 }
 
