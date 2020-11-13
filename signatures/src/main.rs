@@ -25,8 +25,11 @@ macro_rules! test {
                 counter += 1;
             }
             counter
-        }).expect("Failed to run test case!");
-        println!("  --> {} ops per second", ops_per_sec(ops));
+        })
+            .map(ops_per_sec)
+            .expect("Failed to run test case!");
+        println!("  --> {} ops per second", ops);
+        eprint!("{},", ops);
     }}
 }
 
@@ -60,6 +63,8 @@ fn main() {
         let pk = sk.get_public();
         (pk, sk)
     };
+
+    //eprintln!("sign-hmac-sodiumoxide,sign-ed25519-sodiumoxide,sign-ed25519-hacl-gcc,sign-ed25519-ring,sign-ed25519-openssl,verify-hmac-sodiumoxide,verify-ed25519-sodiumoxide,verify-ed25519-hacl-gcc,verify-ed25519-ring,verify-ed25519-openssl");
 
     let sk = sodium_hmac_key.clone();
     let msg_cloned = msg_original.clone();
@@ -153,6 +158,8 @@ fn main() {
         msg: "* Testing throughput of openssl verifying...",
         op: assert!(openssl_verify(&pk, msg_cloned.as_ref(), &sig))
     };
+
+    eprintln!("\x08 ");
 }
 
 fn openssl_sign(sk: &openssl::pkey::PKey<openssl::pkey::Private>, data: &[u8]) -> [u8; 64] {
