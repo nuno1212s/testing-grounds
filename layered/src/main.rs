@@ -1,3 +1,5 @@
+#[cfg_attr(feature = "jemalloc", global_allocator)]
+#[cfg(feature = "jemalloc")]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 const SRC: &str = "0.0.0.0:5555";

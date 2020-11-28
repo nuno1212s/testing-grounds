@@ -4,7 +4,10 @@ version = "0.1.0"
 authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
 edition = "2018"
 
+[features]
+jemalloc = ["jemallocator"]
+
 [dependencies]
-jemallocator = "0.3"
+jemallocator = { version = "0.3", optional = true }
 ditto = { git = "https://github.com/ditto-bft/ditto", features = ["bench"] }
 #ditto = { path = "/home/sugo/Documents/tese/ditto-bft/ditto", features = ["bench"] }
