@@ -1,3 +1,5 @@
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 const SRC: &str = "0.0.0.0:5555";
 const DST: &str = "127.0.0.1:5555";
 
