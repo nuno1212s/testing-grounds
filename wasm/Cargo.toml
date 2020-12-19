@@ -1,0 +1,15 @@
+[package]
+name = "wasm"
+version = "0.1.0"
+authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+#[target.wasm32-unknown-unknown]
+#rustflags = [
+#    "-C", "link-args=--import-memory",
+#]
+
+[dependencies]

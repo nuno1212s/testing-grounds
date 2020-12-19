@@ -1,0 +1,21 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>title</title>
+        <script>
+            (async () => {
+                const env = {
+                    log: x => console.log(x),
+                };
+                const path = "target/wasm32-unknown-unknown/release/wasm.wasm";
+                const { instance } = await WebAssembly.instantiateStreaming(fetch(path), {env});
+                const { exports } = instance;
+                console.log(exports);
+                exports.add_print(41, 1);
+            })();
+        </script>
+    </head>
+    <body>
+        Check the web browser console output.
+    </body>
+</html>
