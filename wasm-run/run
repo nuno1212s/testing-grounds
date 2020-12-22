@@ -1,0 +1,7 @@
+#!/bin/sh
+DIR="$PWD"
+cd ../wasm
+cargo build --release --target wasm32-unknown-unknown || exit 1
+cd "$DIR"
+env RUSTFLAGS="-C target_cpu=native" cargo build --release || exit 1
+exec ./target/release/wasm-run < ../wasm/target/wasm32-unknown-unknown/release/wasm.wasm
