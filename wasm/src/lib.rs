@@ -17,3 +17,4 @@ pub unsafe extern "C" fn add_print(x: i32, y: i32) {
 // https://stackoverflow.com/questions/49014610/passing-a-javascript-string-to-a-rust-function-compiled-to-webassembly
 // https://depth-first.com/articles/2020/06/29/compiling-rust-to-webassembly-a-simple-example/
 // https://doc.rust-lang.org/reference/items/external-blocks.html#the-link-attribute
+// https://docs.wasmer.io/integrations/examples/host-functions
