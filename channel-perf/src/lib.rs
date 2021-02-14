@@ -4,10 +4,11 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use futures::select;
-    use tokio::sync::watch;
-    use tokio::runtime::Runtime;
+    use std::sync::Arc;
+    use std::sync::atomic::{Ordering, AtomicBool};
     use flume::{bounded, Receiver};
+    use tokio::runtime::Runtime;
+    use futures::select;
 
     const CAP: usize = 32;
     const SENDERS: usize = 100;
@@ -38,10 +39,10 @@ mod tests {
         let _guard = rt.enter();
         let (quit, mut rx) = rt.block_on(bench_channel_4_1_setup());
         b.iter(move || rt.block_on(bench_channel_4_1_main(&mut rx)));
-        quit.send(true).unwrap();
+        quit.store(true, Ordering::Relaxed);
     }
 
-    async fn bench_channel_4_1_setup() -> (watch::Sender<bool>, Vec<Receiver<()>>) {
+    async fn bench_channel_4_1_setup() -> (Arc<AtomicBool>, Vec<Receiver<()>>) {
         let (tx, rx) = (0..4)
             .map(|_| bounded(CAP))
             .fold((Vec::new(), Vec::new()), |(mut tx_acc, mut rx_acc), (tx, rx)| {
@@ -49,18 +50,20 @@ mod tests {
                 rx_acc.push(rx);
                 (tx_acc, rx_acc)
             });
-        let (quit, has_quit) = watch::channel(false);
+        let quit = Arc::new(AtomicBool::new(false));
+        let quit_clone = Arc::clone(&quit);
 
         tokio::spawn(async move {
+            let quit = quit_clone;
             for i in 0..SENDERS {
                 let tx = tx.clone();
-                let mut has_quit = has_quit.clone();
+                let quit = Arc::clone(&quit);
                 tokio::spawn(async move {
                     let rand_indices = Rand::new((123456_u64).wrapping_mul((i+1) as u64))
                         .map(|x| (x % 4) as usize)
                         .take(BENCH_SIZE);
                     for i in rand_indices {
-                        if let Ok(_) = has_quit.changed().await {
+                        if quit.load(Ordering::Relaxed) {
                             return;
                         }
                         tx[i].send_async(()).await.unwrap();
@@ -78,6 +81,7 @@ mod tests {
             _ = rx[1].recv_async() => (),
             _ = rx[2].recv_async() => (),
             _ = rx[3].recv_async() => (),
+            complete => (),
         }
     }
 }
