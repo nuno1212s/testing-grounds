@@ -34,11 +34,45 @@ mod tests {
     }
 
     #[bench]
+    fn bench_channel_1_1(b: &mut test::Bencher) {
+        let rt = Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let (quit, rx) = rt.block_on(bench_channel_1_1_setup());
+        b.iter(move || rt.block_on(bench_channel_1_1_main(&rx)));
+        quit.store(true, Ordering::Relaxed);
+    }
+
+    async fn bench_channel_1_1_setup() -> (Arc<AtomicBool>, Receiver<()>) {
+        let (tx, rx) = bounded(CAP);
+        let quit = Arc::new(AtomicBool::new(false));
+        let quit_clone = Arc::clone(&quit);
+
+        tokio::spawn(async move {
+            let quit = quit_clone;
+            for _i in 0..SENDERS {
+                let tx = tx.clone();
+                let quit = Arc::clone(&quit);
+                tokio::spawn(async move {
+                    while !quit.load(Ordering::Relaxed) {
+                        tx.send_async(()).await.unwrap();
+                    }
+                });
+            }
+        });
+
+        (quit, rx)
+    }
+
+    async fn bench_channel_1_1_main(rx: &Receiver<()>) {
+        rx.recv_async().await.unwrap();
+    }
+
+    #[bench]
     fn bench_channel_4_1(b: &mut test::Bencher) {
         let rt = Runtime::new().unwrap();
         let _guard = rt.enter();
-        let (quit, mut rx) = rt.block_on(bench_channel_4_1_setup());
-        b.iter(move || rt.block_on(bench_channel_4_1_main(&mut rx)));
+        let (quit, rx) = rt.block_on(bench_channel_4_1_setup());
+        b.iter(move || rt.block_on(bench_channel_4_1_main(&rx)));
         quit.store(true, Ordering::Relaxed);
     }
 
@@ -75,7 +109,7 @@ mod tests {
         (quit, rx)
     }
 
-    async fn bench_channel_4_1_main(rx: &mut Vec<Receiver<()>>) {
+    async fn bench_channel_4_1_main(rx: &Vec<Receiver<()>>) {
         select! {
             _ = rx[0].recv_async() => (),
             _ = rx[1].recv_async() => (),
