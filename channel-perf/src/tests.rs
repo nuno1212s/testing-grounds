@@ -5,7 +5,7 @@ use tokio::runtime::Runtime;
 use futures::select;
 
 const CAP: usize = 32;
-const SENDERS: usize = 100;
+const SENDERS: usize = 5000;
 
 struct Rand {
     seed: u64,
