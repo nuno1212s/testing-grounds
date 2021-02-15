@@ -113,7 +113,6 @@ mod tests {
             _ = rx[1].recv_async() => (),
             _ = rx[2].recv_async() => (),
             _ = rx[3].recv_async() => (),
-            complete => (),
         }
     }
 }
