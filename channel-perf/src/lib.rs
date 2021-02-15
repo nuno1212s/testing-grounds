@@ -12,7 +12,6 @@ mod tests {
 
     const CAP: usize = 32;
     const SENDERS: usize = 100;
-    const BENCH_SIZE: usize = 1000;
 
     struct Rand {
         seed: u64,
@@ -94,8 +93,7 @@ mod tests {
                 let quit = Arc::clone(&quit);
                 tokio::spawn(async move {
                     let rand_indices = Rand::new((123456_u64).wrapping_mul((i+1) as u64))
-                        .map(|x| (x % 4) as usize)
-                        .take(BENCH_SIZE);
+                        .map(|x| (x % 4) as usize);
                     for i in rand_indices {
                         if quit.load(Ordering::Relaxed) {
                             return;
