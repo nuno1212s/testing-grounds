@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{Ordering, AtomicBool};
 use flume::{bounded, Receiver};
 use tokio::runtime::Runtime;
+use tokio::sync::oneshot;
 use futures::select;
 
 const CAP: usize = 32;
@@ -117,6 +118,57 @@ async fn bench_channel_4_1_main(rx: &Vec<Receiver<()>>) {
 ////////////////////////////////////////////////////////////////////////////
 
 #[bench]
+fn bench_channel_4_1_thpool(b: &mut test::Bencher) {
+    let rt = Runtime::new().unwrap();
+    let _guard = rt.enter();
+    let (quit, rx) = rt.block_on(bench_channel_4_1_thpool_setup());
+    b.iter(move || rt.block_on(bench_channel_4_1_main(&rx)));
+    quit.store(true, Ordering::Relaxed);
+}
+
+async fn bench_channel_4_1_thpool_setup() -> (Arc<AtomicBool>, Vec<Receiver<()>>) {
+    let (tx, rx) = (0..4)
+        .map(|_| bounded(CAP))
+        .fold((Vec::new(), Vec::new()), |(mut tx_acc, mut rx_acc), (tx, rx)| {
+            tx_acc.push(tx);
+            rx_acc.push(rx);
+            (tx_acc, rx_acc)
+        });
+    let thpool = threadpool_crossbeam_channel::ThreadPool::new(4);
+    let quit = Arc::new(AtomicBool::new(false));
+    let quit_clone = Arc::clone(&quit);
+
+    tokio::spawn(async move {
+        let quit = quit_clone;
+        for i in 0..SENDERS {
+            let tx = tx.clone();
+            let quit = Arc::clone(&quit);
+            let thpool = thpool.clone();
+            tokio::spawn(async move {
+                let rand_indices = Rand::new((123456_u64).wrapping_mul((i+1) as u64))
+                    .map(|x| (x % 4) as usize);
+                for i in rand_indices {
+                    if quit.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let tx = tx[i].clone();
+                    let (_tx, _rx) = oneshot::channel();
+                    thpool.execute(move || {
+                        tx.send(()).unwrap();
+                        _tx.send(()).unwrap();
+                    });
+                    _rx.await.unwrap();
+                }
+            });
+        }
+    });
+
+    (quit, rx)
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+#[bench]
 fn bench_channel_8_1(b: &mut test::Bencher) {
     let rt = Runtime::new().unwrap();
     let _guard = rt.enter();
@@ -168,4 +220,55 @@ async fn bench_channel_8_1_main(rx: &Vec<Receiver<()>>) {
         _ = rx[6].recv_async() => (),
         _ = rx[7].recv_async() => (),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+#[bench]
+fn bench_channel_8_1_thpool(b: &mut test::Bencher) {
+    let rt = Runtime::new().unwrap();
+    let _guard = rt.enter();
+    let (quit, rx) = rt.block_on(bench_channel_8_1_thpool_setup());
+    b.iter(move || rt.block_on(bench_channel_8_1_main(&rx)));
+    quit.store(true, Ordering::Relaxed);
+}
+
+async fn bench_channel_8_1_thpool_setup() -> (Arc<AtomicBool>, Vec<Receiver<()>>) {
+    let (tx, rx) = (0..8)
+        .map(|_| bounded(CAP))
+        .fold((Vec::new(), Vec::new()), |(mut tx_acc, mut rx_acc), (tx, rx)| {
+            tx_acc.push(tx);
+            rx_acc.push(rx);
+            (tx_acc, rx_acc)
+        });
+    let thpool = threadpool_crossbeam_channel::ThreadPool::new(4);
+    let quit = Arc::new(AtomicBool::new(false));
+    let quit_clone = Arc::clone(&quit);
+
+    tokio::spawn(async move {
+        let quit = quit_clone;
+        for i in 0..SENDERS {
+            let tx = tx.clone();
+            let quit = Arc::clone(&quit);
+            let thpool = thpool.clone();
+            tokio::spawn(async move {
+                let rand_indices = Rand::new((123456_u64).wrapping_mul((i+1) as u64))
+                    .map(|x| (x % 8) as usize);
+                for i in rand_indices {
+                    if quit.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let tx = tx[i].clone();
+                    let (_tx, _rx) = oneshot::channel();
+                    thpool.execute(move || {
+                        tx.send(()).unwrap();
+                        _tx.send(()).unwrap();
+                    });
+                    _rx.await.unwrap();
+                }
+            });
+        }
+    });
+
+    (quit, rx)
 }
