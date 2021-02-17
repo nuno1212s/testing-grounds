@@ -66,6 +66,46 @@ async fn bench_channel_1_1_main(rx: &Receiver<()>) {
 ////////////////////////////////////////////////////////////////////////////
 
 #[bench]
+fn bench_channel_1_1_thpool(b: &mut test::Bencher) {
+    let rt = Runtime::new().unwrap();
+    let _guard = rt.enter();
+    let (quit, rx) = rt.block_on(bench_channel_1_1_thpool_setup());
+    b.iter(move || rt.block_on(bench_channel_1_1_main(&rx)));
+    quit.store(true, Ordering::Relaxed);
+}
+
+async fn bench_channel_1_1_thpool_setup() -> (Arc<AtomicBool>, Receiver<()>) {
+    let (tx, rx) = bounded(CAP);
+    let quit = Arc::new(AtomicBool::new(false));
+    let quit_clone = Arc::clone(&quit);
+    let thpool = threadpool_crossbeam_channel::ThreadPool::new(4);
+
+    tokio::spawn(async move {
+        let quit = quit_clone;
+        for _i in 0..SENDERS {
+            let tx = tx.clone();
+            let quit = Arc::clone(&quit);
+            let thpool = thpool.clone();
+            tokio::spawn(async move {
+                while !quit.load(Ordering::Relaxed) {
+                    let (_tx, _rx) = oneshot::channel();
+                    let tx = tx.clone();
+                    thpool.execute(move || {
+                        tx.send(()).unwrap();
+                        _tx.send(()).unwrap();
+                    });
+                    _rx.await.unwrap();
+                }
+            });
+        }
+    });
+
+    (quit, rx)
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+#[bench]
 fn bench_channel_4_1(b: &mut test::Bencher) {
     let rt = Runtime::new().unwrap();
     let _guard = rt.enter();
