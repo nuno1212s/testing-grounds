@@ -134,3 +134,15 @@ impl System {
     //    unreachable!()
     //}
 }
+
+impl Node {
+    async fn send_to(&mut self, id: u32, value: &[u8]) -> io::Result<()> {
+        let conn = self.others_tx.get_mut(&id).unwrap();
+        conn.write_all(value).await
+    }
+
+    async fn read_from(&mut self, id: u32, value: &mut [u8]) -> io::Result<()> {
+        let conn = self.others_rx.get_mut(&id).unwrap();
+        conn.read_exact(value).await.map(|_| ())
+    }
+}
