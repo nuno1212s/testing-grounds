@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# cleanup at exit
+trap 'pkill consensus' EXIT INT
+
+# build code
+cargo build || exit 1
+
+# run code
+mkdir -p /tmp/consensus_test/
+env ID=0 ./target/debug/consensus > /tmp/consensus_test/output_0 &
+env ID=1 ./target/debug/consensus > /tmp/consensus_test/output_1 &
+env ID=2 ./target/debug/consensus > /tmp/consensus_test/output_2 &
+env ID=3 ./target/debug/consensus > /tmp/consensus_test/output_3 &
+
+# print output in order
+wait
+cat /tmp/consensus_test/*
