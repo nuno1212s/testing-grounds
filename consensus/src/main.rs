@@ -16,7 +16,16 @@ const PHASE_PREPARE: [u8; 4] = *b"PRPR";
 const PHASE_COMMIT: [u8; 4] = *b"CMIT";
 
 #[derive(Debug)]
+enum ProtoPhase {
+    Init,
+    PrePrepare,
+    Prepare,
+    Commit,
+}
+
+#[derive(Debug)]
 struct System {
+    phase: ProtoPhase,
     node: Node,
 }
 
@@ -103,8 +112,9 @@ impl System {
             };
         }
 
+        let phase = ProtoPhase::Init;
         let node = Node { id, others_tx, others_rx };
-        Ok(System { node })
+        Ok(System { phase, node })
     }
 
     //async fn leader_loop(&self) -> io::Result<()> {
