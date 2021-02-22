@@ -1,18 +1,26 @@
 #!/bin/sh
 
+if [ "$1" = '--release' ]; then
+    export RUSTFLAGS='-C target-cpu=native'
+    TARGET='release'
+    FLAG=$1
+else
+    TARGET='debug'
+fi
+
 # cleanup at exit
 trap 'pkill consensus' EXIT INT
 
 # build code
-cargo build || exit 1
+cargo build $FLAG || exit 1
 
 # run code
 mkdir -p /tmp/consensus/
 mkfifo /tmp/consensus/input 2>/dev/null
-env ID=0 ./target/debug/consensus > /tmp/consensus/output00 &
-env ID=1 ./target/debug/consensus > /tmp/consensus/output01 &
-env ID=2 ./target/debug/consensus > /tmp/consensus/output02 &
-env ID=3 ./target/debug/consensus > /tmp/consensus/output03 &
+env ID=0 ./target/$TARGET/consensus > /tmp/consensus/output00 &
+env ID=1 ./target/$TARGET/consensus > /tmp/consensus/output01 &
+env ID=2 ./target/$TARGET/consensus > /tmp/consensus/output02 &
+env ID=3 ./target/$TARGET/consensus > /tmp/consensus/output03 &
 ./cli
 
 # print output in order
