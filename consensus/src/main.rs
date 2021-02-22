@@ -5,7 +5,7 @@
 use tokio::io;
 use tokio::fs::File;
 use tokio::io::BufReader;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use std::collections::HashMap;
@@ -19,9 +19,10 @@ const PHASE_COMMIT: [u8; 4] = *b"CMIT";
 #[derive(Debug)]
 enum ProtoPhase {
     Init,
-    PrePrepare,
-    Prepare,
-    Commit,
+    PrePreparing,
+    Preparing,
+    Commiting,
+    Executing,
 }
 
 #[derive(Debug)]
@@ -116,23 +117,46 @@ impl System {
         Ok(System { phase, node })
     }
 
+    #[inline]
     async fn leader_loop(&mut self) -> io::Result<()> {
         let mut buf = String::new();
         let mut input = BufReader::new(File::open("/tmp/consensus/input").await?);
-
-        loop {
-            // 1. read next client request
-            let n = input.read_line(&mut buf).await?;
-            if n == 0 {
-                return Ok(());
-            }
-            print!("(r{}) {}", self.node.id, buf);
-            // 2. start consensus
-            //sys.pre_prepare(&buf).await?;
-            // 3. execute
-            // 4. clear value, jump to next round
-            buf.clear();
+        while !self.leader_step(&mut input, &mut buf).await? {
+            // nothing
         }
+        Ok(())
+    }
+
+    #[inline]
+    async fn leader_step(&mut self, mut input: impl Unpin + AsyncBufRead, buf: &mut String) -> io::Result<bool> {
+        match self.phase {
+            ProtoPhase::Init => {
+                println!("< INIT        r{} >", self.node.id);
+                let n = input.read_line(buf).await?;
+                if n == 0 {
+                    return Ok(true);
+                }
+                self.phase = ProtoPhase::PrePreparing;
+            },
+            ProtoPhase::PrePreparing => {
+                println!("< PRE-PREPARE r{} >", self.node.id);
+                self.phase = ProtoPhase::Preparing;
+            },
+            ProtoPhase::Preparing => {
+                println!("< PREPARE     r{} >", self.node.id);
+                self.phase = ProtoPhase::Commiting;
+            },
+            ProtoPhase::Commiting => {
+                println!("< COMMIT      r{} >", self.node.id);
+                self.phase = ProtoPhase::Executing;
+            },
+            ProtoPhase::Executing => {
+                print!("< EXECUTE     r{} > {}", self.node.id, buf);
+                buf.clear();
+                self.phase = ProtoPhase::Init;
+            },
+        }
+        Ok(false)
     }
 
     async fn backup_loop(&mut self) -> io::Result<()> {
