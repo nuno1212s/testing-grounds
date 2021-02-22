@@ -3,8 +3,9 @@
 // way up from there
 
 use tokio::io;
-//use tokio::io::BufReader;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::fs::File;
+use tokio::io::BufReader;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use std::collections::HashMap;
@@ -30,7 +31,7 @@ struct System {
 }
 
 #[derive(Debug)]
-enum Side {
+enum CommSide {
     Tx((u32, TcpStream)),
     Rx((u32, TcpStream)),
 }
@@ -50,15 +51,14 @@ async fn main() -> io::Result<()> {
         .parse()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-    let sys = System::boot(id).await?;
+    let mut sys = System::boot(id).await?;
     println!("{:#?}", sys);
-    Ok(())
 
-    //if sys.node.id == 0 {
-    //    self.leader_loop()
-    //} else {
-    //    self.backup_loop()
-    //}
+    if sys.node.id == 0 {
+        sys.leader_loop().await
+    } else {
+        sys.backup_loop().await
+    }
 }
 
 impl System {
@@ -78,7 +78,7 @@ impl System {
             loop {
                 if let Ok((mut conn, _)) = listener.accept().await {
                     let id = conn.read_u32().await.unwrap();
-                    tx.send(Side::Rx((id, conn))).await.unwrap();
+                    tx.send(CommSide::Rx((id, conn))).await.unwrap();
                 }
             }
         });
@@ -92,7 +92,7 @@ impl System {
                 for _ in 0..4 {
                     if let Ok(mut conn) = TcpStream::connect(&addr).await {
                         conn.write_u32(id).await.unwrap();
-                        tx.send(Side::Tx((other_id, conn))).await.unwrap();
+                        tx.send(CommSide::Tx((other_id, conn))).await.unwrap();
                         return;
                     }
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -107,8 +107,8 @@ impl System {
                 .ok_or_else(||
                     std::io::Error::new(std::io::ErrorKind::Other, "connection problems!"))?;
             match received {
-                Side::Tx((id, conn)) => others_tx.insert(id, conn),
-                Side::Rx((id, conn)) => others_rx.insert(id, conn),
+                CommSide::Tx((id, conn)) => others_tx.insert(id, conn),
+                CommSide::Rx((id, conn)) => others_rx.insert(id, conn),
             };
         }
 
@@ -117,22 +117,28 @@ impl System {
         Ok(System { phase, node })
     }
 
-    //async fn leader_loop(&self) -> io::Result<()> {
-    //    let mut buf = String::new();
-    //    let mut stdin = tokio::io::stdin();
+    async fn leader_loop(&mut self) -> io::Result<()> {
+        let mut buf = String::new();
+        let mut input = BufReader::new(File::open("/tmp/consensus/input").await?);
 
-    //    loop {
-    //        // 1. read next client request
-    //        stdin.read_line(&mut buf).await?;
-    //        // 2. start consensus
-    //        sys.pre_prepare(&buf).await?;
-    //        // 3. execute
-    //        // 4. clear value, jump to next round
-    //        buf.clear();
-    //    }
+        loop {
+            // 1. read next client request
+            let n = input.read_line(&mut buf).await?;
+            if n == 0 {
+                return Ok(());
+            }
+            print!("{:5} -> {}", n, buf);
+            // 2. start consensus
+            //sys.pre_prepare(&buf).await?;
+            // 3. execute
+            // 4. clear value, jump to next round
+            buf.clear();
+        }
+    }
 
-    //    unreachable!()
-    //}
+    async fn backup_loop(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl Node {
