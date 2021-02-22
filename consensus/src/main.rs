@@ -52,7 +52,6 @@ async fn main() -> io::Result<()> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     let mut sys = System::boot(id).await?;
-    println!("{:#?}", sys);
 
     if sys.node.id == 0 {
         sys.leader_loop().await
@@ -127,7 +126,7 @@ impl System {
             if n == 0 {
                 return Ok(());
             }
-            print!("{:5} -> {}", n, buf);
+            print!("(r{}) {}", self.node.id, buf);
             // 2. start consensus
             //sys.pre_prepare(&buf).await?;
             // 3. execute
