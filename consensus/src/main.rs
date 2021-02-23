@@ -169,6 +169,11 @@ impl System {
             // backup
             ProtoPhase::PrePreparing => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
+                // XXX XXX XXX XXX XXX XXX XXX XXX
+                // XXX XXX XXX XXX XXX XXX XXX XXX
+                // XXX XXX XXX XXX XXX XXX XXX XXX
+                // XXX XXX XXX XXX XXX XXX XXX XXX
+                // This should be in the PREPARE phase
                 let (tx, mut rx) = mpsc::channel(8);
                 let mut counter = 0;
                 for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
