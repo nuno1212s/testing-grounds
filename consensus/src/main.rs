@@ -9,7 +9,7 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use std::collections::HashMap;
-
+use std::sync::Arc;
 
 // the three protocol phases
 const PHASE_PRE_PREPARE: [u8; 4] = *b"PPPR";
@@ -40,8 +40,18 @@ enum CommSide {
 #[derive(Debug)]
 struct Node {
     id: u32,
-    others_tx: HashMap<u32, TcpStream>,
-    others_rx: HashMap<u32, TcpStream>,
+    others_tx: HashMap<u32, Arc<TcpStream>>,
+    others_rx: HashMap<u32, Arc<TcpStream>>,
+}
+
+#[derive(Debug)]
+struct SendTo {
+    inner: Arc<TcpStream>,
+}
+
+#[derive(Debug)]
+struct RecvFrom {
+    inner: Arc<TcpStream>,
 }
 
 #[tokio::main]
@@ -57,7 +67,12 @@ async fn main() -> io::Result<()> {
     if sys.node.id == 0 {
         sys.leader_loop().await
     } else {
-        sys.backup_loop().await
+        //sys.backup_loop().await
+        let mut buf = [0; 4096];
+        let n = sys.node.recv_from(0).value(&mut buf[..]).await?;
+        let s = std::str::from_utf8(&buf[..n]).unwrap();
+        print!("{}", s);
+        Ok(())
     }
 }
 
@@ -107,8 +122,8 @@ impl System {
                 .ok_or_else(||
                     std::io::Error::new(std::io::ErrorKind::Other, "connection problems!"))?;
             match received {
-                CommSide::Tx((id, conn)) => others_tx.insert(id, conn),
-                CommSide::Rx((id, conn)) => others_rx.insert(id, conn),
+                CommSide::Tx((id, conn)) => others_tx.insert(id, Arc::new(conn)),
+                CommSide::Rx((id, conn)) => others_rx.insert(id, Arc::new(conn)),
             };
         }
 
@@ -140,6 +155,10 @@ impl System {
             },
             ProtoPhase::PrePreparing => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
+                for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
+                    let send_to_replica = self.node.send_to(id);
+                    send_to_replica.value(buf.as_ref()).await?; // TODO: spawn task
+                }
                 self.phase = ProtoPhase::Preparing;
             },
             ProtoPhase::Preparing => {
@@ -165,13 +184,40 @@ impl System {
 }
 
 impl Node {
-    async fn send_to(&mut self, id: u32, value: &[u8]) -> io::Result<()> {
-        let conn = self.others_tx.get_mut(&id).unwrap();
-        conn.write_all(value).await
+    fn send_to(&self, id: u32) -> SendTo {
+        let inner = Arc::clone(self.others_tx.get(&id).unwrap());
+        SendTo { inner }
     }
 
-    async fn read_from(&mut self, id: u32, value: &mut [u8]) -> io::Result<()> {
-        let conn = self.others_rx.get_mut(&id).unwrap();
-        conn.read_exact(value).await.map(|_| ())
+    fn recv_from(&self, id: u32) -> RecvFrom {
+        let inner = Arc::clone(self.others_rx.get(&id).unwrap());
+        RecvFrom { inner }
+    }
+}
+
+impl SendTo {
+    async fn value(&self, buf: &[u8]) -> io::Result<()> {
+        loop {
+            self.inner.writable().await?;
+            match self.inner.try_write(buf) {
+                Ok(n) if n != buf.len() => return Err(io::Error::new(io::ErrorKind::Other, "Short write")),
+                Ok(_) => return Ok(()),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+}
+
+impl RecvFrom {
+    async fn value(&self, buf: &mut [u8]) -> io::Result<usize> {
+        loop {
+            self.inner.readable().await?;
+            match self.inner.try_read(buf) {
+                Ok(n) => return Ok(n),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
     }
 }
