@@ -27,6 +27,7 @@ enum ProtoPhase {
 
 #[derive(Debug)]
 struct System {
+    view: u32,
     phase: ProtoPhase,
     node: Node,
 }
@@ -64,16 +65,7 @@ async fn main() -> io::Result<()> {
 
     let mut sys = System::boot(id).await?;
 
-    if sys.node.id == 0 {
-        sys.leader_loop().await
-    } else {
-        //sys.backup_loop().await
-        let mut buf = [0; 4096];
-        let n = sys.node.recv_from(0).value(&mut buf[..]).await?;
-        let s = std::str::from_utf8(&buf[..n]).unwrap();
-        print!("{}", s);
-        Ok(())
-    }
+    sys.consensus_loop().await
 }
 
 impl System {
@@ -129,23 +121,24 @@ impl System {
 
         let phase = ProtoPhase::Init;
         let node = Node { id, others_tx, others_rx };
-        Ok(System { phase, node })
+        Ok(System { view: 0, phase, node })
     }
 
     #[inline]
-    async fn leader_loop(&mut self) -> io::Result<()> {
+    async fn consensus_loop(&mut self) -> io::Result<()> {
         let mut buf = String::new();
         let mut input = BufReader::new(File::open("/tmp/consensus/input").await?);
-        while !self.leader_step(&mut input, &mut buf).await? {
+        while !self.consensus_step(&mut input, &mut buf).await? {
             // nothing
         }
         Ok(())
     }
 
     #[inline]
-    async fn leader_step(&mut self, mut input: impl Unpin + AsyncBufRead, buf: &mut String) -> io::Result<bool> {
+    async fn consensus_step(&mut self, mut input: impl Unpin + AsyncBufRead, buf: &mut String) -> io::Result<bool> {
         match self.phase {
-            ProtoPhase::Init => {
+            // leader
+            ProtoPhase::Init if self.node.id == self.view => {
                 println!("< INIT        r{} >", self.node.id);
                 let n = input.read_line(buf).await?;
                 if n == 0 {
@@ -153,11 +146,66 @@ impl System {
                 }
                 self.phase = ProtoPhase::PrePreparing;
             },
-            ProtoPhase::PrePreparing => {
+            // backup
+            ProtoPhase::Init => {
+                println!("< INIT        r{} >", self.node.id);
+                self.phase = ProtoPhase::PrePreparing;
+            },
+            // leader
+            ProtoPhase::PrePreparing if self.node.id == self.view => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
                 for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
                     let send_to_replica = self.node.send_to(id);
-                    send_to_replica.value(buf.as_ref()).await?; // TODO: spawn task
+                    let buf = buf.clone();
+                    tokio::spawn(async move {
+                        let len = (buf.len() as u32).to_be_bytes();
+                        send_to_replica.value(&PHASE_PRE_PREPARE[..]).await.unwrap_or(());
+                        send_to_replica.value(&len[..]).await.unwrap_or(());
+                        send_to_replica.value(buf.as_ref()).await.unwrap_or(());
+                    });
+                }
+                self.phase = ProtoPhase::Preparing;
+            },
+            // backup
+            ProtoPhase::PrePreparing => {
+                println!("< PRE-PREPARE r{} >", self.node.id);
+                let (tx, mut rx) = mpsc::channel(8);
+                let mut counter = 0;
+                for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
+                    let recv_from_replica = self.node.recv_from(id);
+                    let buf = buf.clone();
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        let mut buf = [0; 256];
+                        recv_from_replica.value(&mut buf[..8]).await.unwrap();
+                        if &buf[..4] != &PHASE_PRE_PREPARE[..] {
+                            panic!("INVALID PHASE");
+                        }
+                        let len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
+                        recv_from_replica.value(&mut buf[..len]).await.unwrap();
+                        tx.send((len, buf)).await.unwrap();
+                    });
+                }
+                loop {
+                    let (n, buf_rx) = rx.recv().await.unwrap();
+                    match counter {
+                        0 => {
+                            let s = std::str::from_utf8(&buf_rx[..n]).unwrap();
+                            buf.push_str(s);
+                            counter += 1;
+                        },
+                        // 2f+1 = 2*1 + 1 = 3
+                        _ if counter == 3 => {
+                            break;
+                        },
+                        _ => {
+                            let s = std::str::from_utf8(&buf_rx[..n]).unwrap();
+                            if buf != s {
+                                panic!("DIFFERENT");
+                            }
+                            counter += 1;
+                        },
+                    }
                 }
                 self.phase = ProtoPhase::Preparing;
             },
@@ -177,10 +225,6 @@ impl System {
         }
         Ok(false)
     }
-
-    async fn backup_loop(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 impl Node {
@@ -197,11 +241,16 @@ impl Node {
 
 impl SendTo {
     async fn value(&self, buf: &[u8]) -> io::Result<()> {
+        let mut i = 0;
         loop {
             self.inner.writable().await?;
-            match self.inner.try_write(buf) {
-                Ok(n) if n != buf.len() => return Err(io::Error::new(io::ErrorKind::Other, "Short write")),
-                Ok(_) => return Ok(()),
+            match self.inner.try_write(&buf[i..]) {
+                Ok(n) => {
+                    if n == buf.len() - i {
+                        return Ok(());
+                    }
+                    i += n;
+                },
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 Err(e) => return Err(e.into()),
             }
@@ -210,11 +259,17 @@ impl SendTo {
 }
 
 impl RecvFrom {
-    async fn value(&self, buf: &mut [u8]) -> io::Result<usize> {
+    async fn value(&self, buf: &mut [u8]) -> io::Result<()> {
+        let mut i = 0;
         loop {
             self.inner.readable().await?;
-            match self.inner.try_read(buf) {
-                Ok(n) => return Ok(n),
+            match self.inner.try_read(&mut buf[i..]) {
+                Ok(n) => {
+                    if n == buf.len() - i {
+                        return Ok(());
+                    }
+                    i += n;
+                },
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 Err(e) => return Err(e.into()),
             }
