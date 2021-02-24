@@ -72,7 +72,7 @@ impl System {
     async fn boot(id: u32) -> io::Result<Self> {
         // assume we're using 4 nodes -> f = 1;
         // assume leader id = 0; others = 1, 2, 3;
-        let listener = TcpListener::bind(format!("127.0.0.1:1000{}", id)).await?;
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", 10000 + id)).await?;
         let mut others_tx = HashMap::new();
         let mut others_rx = HashMap::new();
 
@@ -94,7 +94,7 @@ impl System {
         for other_id in (0_u32..4_u32).filter(|&x| x != id) {
             let tx = tx.clone();
             tokio::spawn(async move {
-                let addr = format!("127.0.0.1:1000{}", other_id);
+                let addr = format!("127.0.0.1:{}", 10000 + other_id);
                 // try 4 times
                 for _ in 0..4 {
                     if let Ok(mut conn) = TcpStream::connect(&addr).await {
