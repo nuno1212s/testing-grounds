@@ -139,8 +139,10 @@ impl System {
     async fn consensus_loop(&mut self) -> io::Result<()> {
         let mut buf = String::new();
         let mut input = BufReader::new(File::open("/tmp/consensus/input").await?);
+        let mut round = 0;
         while !self.consensus_step(&mut input, &mut buf).await? {
-            // nothing
+            round += 1;
+            println!("End of round {} on replica {}.", round, self.node.id);
         }
         Ok(())
     }
@@ -191,46 +193,30 @@ impl System {
                 loop {
                     let message = rx.recv().await.unwrap();
                     match message {
-                        Message::Prepare => (),
+                        Message::Prepare => counter += 1,
                         _ => panic!("INVALID PHASE"),
                     };
-                    match counter {
-                        0 => {
-                            counter += 1;
-                        },
-                        _ => {
-                            counter += 1;
-                            if counter == 3 {
-                                self.node.broadcast(Message::Commit, 0_u32..4_u32);
-                                break;
-                            }
-                        },
+                    if counter == 3 {
+                        self.node.broadcast(Message::Commit, 0_u32..4_u32);
+                        break;
                     }
                 }
                 self.phase = ProtoPhase::Executing;
             },
             ProtoPhase::Executing => {
-                print!("< EXECUTE     r{} > {}", self.node.id, buf);
+                println!("< EXECUTE     r{} >", self.node.id);
                 let mut counter = 0;
                 let mut rx = self.node.receive(0_u32..4_u32);
                 loop {
                     let message = rx.recv().await.unwrap();
                     match message {
-                        Message::Commit => (),
+                        Message::Commit => counter += 1,
                         _ => panic!("INVALID PHASE"),
                     };
-                    match counter {
-                        0 => {
-                            counter += 1;
-                        },
-                        _ => {
-                            counter += 1;
-                            if counter == 3 {
-                                eprintln!("{}", buf);
-                                buf.clear();
-                                break;
-                            }
-                        },
+                    if counter == 3 {
+                        eprintln!("{}", buf);
+                        buf.clear();
+                        break;
                     }
                 }
                 self.phase = ProtoPhase::Init;
