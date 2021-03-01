@@ -31,7 +31,7 @@ enum ProtoPhase {
 
 #[derive(Debug)]
 struct System {
-    view: u32,
+    leader: u32,
     phase: ProtoPhase,
     node: Node,
 }
@@ -93,7 +93,7 @@ impl System {
             loop {
                 if let Ok((mut conn, _)) = listener.accept().await {
                     let id = conn.read_u32().await.unwrap();
-                    tx.send(CommSide::Rx((id, conn))).await.unwrap();
+                    tx.send(CommSide::Rx((id, conn))).await.unwrap_or(());
                 }
             }
         });
@@ -131,7 +131,7 @@ impl System {
         let c = mpsc::channel(8);
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
         let node = Node { id, others_tx, others_rx, my_tx, my_rx };
-        Ok(System { view: 0, phase, node })
+        Ok(System { leader: 0, phase, node })
     }
 
     #[inline]
@@ -147,57 +147,38 @@ impl System {
     #[inline]
     async fn consensus_step(&mut self, mut input: impl Unpin + AsyncBufRead, buf: &mut String) -> io::Result<bool> {
         match self.phase {
-            // leader
-            ProtoPhase::Init if self.node.id == self.view => {
+            ProtoPhase::Init => {
                 println!("< INIT        r{} >", self.node.id);
-                let n = input.read_line(buf).await?;
-                if n == 0 {
-                    return Ok(true);
+                if self.node.id == self.leader {
+                    let n = input.read_line(buf).await?;
+                    if n == 0 {
+                        return Ok(true);
+                    }
                 }
                 self.phase = ProtoPhase::PrePreparing;
             },
-            // backup
-            ProtoPhase::Init => {
-                println!("< INIT        r{} >", self.node.id);
-                self.phase = ProtoPhase::PrePreparing;
-            },
-            // leader
-            ProtoPhase::PrePreparing if self.node.id == self.view => {
+            ProtoPhase::PrePreparing => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
-                let value: i32 = (&buf[..buf.len()-1]).parse().unwrap_or(0);
-                let message = Message::PrePrepare(value);
-                for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
-                    let send_to_replica = self.node.send_to(id);
-                    tokio::spawn(async move {
-                        send_to_replica.value(message).await.unwrap_or(());
-                    });
+                if self.node.id == self.leader {
+                    let value: i32 = (&buf[..buf.len()-1]).parse().unwrap_or(0);
+                    let message = Message::PrePrepare(value);
+                    self.node.broadcast(message, 0_u32..4_u32);
+                    self.phase = ProtoPhase::Preparing;
+                    return Ok(false);
                 }
                 self.phase = ProtoPhase::Preparing;
             },
-            // backup
-            ProtoPhase::PrePreparing => {
-                println!("< PRE-PREPARE r{} >", self.node.id);
-                // XXX XXX XXX XXX XXX XXX XXX XXX
-                // XXX XXX XXX XXX XXX XXX XXX XXX
-                // XXX XXX XXX XXX XXX XXX XXX XXX
-                // XXX XXX XXX XXX XXX XXX XXX XXX
-                // This should be in the PREPARE phase
-                let (tx, mut rx) = mpsc::channel(8);
+            ProtoPhase::Preparing => {
+                println!("< PREPARE     r{} >", self.node.id);
                 let mut counter = 0;
-                for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
-                    let recv_from_replica = self.node.recv_from(id);
-                    let tx = tx.clone();
-                    tokio::spawn(async move {
-                        let message = recv_from_replica.value().await.unwrap();
-                        match message {
-                            Message::PrePrepare(value) => tx.send(value).await.unwrap(),
-                            _ => panic!("INVALID PHASE"),
-                        }
-                    });
-                }
+                let mut rx = self.node.receive(0_u32..4_u32);
                 let mut received = 0;
                 loop {
-                    let value = rx.recv().await.unwrap();
+                    let message = rx.recv().await.unwrap();
+                    let value = match message {
+                        Message::PrePrepare(value) => value,
+                        _ => panic!("INVALID PHASE"),
+                    };
                     match counter {
                         0 => {
                             received = value;
@@ -205,6 +186,9 @@ impl System {
                         },
                         // 2f+1 = 2*1 + 1 = 3
                         _ if counter == 3 => {
+                            if self.node.id != self.leader {
+                                self.node.broadcast(Message::Prepare, 0_u32..4_u32);
+                            }
                             break;
                         },
                         _ => {
@@ -215,10 +199,6 @@ impl System {
                         },
                     }
                 }
-                self.phase = ProtoPhase::Preparing;
-            },
-            ProtoPhase::Preparing => {
-                println!("< PREPARE     r{} >", self.node.id);
                 self.phase = ProtoPhase::Commiting;
             },
             ProtoPhase::Commiting => {
@@ -254,6 +234,28 @@ impl Node {
             let inner = Arc::clone(&self.my_rx);
             RecvFrom::Me(inner)
         }
+    }
+
+    fn broadcast(&self, m: Message, targets: impl Iterator<Item = u32>) {
+        for id in targets {
+            let send_to = self.send_to(id);
+            tokio::spawn(async move {
+                send_to.value(m).await.unwrap();
+            });
+        }
+    }
+
+    fn receive(&self, targets: impl Iterator<Item = u32>) -> mpsc::Receiver<Message> {
+        let (tx, rx) = mpsc::channel(1);
+        for id in targets {
+            let recv_from = self.recv_from(id);
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                let message = recv_from.value().await.unwrap();
+                tx.send(message).await.unwrap_or(());
+            });
+        }
+        rx
     }
 }
 
