@@ -11,6 +11,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -181,21 +182,22 @@ impl System {
                     };
                     match counter {
                         0 => {
+                            write!(buf, "Received value {}!", received).unwrap();
                             received = value;
                             counter += 1;
-                        },
-                        // 2f+1 = 2*1 + 1 = 3
-                        _ if counter == 3 => {
-                            if self.node.id != self.leader {
-                                self.node.broadcast(Message::Prepare, 0_u32..4_u32);
-                            }
-                            break;
                         },
                         _ => {
                             if value != received {
                                 panic!("DIFFERENT");
                             }
                             counter += 1;
+                            // 2f+1 = 2*1 + 1 = 3
+                            if counter == 3 {
+                                if self.node.id != self.leader {
+                                    self.node.broadcast(Message::Prepare, 0_u32..4_u32);
+                                }
+                                break;
+                            }
                         },
                     }
                 }
@@ -203,11 +205,53 @@ impl System {
             },
             ProtoPhase::Commiting => {
                 println!("< COMMIT      r{} >", self.node.id);
+                let mut counter = 0;
+                let mut rx = self.node.receive(0_u32..4_u32);
+                loop {
+                    let message = rx.recv().await.unwrap();
+                    match message {
+                        Message::Prepare => (),
+                        _ => panic!("INVALID PHASE"),
+                    };
+                    match counter {
+                        0 => {
+                            counter += 1;
+                        },
+                        _ => {
+                            counter += 1;
+                            if counter == 3 {
+                                self.node.broadcast(Message::Commit, 0_u32..4_u32);
+                                break;
+                            }
+                        },
+                    }
+                }
                 self.phase = ProtoPhase::Executing;
             },
             ProtoPhase::Executing => {
                 print!("< EXECUTE     r{} > {}", self.node.id, buf);
-                buf.clear();
+                let mut counter = 0;
+                let mut rx = self.node.receive(0_u32..4_u32);
+                loop {
+                    let message = rx.recv().await.unwrap();
+                    match message {
+                        Message::Commit => (),
+                        _ => panic!("INVALID PHASE"),
+                    };
+                    match counter {
+                        0 => {
+                            counter += 1;
+                        },
+                        _ => {
+                            counter += 1;
+                            if counter == 3 {
+                                println!("{}", buf);
+                                buf.clear();
+                                break;
+                            }
+                        },
+                    }
+                }
                 self.phase = ProtoPhase::Init;
             },
         }
