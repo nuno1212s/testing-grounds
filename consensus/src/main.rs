@@ -8,13 +8,17 @@ use tokio::io::BufReader;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-// the three protocol phases
-const PHASE_PRE_PREPARE: [u8; 4] = *b"PPPR";
-const PHASE_PREPARE: [u8; 4] = *b"PRPR";
-const PHASE_COMMIT: [u8; 4] = *b"CMIT";
+#[derive(Copy, Clone, Serialize, Deserialize)]
+enum Message {
+    PrePrepare(i32),
+    Prepare,
+    Commit,
+}
 
 #[derive(Debug)]
 enum ProtoPhase {
@@ -43,18 +47,20 @@ struct Node {
     id: u32,
     others_tx: HashMap<u32, Arc<TcpStream>>,
     others_rx: HashMap<u32, Arc<TcpStream>>,
-//    my_tx: Arc<mpsc::Sender<i32>>,
-//    my_rx: Arc<mpsc::Receiver<i32>>,
+    my_tx: Arc<mpsc::Sender<Message>>,
+    my_rx: Arc<Mutex<mpsc::Receiver<Message>>>,
 }
 
 #[derive(Debug)]
-struct SendTo {
-    inner: Arc<TcpStream>,
+enum SendTo {
+    Me(Arc<mpsc::Sender<Message>>),
+    Others(Arc<TcpStream>),
 }
 
 #[derive(Debug)]
-struct RecvFrom {
-    inner: Arc<TcpStream>,
+enum RecvFrom {
+    Me(Arc<Mutex<mpsc::Receiver<Message>>>),
+    Others(Arc<TcpStream>),
 }
 
 #[tokio::main]
@@ -122,7 +128,9 @@ impl System {
         }
 
         let phase = ProtoPhase::Init;
-        let node = Node { id, others_tx, others_rx };
+        let c = mpsc::channel(8);
+        let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
+        let node = Node { id, others_tx, others_rx, my_tx, my_rx };
         Ok(System { view: 0, phase, node })
     }
 
@@ -156,14 +164,12 @@ impl System {
             // leader
             ProtoPhase::PrePreparing if self.node.id == self.view => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
-                let value: i32 = buf.parse().unwrap_or(0);
+                let value: i32 = (&buf[..buf.len()-1]).parse().unwrap_or(0);
+                let message = Message::PrePrepare(value);
                 for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
                     let send_to_replica = self.node.send_to(id);
-                    let buf = buf.clone();
                     tokio::spawn(async move {
-                        let value = value.to_be_bytes();
-                        send_to_replica.value(&PHASE_PRE_PREPARE[..]).await.unwrap_or(());
-                        send_to_replica.value(value.as_ref()).await.unwrap_or(());
+                        send_to_replica.value(message).await.unwrap_or(());
                     });
                 }
                 self.phase = ProtoPhase::Preparing;
@@ -180,16 +186,13 @@ impl System {
                 let mut counter = 0;
                 for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
                     let recv_from_replica = self.node.recv_from(id);
-                    let buf = buf.clone();
                     let tx = tx.clone();
                     tokio::spawn(async move {
-                        let mut buf = [0; 8];
-                        recv_from_replica.value(&mut buf[..]).await.unwrap();
-                        if &buf[..4] != &PHASE_PRE_PREPARE[..] {
-                            panic!("INVALID PHASE");
+                        let message = recv_from_replica.value().await.unwrap();
+                        match message {
+                            Message::PrePrepare(value) => tx.send(value).await.unwrap(),
+                            _ => panic!("INVALID PHASE"),
                         }
-                        let value = i32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]);
-                        tx.send(value).await.unwrap();
                     });
                 }
                 let mut received = 0;
@@ -234,50 +237,91 @@ impl System {
 
 impl Node {
     fn send_to(&self, id: u32) -> SendTo {
-        let inner = Arc::clone(self.others_tx.get(&id).unwrap());
-        SendTo { inner }
+        if self.id != id {
+            let inner = Arc::clone(self.others_tx.get(&id).unwrap());
+            SendTo::Others(inner)
+        } else {
+            let inner = Arc::clone(&self.my_tx);
+            SendTo::Me(inner)
+        }
     }
 
     fn recv_from(&self, id: u32) -> RecvFrom {
-        let inner = Arc::clone(self.others_rx.get(&id).unwrap());
-        RecvFrom { inner }
+        if self.id != id {
+            let inner = Arc::clone(self.others_rx.get(&id).unwrap());
+            RecvFrom::Others(inner)
+        } else {
+            let inner = Arc::clone(&self.my_rx);
+            RecvFrom::Me(inner)
+        }
     }
 }
 
 impl SendTo {
-    async fn value(&self, buf: &[u8]) -> io::Result<()> {
-        let mut i = 0;
-        loop {
-            self.inner.writable().await?;
-            match self.inner.try_write(&buf[i..]) {
-                Ok(n) => {
-                    if n == buf.len() - i {
-                        return Ok(());
-                    }
-                    i += n;
-                },
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => return Err(e.into()),
+    async fn value(&self, m: Message) -> io::Result<()> {
+        async fn me(m: Message, s: &mpsc::Sender<Message>) -> io::Result<()> {
+            Ok(s.send(m).await.unwrap_or(()))
+        }
+        async fn write(s: &TcpStream, buf: &[u8]) -> io::Result<()> {
+            let mut i = 0;
+            loop {
+                s.writable().await?;
+                match s.try_write(&buf[i..]) {
+                    Ok(n) => {
+                        if n == buf.len() - i {
+                            return Ok(());
+                        }
+                        i += n;
+                    },
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => return Err(e.into()),
+                }
             }
+        }
+        async fn others(m: Message, s: &TcpStream) -> io::Result<()> {
+            let buf = bincode::serialize(&m).unwrap();
+            let len = (buf.len() as u32).to_be_bytes();
+            write(s, &len).await?;
+            write(s, &buf).await
+        }
+        match self {
+            SendTo::Me(ref inner) => me(m, &*inner).await,
+            SendTo::Others(ref inner) => others(m, &*inner).await,
         }
     }
 }
 
 impl RecvFrom {
-    async fn value(&self, buf: &mut [u8]) -> io::Result<()> {
-        let mut i = 0;
-        loop {
-            self.inner.readable().await?;
-            match self.inner.try_read(&mut buf[i..]) {
-                Ok(n) => {
-                    if n == buf.len() - i {
-                        return Ok(());
-                    }
-                    i += n;
-                },
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => return Err(e.into()),
+    async fn value(&self) -> io::Result<Message> {
+        async fn me(s: &Mutex<mpsc::Receiver<Message>>) -> io::Result<Message> {
+            Ok(s.lock().await.recv().await.unwrap())
+        }
+        async fn read(s: &TcpStream, buf: &mut [u8]) -> io::Result<()> {
+            let mut i = 0;
+            loop {
+                s.readable().await?;
+                match s.try_read(&mut buf[i..]) {
+                    Ok(n) => {
+                        if n == buf.len() - i {
+                            return Ok(());
+                        }
+                        i += n;
+                    },
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => return Err(e.into()),
+                }
             }
+        }
+        async fn others(s: &TcpStream) -> io::Result<Message> {
+            let mut size = [0; 4];
+            read(s, &mut size[..]).await?;
+            let mut buf = vec![0; u32::from_be_bytes(size) as usize];
+            read(s, &mut buf[..]).await?;
+            Ok(bincode::deserialize(&buf).unwrap())
+        }
+        match self {
+            RecvFrom::Me(ref inner) => me(&*inner).await,
+            RecvFrom::Others(ref inner) => others(&*inner).await,
         }
     }
 }
