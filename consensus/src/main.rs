@@ -43,6 +43,8 @@ struct Node {
     id: u32,
     others_tx: HashMap<u32, Arc<TcpStream>>,
     others_rx: HashMap<u32, Arc<TcpStream>>,
+//    my_tx: Arc<mpsc::Sender<i32>>,
+//    my_rx: Arc<mpsc::Receiver<i32>>,
 }
 
 #[derive(Debug)]
@@ -154,14 +156,14 @@ impl System {
             // leader
             ProtoPhase::PrePreparing if self.node.id == self.view => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
+                let value: i32 = buf.parse().unwrap_or(0);
                 for id in (0_u32..4_u32).filter(|&x| x != self.node.id) {
                     let send_to_replica = self.node.send_to(id);
                     let buf = buf.clone();
                     tokio::spawn(async move {
-                        let len = (buf.len() as u32).to_be_bytes();
+                        let value = value.to_be_bytes();
                         send_to_replica.value(&PHASE_PRE_PREPARE[..]).await.unwrap_or(());
-                        send_to_replica.value(&len[..]).await.unwrap_or(());
-                        send_to_replica.value(buf.as_ref()).await.unwrap_or(());
+                        send_to_replica.value(value.as_ref()).await.unwrap_or(());
                     });
                 }
                 self.phase = ProtoPhase::Preparing;
@@ -181,22 +183,21 @@ impl System {
                     let buf = buf.clone();
                     let tx = tx.clone();
                     tokio::spawn(async move {
-                        let mut buf = [0; 256];
-                        recv_from_replica.value(&mut buf[..8]).await.unwrap();
+                        let mut buf = [0; 8];
+                        recv_from_replica.value(&mut buf[..]).await.unwrap();
                         if &buf[..4] != &PHASE_PRE_PREPARE[..] {
                             panic!("INVALID PHASE");
                         }
-                        let len = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
-                        recv_from_replica.value(&mut buf[..len]).await.unwrap();
-                        tx.send((len, buf)).await.unwrap();
+                        let value = i32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]);
+                        tx.send(value).await.unwrap();
                     });
                 }
+                let mut received = 0;
                 loop {
-                    let (n, buf_rx) = rx.recv().await.unwrap();
+                    let value = rx.recv().await.unwrap();
                     match counter {
                         0 => {
-                            let s = std::str::from_utf8(&buf_rx[..n]).unwrap();
-                            buf.push_str(s);
+                            received = value;
                             counter += 1;
                         },
                         // 2f+1 = 2*1 + 1 = 3
@@ -204,8 +205,7 @@ impl System {
                             break;
                         },
                         _ => {
-                            let s = std::str::from_utf8(&buf_rx[..n]).unwrap();
-                            if buf != s {
+                            if value != received {
                                 panic!("DIFFERENT");
                             }
                             counter += 1;
