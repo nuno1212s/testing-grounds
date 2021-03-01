@@ -12,8 +12,14 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::Arc;
 
-#[derive(Copy, Clone, Serialize, Deserialize)]
-enum Message {
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+struct Message {
+    seq: i32,
+    kind: MessageKind,
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+enum MessageKind {
     PrePrepare(i32),
     Prepare,
     Commit,
@@ -30,9 +36,13 @@ enum ProtoPhase {
 
 #[derive(Debug)]
 struct System {
+    seq: i32,
     leader: u32,
     phase: ProtoPhase,
     node: Node,
+    tbo_pre_prepare: Vec<Vec<Message>>,
+    tbo_prepare: Vec<Vec<Message>>,
+    tbo_commit: Vec<Vec<Message>>,
 }
 
 #[derive(Debug)]
@@ -133,7 +143,18 @@ impl System {
         let c = mpsc::channel(8);
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
         let node = Node { id, others_tx, others_rx, my_tx, my_rx };
-        Ok(System { leader: 0, phase, node })
+        Ok(System {
+            seq: 0,
+            leader: 0,
+            tbo_pre_prepare: Vec::new(),
+            tbo_prepare: Vec::new(),
+            tbo_commit: Vec::new(),
+            phase,
+            node,
+        })
+    }
+
+    fn queue_pre_prepare(&mut self, m: Message) {
     }
 
     #[inline]
@@ -162,7 +183,7 @@ impl System {
                 println!("< PRE-PREPARE r{} >", self.node.id);
                 if self.node.id == self.leader {
                     let value: i32 = buf.parse().unwrap_or(0);
-                    let message = Message::PrePrepare(value);
+                    let message = self.new_msg(MessageKind::PrePrepare(value));
                     self.node.broadcast(message, 0_u32..4_u32);
                     buf.clear();
                 }
@@ -170,18 +191,21 @@ impl System {
             },
             ProtoPhase::Preparing => {
                 println!("< PREPARE     r{} >", self.node.id);
-                let targets = [self.leader];
-                let mut rx = self.node.receive(targets.iter().copied());
-                let message = rx.recv().await.unwrap();
-                let value = match message {
-                    Message::PrePrepare(value) => value,
-                    Message::Prepare => panic!("PREPARE OUT OF CONTEXT"),
-                    Message::Commit => panic!("COMMIT OUT OF CONTEXT"),
+                let message = if let Some(m) = pop_message(&mut self.tbo_pre_prepare) {
+                    m
+                } else {
+                    self.node.recv_from(self.leader).value().await?
+                };
+                let value = match message.kind {
+                    MessageKind::PrePrepare(value) => value,
+                    MessageKind::Prepare => queue_message(self.seq, &mut self.tbo_prepare, message),
+                    MessageKind::Commit => queue_message(self.seq, &mut self.tbo_commit, message),
                 };
                 write!(buf, "Received value {}!", value).unwrap();
                 if self.node.id != self.leader {
-                    self.node.broadcast(Message::Prepare, 0_u32..4_u32);
+                    self.node.broadcast(self.new_msg(MessageKind::Prepare), 0_u32..4_u32);
                 }
+                advance_message_queue(&mut self.tbo_pre_prepare);
                 self.phase = ProtoPhase::Commiting;
             },
             ProtoPhase::Commiting => {
@@ -189,17 +213,22 @@ impl System {
                 let mut counter = 0;
                 let mut rx = self.node.receive(0_u32..4_u32);
                 loop {
-                    let message = rx.recv().await.unwrap();
-                    match message {
-                        Message::PrePrepare(_) => panic!("PRE-PREPARE OUT OF CONTEXT"),
-                        Message::Prepare => counter += 1,
-                        Message::Commit => panic!("COMMIT OUT OF CONTEXT"),
+                    let message = if let Some(m) = pop_message(&mut self.tbo_prepare) {
+                        m
+                    } else {
+                        rx.recv().await.unwrap()
+                    };
+                    match message.kind {
+                        MessageKind::PrePrepare(_) => queue_message(self.seq, &mut self.tbo_pre_prepare, message),
+                        MessageKind::Prepare => counter += 1,
+                        MessageKind::Commit => queue_message(self.seq, &mut self.tbo_commit, message),
                     };
                     if counter == 3 {
-                        self.node.broadcast(Message::Commit, 0_u32..4_u32);
+                        self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..4_u32);
                         break;
                     }
                 }
+                advance_message_queue(&mut self.tbo_prepare);
                 self.phase = ProtoPhase::Executing;
             },
             ProtoPhase::Executing => {
@@ -207,11 +236,15 @@ impl System {
                 let mut counter = 0;
                 let mut rx = self.node.receive(0_u32..4_u32);
                 loop {
-                    let message = rx.recv().await.unwrap();
-                    match message {
-                        Message::PrePrepare(_) => panic!("PRE-PREPARE OUT OF CONTEXT"),
-                        Message::Prepare => panic!("PREPARE OUT OF CONTEXT"),
-                        Message::Commit => counter += 1,
+                    let message = if let Some(m) = pop_message(&mut self.tbo_commit) {
+                        m
+                    } else {
+                        rx.recv().await.unwrap()
+                    };
+                    match message.kind {
+                        MessageKind::PrePrepare(_) => queue_message(self.seq, &mut self.tbo_pre_prepare, message),
+                        MessageKind::Prepare => queue_message(self.seq, &mut self.tbo_prepare, message),
+                        MessageKind::Commit => counter += 1,
                     };
                     if counter == 3 {
                         eprintln!("{}", buf);
@@ -219,10 +252,16 @@ impl System {
                         break;
                     }
                 }
+                advance_message_queue(&mut self.tbo_commit);
                 self.phase = ProtoPhase::Init;
+                self.seq += 1;
             },
         }
         Ok(false)
+    }
+
+    fn new_msg(&self, kind: MessageKind) -> Message {
+        Message::new(self.seq, kind)
     }
 }
 
@@ -336,5 +375,38 @@ impl RecvFrom {
             RecvFrom::Me(ref inner) => me(&*inner).await,
             RecvFrom::Others(ref inner) => others(&*inner).await,
         }
+    }
+}
+
+impl Message {
+    fn new(seq: i32, kind: MessageKind) -> Self {
+        Self { seq, kind }
+    }
+}
+
+fn pop_message(tbo: &mut Vec<Vec<Message>>) -> Option<Message> {
+    if tbo.is_empty() {
+        None
+    } else {
+        tbo[0].pop()
+    }
+}
+
+fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<Message>>, m: Message) {
+    let index = m.seq - curr_seq - 1;
+    if index < 0 {
+        // drop old messages
+        return;
+    }
+    if index >= tbo.len() {
+        let len = tbo.len() - index + 1;
+        tbo.extend(std::iter::repeat_with(Vec::new).take(len));
+    }
+    tbo[index].push(m);
+}
+
+fn advance_message_queue(tbo: &mut Vec<Vec<Message>>) {
+    if !tbo.is_empty() {
+        tbo.remove(0);
     }
 }
