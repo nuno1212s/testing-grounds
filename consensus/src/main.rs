@@ -171,35 +171,16 @@ impl System {
             },
             ProtoPhase::Preparing => {
                 println!("< PREPARE     r{} >", self.node.id);
-                let mut counter = 0;
-                let mut rx = self.node.receive(0_u32..4_u32);
-                let mut received = 0;
-                loop {
-                    let message = rx.recv().await.unwrap();
-                    let value = match message {
-                        Message::PrePrepare(value) => value,
-                        _ => panic!("INVALID PHASE"),
-                    };
-                    match counter {
-                        0 => {
-                            write!(buf, "Received value {}!", received).unwrap();
-                            received = value;
-                            counter += 1;
-                        },
-                        _ => {
-                            if value != received {
-                                panic!("DIFFERENT");
-                            }
-                            counter += 1;
-                            // 2f+1 = 2*1 + 1 = 3
-                            if counter == 3 {
-                                if self.node.id != self.leader {
-                                    self.node.broadcast(Message::Prepare, 0_u32..4_u32);
-                                }
-                                break;
-                            }
-                        },
-                    }
+                let targets = [self.leader];
+                let mut rx = self.node.receive(targets.iter().copied());
+                let message = rx.recv().await.unwrap();
+                let value = match message {
+                    Message::PrePrepare(value) => value,
+                    _ => panic!("INVALID PHASE"),
+                };
+                write!(buf, "Received value {}!", value).unwrap();
+                if self.node.id != self.leader {
+                    self.node.broadcast(Message::Prepare, 0_u32..4_u32);
                 }
                 self.phase = ProtoPhase::Commiting;
             },
@@ -245,7 +226,7 @@ impl System {
                         _ => {
                             counter += 1;
                             if counter == 3 {
-                                println!("{}", buf);
+                                eprintln!("{}", buf);
                                 buf.clear();
                                 break;
                             }
@@ -290,7 +271,7 @@ impl Node {
     }
 
     fn receive(&self, targets: impl Iterator<Item = u32>) -> mpsc::Receiver<Message> {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(8);
         for id in targets {
             let recv_from = self.recv_from(id);
             let tx = tx.clone();
