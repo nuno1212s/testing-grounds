@@ -69,10 +69,13 @@ async fn main() -> io::Result<()> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
         .parse()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
     let mut sys = System::boot(id).await?;
 
-    sys.consensus_loop("1 2 3 4 5").await
+    let values = std::env::args()
+        .nth(1)
+        .unwrap();
+
+    sys.consensus_loop(&values).await
 }
 
 impl System {
