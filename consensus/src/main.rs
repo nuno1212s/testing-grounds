@@ -3,9 +3,7 @@
 // way up from there
 
 use tokio::io;
-use tokio::fs::File;
-use tokio::io::BufReader;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
@@ -74,7 +72,7 @@ async fn main() -> io::Result<()> {
 
     let mut sys = System::boot(id).await?;
 
-    sys.consensus_loop().await
+    sys.consensus_loop("1 2 3 4 5").await
 }
 
 impl System {
@@ -136,38 +134,34 @@ impl System {
     }
 
     #[inline]
-    async fn consensus_loop(&mut self) -> io::Result<()> {
+    async fn consensus_loop(&mut self, values: &str) -> io::Result<()> {
+        let mut input = values.split_whitespace();
         let mut buf = String::new();
-        let mut input = BufReader::new(File::open("/tmp/consensus/input").await?);
-        let mut round = 0;
         while !self.consensus_step(&mut input, &mut buf).await? {
-            round += 1;
-            println!("End of round {} on replica {}.", round, self.node.id);
+            // nothing
         }
         Ok(())
     }
 
     #[inline]
-    async fn consensus_step(&mut self, mut input: impl Unpin + AsyncBufRead, buf: &mut String) -> io::Result<bool> {
+    async fn consensus_step<'a>(&mut self, mut input: impl Iterator<Item = &'a str>, buf: &mut String) -> io::Result<bool> {
         match self.phase {
             ProtoPhase::Init => {
                 println!("< INIT        r{} >", self.node.id);
-                if self.node.id == self.leader {
-                    let n = input.read_line(buf).await?;
-                    if n == 0 {
-                        return Ok(true);
-                    }
-                }
+                match input.next() {
+                    Some(s) if self.node.id == self.leader => buf.push_str(s),
+                    Some(_) => (),
+                    None => return Ok(true),
+                };
                 self.phase = ProtoPhase::PrePreparing;
             },
             ProtoPhase::PrePreparing => {
                 println!("< PRE-PREPARE r{} >", self.node.id);
                 if self.node.id == self.leader {
-                    let value: i32 = (&buf[..buf.len()-1]).parse().unwrap_or(0);
+                    let value: i32 = buf.parse().unwrap_or(0);
                     let message = Message::PrePrepare(value);
                     self.node.broadcast(message, 0_u32..4_u32);
-                    self.phase = ProtoPhase::Preparing;
-                    return Ok(false);
+                    buf.clear();
                 }
                 self.phase = ProtoPhase::Preparing;
             },
@@ -178,7 +172,8 @@ impl System {
                 let message = rx.recv().await.unwrap();
                 let value = match message {
                     Message::PrePrepare(value) => value,
-                    _ => panic!("INVALID PHASE"),
+                    Message::Prepare => panic!("PREPARE OUT OF CONTEXT"),
+                    Message::Commit => panic!("COMMIT OUT OF CONTEXT"),
                 };
                 write!(buf, "Received value {}!", value).unwrap();
                 if self.node.id != self.leader {
@@ -193,8 +188,9 @@ impl System {
                 loop {
                     let message = rx.recv().await.unwrap();
                     match message {
+                        Message::PrePrepare(_) => panic!("PRE-PREPARE OUT OF CONTEXT"),
                         Message::Prepare => counter += 1,
-                        _ => panic!("INVALID PHASE"),
+                        Message::Commit => panic!("COMMIT OUT OF CONTEXT"),
                     };
                     if counter == 3 {
                         self.node.broadcast(Message::Commit, 0_u32..4_u32);
@@ -210,8 +206,9 @@ impl System {
                 loop {
                     let message = rx.recv().await.unwrap();
                     match message {
+                        Message::PrePrepare(_) => panic!("PRE-PREPARE OUT OF CONTEXT"),
+                        Message::Prepare => panic!("PREPARE OUT OF CONTEXT"),
                         Message::Commit => counter += 1,
-                        _ => panic!("INVALID PHASE"),
                     };
                     if counter == 3 {
                         eprintln!("{}", buf);
