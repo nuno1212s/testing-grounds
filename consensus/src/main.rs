@@ -214,6 +214,9 @@ impl System {
                         return Ok(self.phase);
                     },
                 };
+                if self.node.id != self.leader {
+                    self.node.broadcast(self.new_msg(MessageKind::Prepare), 0_u32..self.n);
+                }
                 Ok(ProtoPhase::Preparing(0))
             },
             ProtoPhase::Preparing(i) => {
@@ -233,9 +236,7 @@ impl System {
                     },
                 };
                 if i == self.quorum() {
-                    if self.node.id != self.leader {
-                        self.node.broadcast(self.new_msg(MessageKind::Prepare), 0_u32..self.n);
-                    }
+                    self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..self.n);
                     Ok(ProtoPhase::Commiting(0))
                 } else {
                     Ok(ProtoPhase::Preparing(i))
@@ -258,7 +259,6 @@ impl System {
                     MessageKind::Commit => i + 1,
                 };
                 if i == self.quorum() {
-                    self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..self.n);
                     Ok(ProtoPhase::Executing)
                 } else {
                     Ok(ProtoPhase::Commiting(i))
