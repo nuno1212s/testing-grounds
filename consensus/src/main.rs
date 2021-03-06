@@ -393,13 +393,14 @@ fn pop_message(tbo: &mut Vec<Vec<Message>>) -> Option<Message> {
 }
 
 fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<Message>>, m: Message) {
-    let index = m.seq - curr_seq - 1;
+    let index = m.seq - curr_seq;
     if index < 0 {
         // drop old messages
         return;
     }
+    let index = index as usize;
     if index >= tbo.len() {
-        let len = tbo.len() - index + 1;
+        let len = index - tbo.len() + 1;
         tbo.extend(std::iter::repeat_with(Vec::new).take(len));
     }
     tbo[index].push(m);
