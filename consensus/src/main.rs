@@ -169,6 +169,7 @@ impl System {
     #[inline]
     async fn consensus_loop(&mut self, values: &str) -> io::Result<()> {
         // TODO:
+        //  - pick message to be processed from the queue
         //  - self.seq += 1
         //  - advance_message_queue()
         //
