@@ -28,6 +28,7 @@ enum MessageKind {
 
 #[derive(Debug)]
 enum ProtoPhase {
+    Boot,
     PrePreparing,
     Preparing(u32),
     Commiting(u32),
@@ -143,7 +144,7 @@ impl System {
             };
         }
 
-        let phase = ProtoPhase::PrePreparing;
+        let phase = ProtoPhase::Boot;
         let c = mpsc::channel(8);
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
         let node = Node { id, others_tx, others_rx, my_tx, my_rx };
@@ -191,8 +192,13 @@ impl System {
     #[inline]
     async fn process_message(&mut self, message: Message) -> io::Result<ProtoPhase> {
         match self.phase {
+            ProtoPhase::Boot | ProtoPhase::End => Ok(self.phase),
             ProtoPhase::PrePreparing => {
                 self.value = match message.kind {
+                    MessageKind::PrePrepare(value) if message.seq != self.seq => {
+                        queue_message(self.seq, &mut self.tbo_pre_prepare, message);
+                        return Ok(self.phase);
+                    },
                     MessageKind::PrePrepare(value) => value,
                     MessageKind::Prepare => {
                         queue_message(self.seq, &mut self.tbo_prepare, message);
@@ -211,6 +217,10 @@ impl System {
                         queue_message(self.seq, &mut self.tbo_pre_prepare, message);
                         return Ok(self.phase);
                     },
+                    MessageKind::Prepare if message.seq != self.seq => {
+                        queue_message(self.seq, &mut self.tbo_prepare, message);
+                        return Ok(self.phase);
+                    },
                     MessageKind::Prepare => i + 1,
                     MessageKind::Commit => {
                         queue_message(self.seq, &mut self.tbo_commit, message);
@@ -221,49 +231,36 @@ impl System {
                     if self.node.id != self.leader {
                         self.node.broadcast(self.new_msg(MessageKind::Prepare), 0_u32..self.n);
                     }
-                    return Ok(ProtoPhase::Commiting);
+                    Ok(ProtoPhase::Commiting(0))
+                } else {
+                    Ok(ProtoPhase::Preparing(i))
                 }
-                Ok(ProtoPhase::PrePreparing(i))
             },
-            ProtoPhase::Commiting => {
-                let mut counter = 0;
-                let mut rx = self.node.receive(0_u32..self.n);
-                loop {
-                    let message = if let Some(m) = pop_message(&mut self.tbo_prepare) {
-                        m
-                    } else {
-                        rx.recv().await.unwrap()
-                    };
-                    if counter == 3 {
-                        self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..self.n);
-                        break;
-                    }
+            ProtoPhase::Commiting(i) => {
+                let i = match message.kind {
+                    MessageKind::PrePrepare(_) => {
+                        queue_message(self.seq, &mut self.tbo_pre_prepare, message);
+                        return Ok(self.phase);
+                    },
+                    MessageKind::Prepare => {
+                        queue_message(self.seq, &mut self.tbo_prepare, message);
+                        return Ok(self.phase);
+                    },
+                    MessageKind::Commit if message.seq != self.seq => {
+                        queue_message(self.seq, &mut self.tbo_commit, message);
+                        return Ok(self.phase);
+                    },
+                    MessageKind::Commit => i + 1,
+                };
+                if i == self.quorum() {
+                    self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..self.n);
+                    Ok(ProtoPhase::Executing)
+                } else {
+                    Ok(ProtoPhase::Commiting(i))
                 }
-                advance_message_queue(&mut self.tbo_prepare);
-                Ok(ProtoPhase::Executing)
             },
             ProtoPhase::Executing => {
-                let mut counter = 0;
-                let mut rx = self.node.receive(0_u32..self.n);
-                loop {
-                    let message = if let Some(m) = pop_message(&mut self.tbo_commit) {
-                        m
-                    } else {
-                        rx.recv().await.unwrap()
-                    };
-                    match message.kind {
-                        MessageKind::PrePrepare(_) => queue_message(self.seq, &mut self.tbo_pre_prepare, message),
-                        MessageKind::Prepare => queue_message(self.seq, &mut self.tbo_prepare, message),
-                        MessageKind::Commit => counter += 1,
-                    };
-                    if counter == 3 {
-                        eprintln!("{}", buf);
-                        buf.clear();
-                        break;
-                    }
-                }
-                advance_message_queue(&mut self.tbo_commit);
-                self.seq += 1;
+                eprintln!("Value executed on r{} -> {}", self.node.id, self.value);
                 Ok(ProtoPhase::PrePreparing)
             },
         }
