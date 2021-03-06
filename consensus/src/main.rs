@@ -29,8 +29,8 @@ enum MessageKind {
 enum ProtoPhase {
     Init,
     PrePreparing,
-    Preparing,
-    Commiting,
+    Preparing(i32),
+    Commiting(i32),
     Executing,
 }
 
