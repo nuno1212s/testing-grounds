@@ -195,7 +195,7 @@ impl System {
     }
 
     #[inline]
-    async fn process_message(&mut self, message: Message) -> io::Result<ProtoPhase> {
+    fn process_message(&mut self, message: Message) -> io::Result<ProtoPhase> {
         match self.phase {
             ProtoPhase::Boot | ProtoPhase::End => Ok(self.phase),
             ProtoPhase::PrePreparing => {
