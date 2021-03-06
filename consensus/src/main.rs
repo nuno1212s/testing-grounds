@@ -168,11 +168,15 @@ impl System {
 
     #[inline]
     async fn consensus_loop(&mut self, values: &str) -> io::Result<()> {
-        let mut input = values.split_whitespace();
-        let mut buf = String::new();
-        while !self.consensus_step(&mut input, &mut buf).await? {
-            // nothing
-        }
+        // TODO:
+        //  - self.seq += 1
+        //  - advance_message_queue()
+        //
+        //let mut input = values.split_whitespace();
+        //let mut buf = String::new();
+        //while !self.consensus_step(&mut input, &mut buf).await? {
+        //    // nothing
+        //}
         Ok(())
     }
 
