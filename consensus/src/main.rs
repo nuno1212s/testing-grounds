@@ -26,7 +26,7 @@ enum MessageKind {
     Commit,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum ProtoPhase {
     Boot,
     PrePreparing,
