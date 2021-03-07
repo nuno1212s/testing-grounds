@@ -122,6 +122,7 @@ impl System {
             return Err(e);
         }
         let id = cfg.id;
+        let n = cfg.addrs.len() as u32;
 
         let listener = TcpListener::bind(cfg.addrs[id as usize]).await?;
         let mut others_tx = HashMap::new();
@@ -142,7 +143,7 @@ impl System {
         });
 
         // tx side (connect to replica)
-        for other_id in (0_u32..4_u32).filter(|&x| x != id) {
+        for other_id in (0..n).filter(|&x| x != id) {
             let tx = tx.clone();
             let addr = cfg.addrs[other_id as usize];
             tokio::spawn(async move {
@@ -159,7 +160,7 @@ impl System {
             });
         }
 
-        for _ in 0..(2 * (cfg.addrs.len() - 1)) {
+        for _ in 0..(2 * (n - 1)) {
             let received = rx.recv()
                 .await
                 .ok_or_else(||
@@ -175,7 +176,7 @@ impl System {
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
         let node = Node { id, others_tx, others_rx, my_tx, my_rx };
         Ok(System {
-            n: cfg.addrs.len() as u32,
+            n,
             f: cfg.f,
             seq: 0,
             leader: 0,
