@@ -9,8 +9,15 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::net::SocketAddr;
 use std::sync::Arc;
+
+#[derive(Debug)]
+struct Config {
+    f: u32,
+    id: u32,
+    addrs: Vec<SocketAddr>,
+}
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 struct Message {
@@ -84,7 +91,18 @@ async fn main() -> io::Result<()> {
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
         .parse()
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    let mut sys = System::boot(id).await?;
+    let mut sys = System::boot(
+        Config {
+            id,
+            f: 1,
+            addrs: vec![
+                "127.0.0.1:10001".parse().unwrap(),
+                "127.0.0.1:10002".parse().unwrap(),
+                "127.0.0.1:10003".parse().unwrap(),
+                "127.0.0.1:10004".parse().unwrap(),
+            ],
+        }
+    ).await?;
 
     let values = std::env::args()
         .nth(1)
@@ -94,10 +112,18 @@ async fn main() -> io::Result<()> {
 }
 
 impl System {
-    async fn boot(id: u32) -> io::Result<Self> {
-        // assume we're using 4 nodes -> f = 1;
-        // assume leader id = 0; others = 1, 2, 3;
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", 10000 + id)).await?;
+    async fn boot(cfg: Config) -> io::Result<Self> {
+        if cfg.addrs.len() < (3*cfg.f as usize + 1) {
+            let e = io::Error::new(io::ErrorKind::Other, "invalid no. of replicas");
+            return Err(e);
+        }
+        if cfg.id as usize >= cfg.addrs.len() {
+            let e = io::Error::new(io::ErrorKind::Other, "invalid node id");
+            return Err(e);
+        }
+        let id = cfg.id;
+
+        let listener = TcpListener::bind(cfg.addrs[id as usize]).await?;
         let mut others_tx = HashMap::new();
         let mut others_rx = HashMap::new();
 
@@ -118,11 +144,11 @@ impl System {
         // tx side (connect to replica)
         for other_id in (0_u32..4_u32).filter(|&x| x != id) {
             let tx = tx.clone();
+            let addr = cfg.addrs[other_id as usize];
             tokio::spawn(async move {
-                let addr = format!("127.0.0.1:{}", 10000 + other_id);
                 // try 4 times
                 for _ in 0..4 {
-                    if let Ok(mut conn) = TcpStream::connect(&addr).await {
+                    if let Ok(mut conn) = TcpStream::connect(addr).await {
                         conn.write_u32(id).await.unwrap();
                         tx.send(CommSide::Tx((other_id, conn))).await.unwrap();
                         return;
@@ -133,7 +159,7 @@ impl System {
             });
         }
 
-        for _ in 0..6 {
+        for _ in 0..(2 * (cfg.addrs.len() - 1)) {
             let received = rx.recv()
                 .await
                 .ok_or_else(||
@@ -149,8 +175,8 @@ impl System {
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
         let node = Node { id, others_tx, others_rx, my_tx, my_rx };
         Ok(System {
-            n: 4,
-            f: 1,
+            n: cfg.addrs.len() as u32,
+            f: cfg.f,
             seq: 0,
             leader: 0,
             value: 0,
@@ -200,7 +226,7 @@ impl System {
             ProtoPhase::Boot | ProtoPhase::End => Ok(self.phase),
             ProtoPhase::PrePreparing => {
                 self.value = match message.kind {
-                    MessageKind::PrePrepare(value) if message.seq != self.seq => {
+                    MessageKind::PrePrepare(_) if message.seq != self.seq => {
                         queue_message(self.seq, &mut self.tbo_pre_prepare, message);
                         return Ok(self.phase);
                     },
