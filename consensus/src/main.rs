@@ -20,6 +20,17 @@ struct Config {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+enum ErrorKind {
+    Disconnected(u32),
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+enum Message {
+    Consensus(ConsensusMessage),
+    Error(ErrorKind),
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 struct ConsensusMessage {
     seq: i32,
     from: u32,
@@ -66,6 +77,7 @@ enum CommSide {
 #[derive(Debug)]
 struct Node {
     id: u32,
+    addrs: Vec<SocketAddr>,
     others_tx: HashMap<u32, Arc<TcpStream>>,
     others_rx: HashMap<u32, Arc<TcpStream>>,
     my_tx: Arc<mpsc::Sender<ConsensusMessage>>,
@@ -174,7 +186,7 @@ impl System {
         let phase = ProtoPhase::Boot;
         let c = mpsc::channel(8);
         let (my_tx, my_rx) = (Arc::new(c.0), Arc::new(Mutex::new(c.1)));
-        let node = Node { id, others_tx, others_rx, my_tx, my_rx };
+        let node = Node { id, addrs: cfg.addrs, others_tx, others_rx, my_tx, my_rx };
         Ok(System {
             n,
             f: cfg.f,
