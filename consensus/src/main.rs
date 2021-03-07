@@ -20,14 +20,14 @@ struct Config {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-struct Message {
+struct ConsensusMessage {
     seq: i32,
     from: u32,
-    kind: MessageKind,
+    kind: ConsensusMessageKind,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-enum MessageKind {
+enum ConsensusMessageKind {
     PrePrepare(i32),
     Prepare,
     Commit,
@@ -52,9 +52,9 @@ struct System {
     f: u32,
     node: Node,
     value: i32,
-    tbo_pre_prepare: Vec<Vec<Message>>,
-    tbo_prepare: Vec<Vec<Message>>,
-    tbo_commit: Vec<Vec<Message>>,
+    tbo_pre_prepare: Vec<Vec<ConsensusMessage>>,
+    tbo_prepare: Vec<Vec<ConsensusMessage>>,
+    tbo_commit: Vec<Vec<ConsensusMessage>>,
 }
 
 #[derive(Debug)]
@@ -68,19 +68,19 @@ struct Node {
     id: u32,
     others_tx: HashMap<u32, Arc<TcpStream>>,
     others_rx: HashMap<u32, Arc<TcpStream>>,
-    my_tx: Arc<mpsc::Sender<Message>>,
-    my_rx: Arc<Mutex<mpsc::Receiver<Message>>>,
+    my_tx: Arc<mpsc::Sender<ConsensusMessage>>,
+    my_rx: Arc<Mutex<mpsc::Receiver<ConsensusMessage>>>,
 }
 
 #[derive(Debug)]
 enum SendTo {
-    Me(Arc<mpsc::Sender<Message>>),
+    Me(Arc<mpsc::Sender<ConsensusMessage>>),
     Others(Arc<TcpStream>),
 }
 
 #[derive(Debug)]
 enum RecvFrom {
-    Me(Arc<Mutex<mpsc::Receiver<Message>>>),
+    Me(Arc<Mutex<mpsc::Receiver<ConsensusMessage>>>),
     Others(Arc<TcpStream>),
 }
 
@@ -212,7 +212,7 @@ impl System {
     async fn propose_value(&self, value: i32) -> io::Result<()> {
         match self.phase {
             ProtoPhase::PrePreparing if self.node.id == self.leader => {
-                let message = self.new_msg(MessageKind::PrePrepare(value));
+                let message = self.new_msg(ConsensusMessageKind::PrePrepare(value));
                 self.node.broadcast(message, 0_u32..self.n);
                 Ok(())
             },
@@ -222,48 +222,50 @@ impl System {
     }
 
     #[inline]
-    fn process_message(&mut self, message: Message) -> io::Result<ProtoPhase> {
+    fn process_message(&mut self, message: ConsensusMessage) -> io::Result<ProtoPhase> {
         match self.phase {
             ProtoPhase::Boot | ProtoPhase::End => Ok(self.phase),
             ProtoPhase::PrePreparing => {
                 self.value = match message.kind {
-                    MessageKind::PrePrepare(_) if message.seq != self.seq => {
+                    ConsensusMessageKind::PrePrepare(_) if message.seq != self.seq => {
                         queue_message(self.seq, &mut self.tbo_pre_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::PrePrepare(value) => value,
-                    MessageKind::Prepare => {
+                    ConsensusMessageKind::PrePrepare(value) => value,
+                    ConsensusMessageKind::Prepare => {
                         queue_message(self.seq, &mut self.tbo_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Commit => {
+                    ConsensusMessageKind::Commit => {
                         queue_message(self.seq, &mut self.tbo_commit, message);
                         return Ok(self.phase);
                     },
                 };
                 if self.node.id != self.leader {
-                    self.node.broadcast(self.new_msg(MessageKind::Prepare), 0_u32..self.n);
+                    let message = self.new_msg(ConsensusMessageKind::Prepare);
+                    self.node.broadcast(message, 0_u32..self.n);
                 }
                 Ok(ProtoPhase::Preparing(0))
             },
             ProtoPhase::Preparing(i) => {
                 let i = match message.kind {
-                    MessageKind::PrePrepare(_) => {
+                    ConsensusMessageKind::PrePrepare(_) => {
                         queue_message(self.seq, &mut self.tbo_pre_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Prepare if message.seq != self.seq => {
+                    ConsensusMessageKind::Prepare if message.seq != self.seq => {
                         queue_message(self.seq, &mut self.tbo_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Prepare => i + 1,
-                    MessageKind::Commit => {
+                    ConsensusMessageKind::Prepare => i + 1,
+                    ConsensusMessageKind::Commit => {
                         queue_message(self.seq, &mut self.tbo_commit, message);
                         return Ok(self.phase);
                     },
                 };
                 if i == self.quorum() {
-                    self.node.broadcast(self.new_msg(MessageKind::Commit), 0_u32..self.n);
+                    let message = self.new_msg(ConsensusMessageKind::Commit);
+                    self.node.broadcast(message, 0_u32..self.n);
                     Ok(ProtoPhase::Commiting(0))
                 } else {
                     Ok(ProtoPhase::Preparing(i))
@@ -271,19 +273,19 @@ impl System {
             },
             ProtoPhase::Commiting(i) => {
                 let i = match message.kind {
-                    MessageKind::PrePrepare(_) => {
+                    ConsensusMessageKind::PrePrepare(_) => {
                         queue_message(self.seq, &mut self.tbo_pre_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Prepare => {
+                    ConsensusMessageKind::Prepare => {
                         queue_message(self.seq, &mut self.tbo_prepare, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Commit if message.seq != self.seq => {
+                    ConsensusMessageKind::Commit if message.seq != self.seq => {
                         queue_message(self.seq, &mut self.tbo_commit, message);
                         return Ok(self.phase);
                     },
-                    MessageKind::Commit => i + 1,
+                    ConsensusMessageKind::Commit => i + 1,
                 };
                 if i == self.quorum() {
                     Ok(ProtoPhase::Executing)
@@ -298,8 +300,8 @@ impl System {
         }
     }
 
-    fn new_msg(&self, kind: MessageKind) -> Message {
-        Message::new(self.node.id, self.seq, kind)
+    fn new_msg(&self, kind: ConsensusMessageKind) -> ConsensusMessage {
+        ConsensusMessage::new(self.node.id, self.seq, kind)
     }
 }
 
@@ -324,7 +326,7 @@ impl Node {
         }
     }
 
-    fn broadcast(&self, m: Message, targets: impl Iterator<Item = u32>) {
+    fn broadcast(&self, m: ConsensusMessage, targets: impl Iterator<Item = u32>) {
         for id in targets {
             let send_to = self.send_to(id);
             tokio::spawn(async move {
@@ -333,7 +335,7 @@ impl Node {
         }
     }
 
-    fn receive(&self, targets: impl Iterator<Item = u32>) -> mpsc::Receiver<Message> {
+    fn receive(&self, targets: impl Iterator<Item = u32>) -> mpsc::Receiver<ConsensusMessage> {
         let (tx, rx) = mpsc::channel(8);
         for id in targets {
             let recv_from = self.recv_from(id);
@@ -348,8 +350,8 @@ impl Node {
 }
 
 impl SendTo {
-    async fn value(&self, m: Message) -> io::Result<()> {
-        async fn me(m: Message, s: &mpsc::Sender<Message>) -> io::Result<()> {
+    async fn value(&self, m: ConsensusMessage) -> io::Result<()> {
+        async fn me(m: ConsensusMessage, s: &mpsc::Sender<ConsensusMessage>) -> io::Result<()> {
             Ok(s.send(m).await.unwrap_or(()))
         }
         async fn write(s: &TcpStream, buf: &[u8]) -> io::Result<()> {
@@ -368,7 +370,7 @@ impl SendTo {
                 }
             }
         }
-        async fn others(m: Message, s: &TcpStream) -> io::Result<()> {
+        async fn others(m: ConsensusMessage, s: &TcpStream) -> io::Result<()> {
             let buf = bincode::serialize(&m).unwrap();
             let len = (buf.len() as u32).to_be_bytes();
             write(s, &len).await?;
@@ -382,8 +384,8 @@ impl SendTo {
 }
 
 impl RecvFrom {
-    async fn value(&self) -> io::Result<Message> {
-        async fn me(s: &Mutex<mpsc::Receiver<Message>>) -> io::Result<Message> {
+    async fn value(&self) -> io::Result<ConsensusMessage> {
+        async fn me(s: &Mutex<mpsc::Receiver<ConsensusMessage>>) -> io::Result<ConsensusMessage> {
             Ok(s.lock().await.recv().await.unwrap())
         }
         async fn read(s: &TcpStream, buf: &mut [u8]) -> io::Result<()> {
@@ -402,7 +404,7 @@ impl RecvFrom {
                 }
             }
         }
-        async fn others(s: &TcpStream) -> io::Result<Message> {
+        async fn others(s: &TcpStream) -> io::Result<ConsensusMessage> {
             let mut size = [0; 4];
             read(s, &mut size[..]).await?;
             let mut buf = vec![0; u32::from_be_bytes(size) as usize];
@@ -416,13 +418,13 @@ impl RecvFrom {
     }
 }
 
-impl Message {
-    fn new(from: u32, seq: i32, kind: MessageKind) -> Self {
+impl ConsensusMessage {
+    fn new(from: u32, seq: i32, kind: ConsensusMessageKind) -> Self {
         Self { seq, from, kind }
     }
 }
 
-fn pop_message(tbo: &mut Vec<Vec<Message>>) -> Option<Message> {
+fn pop_message(tbo: &mut Vec<Vec<ConsensusMessage>>) -> Option<ConsensusMessage> {
     if tbo.is_empty() {
         None
     } else {
@@ -430,7 +432,7 @@ fn pop_message(tbo: &mut Vec<Vec<Message>>) -> Option<Message> {
     }
 }
 
-fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<Message>>, m: Message) {
+fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<ConsensusMessage>>, m: ConsensusMessage) {
     let index = m.seq - curr_seq;
     if index < 0 {
         // drop old messages
@@ -444,7 +446,7 @@ fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<Message>>, m: Message) {
     tbo[index].push(m);
 }
 
-fn advance_message_queue(tbo: &mut Vec<Vec<Message>>) {
+fn advance_message_queue(tbo: &mut Vec<Vec<ConsensusMessage>>) {
     if !tbo.is_empty() {
         tbo.remove(0);
     }
