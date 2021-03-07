@@ -27,6 +27,7 @@ enum ErrorKind {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 enum Message {
     Consensus(ConsensusMessage),
+    Connected(u32, TcpStream),
     Error(ErrorKind),
 }
 
@@ -66,12 +67,6 @@ struct System {
     tbo_pre_prepare: Vec<Vec<ConsensusMessage>>,
     tbo_prepare: Vec<Vec<ConsensusMessage>>,
     tbo_commit: Vec<Vec<ConsensusMessage>>,
-}
-
-#[derive(Debug)]
-enum CommSide {
-    Tx((u32, TcpStream)),
-    Rx((u32, TcpStream)),
 }
 
 #[derive(Debug)]
@@ -145,6 +140,8 @@ impl System {
         // rx side (accept conns from replica)
         let tx_clone = tx.clone();
         tokio::spawn(async move {
+            // TODO: spawn handler for conn, get messages on a single channel shared
+            // across all tasks
             let tx = tx_clone;
             loop {
                 if let Ok((mut conn, _)) = listener.accept().await {
@@ -173,7 +170,7 @@ impl System {
         }
 
         for _ in 0..(2 * (n - 1)) {
-            let received = rx.recv()
+            let (id, conn) = rx.recv()
                 .await
                 .ok_or_else(||
                     io::Error::new(io::ErrorKind::Other, "connection problems!"))?;
