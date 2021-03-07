@@ -231,7 +231,7 @@ impl System {
     }
 
     #[inline]
-    fn process_message(&mut self, message: ConsensusMessage) -> io::Result<ProtoPhase> {
+    fn process_consensus(&mut self, message: ConsensusMessage) -> io::Result<ProtoPhase> {
         match self.phase {
             ProtoPhase::Boot | ProtoPhase::End => Ok(self.phase),
             ProtoPhase::PrePreparing => {
