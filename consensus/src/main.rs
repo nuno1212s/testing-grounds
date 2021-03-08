@@ -117,6 +117,21 @@ async fn main() -> io::Result<()> {
         }
     ).await?;
 
+    // XXX XXX XXX XXX XXX XXX XXX XXX
+    // fake the client requests for now,
+    // for testing purposes
+    // XXX XXX XXX XXX XXX XXX XXX XXX
+    let tx = sys.node.my_tx.clone();
+    tokio::spawn(async move {
+        for i in 0..i32::MAX {
+            let m = RequestMessage { value: i };
+            let m = SystemMessage::Request(m);
+            let m = Message::System(m);
+            tx.send(m).await.unwrap_or(());
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
+    });
+
     sys.replica_loop().await
 }
 
@@ -233,9 +248,6 @@ impl System {
     #[inline]
     async fn replica_loop(&mut self) -> io::Result<()> {
         // TODO:
-        //  - receive client requests
-        //  - queue client requests
-        //  - propose if leader
         //  - handle errors
         let mut get_queue = false;
         loop {
