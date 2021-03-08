@@ -51,7 +51,7 @@ enum ConsensusMessageKind {
     Commit,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 enum ProtoPhase {
     Boot,
     PrePreparing,
@@ -288,7 +288,6 @@ impl System {
                                     self.phase = new_phase;
                                     self.seq += 1;
                                 },
-                                (p, q) if p == q => (),
                                 (_, _) => self.phase = new_phase,
                             };
                             get_queue = true;
