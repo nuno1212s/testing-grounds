@@ -100,6 +100,7 @@ enum SendTo {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    println!("========================");
     // our replica's id
     let id: u32 = std::env::var("ID")
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
@@ -118,23 +119,21 @@ async fn main() -> io::Result<()> {
         }
     ).await?;
 
-    let tx = sys.node.my_tx.clone();
-
-    tokio::spawn(async move {
-        sys.replica_loop().await.unwrap();
-    });
-
     // fake the client requests for now,
     // for testing purposes
-    for i in 0..i32::MAX {
+    let tx = sys.node.my_tx.clone();
+    tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        let m = RequestMessage { value: i };
-        let m = SystemMessage::Request(m);
-        let m = Message::System(m);
-        tx.send(m).await.unwrap_or(());
-    }
+        for i in 1000.. {
+            let m = RequestMessage { value: i };
+            let m = SystemMessage::Request(m);
+            let m = Message::System(m);
+            tx.send(m).await.unwrap_or(());
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+    });
 
-    Ok(())
+    sys.replica_loop().await
 }
 
 impl System {
@@ -256,6 +255,7 @@ impl System {
             let message = match self.phase {
                 ProtoPhase::End => return Ok(()),
                 ProtoPhase::Init => {
+                    println!("A");
                     if let Some(request) = self.requests.pop_front() {
                         if self.leader == self.node.id {
                             self.propose_value(request.value);
@@ -266,6 +266,7 @@ impl System {
                     message
                 },
                 ProtoPhase::PrePreparing if get_queue => {
+                    println!("B");
                     if let Some(m) = pop_message(&mut self.tbo_pre_prepare) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -274,6 +275,7 @@ impl System {
                     }
                 },
                 ProtoPhase::Preparing(_) if get_queue => {
+                    println!("C");
                     if let Some(m) = pop_message(&mut self.tbo_prepare) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -282,6 +284,7 @@ impl System {
                     }
                 },
                 ProtoPhase::Commiting(_) if get_queue => {
+                    println!("D");
                     if let Some(m) = pop_message(&mut self.tbo_commit) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -290,10 +293,12 @@ impl System {
                     }
                 },
                 _ => {
+                    println!("E");
                     let message = self.node.receive().await?;
                     message
                 },
             };
+            println!("{:?}", message);
             match message {
                 Message::System(message) => {
                     match message {
@@ -301,17 +306,18 @@ impl System {
                             self.requests.push_back(message);
                         },
                         SystemMessage::Consensus(message) => {
+                            println!("F");
                             let new_phase = self.process_consensus(message);
                             match (self.phase, new_phase) {
-                                (ProtoPhase::Executing, ProtoPhase::PrePreparing) => {
+                                (ProtoPhase::Executing, ProtoPhase::Init) => {
                                     advance_message_queue(&mut self.tbo_pre_prepare);
                                     advance_message_queue(&mut self.tbo_prepare);
                                     advance_message_queue(&mut self.tbo_commit);
-                                    self.phase = new_phase;
                                     self.seq += 1;
                                 },
-                                (_, _) => self.phase = new_phase,
+                                (_, _) => (),
                             };
+                            self.phase = new_phase;
                             get_queue = true;
                         },
                         // ....
@@ -326,6 +332,7 @@ impl System {
     #[inline]
     fn propose_value(&self, value: i32) {
         let message = self.new_consensus_msg(ConsensusMessageKind::PrePrepare(value));
+        println!("{:?} ~> {:?}", self.phase, message);
         self.node.broadcast(message, 0_u32..self.n);
     }
 
@@ -351,6 +358,7 @@ impl System {
                 };
                 if self.node.id != self.leader {
                     let message = self.new_consensus_msg(ConsensusMessageKind::Prepare);
+                    println!("{:?} ~> {:?}", self.phase, message);
                     self.node.broadcast(message, 0_u32..self.n);
                 }
                 ProtoPhase::Preparing(0)
@@ -373,6 +381,7 @@ impl System {
                 };
                 if i == self.quorum() {
                     let message = self.new_consensus_msg(ConsensusMessageKind::Commit);
+                    println!("{:?} ~> {:?}", self.phase, message);
                     self.node.broadcast(message, 0_u32..self.n);
                     ProtoPhase::Commiting(0)
                 } else {
