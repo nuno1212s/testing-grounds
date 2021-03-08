@@ -25,6 +25,7 @@ enum ErrorKind {
     DisconnectedRx(u32),
 }
 
+#[derive(Debug)]
 enum Message {
     System(SystemMessage),
     ConnectedTx(u32, TcpStream),
@@ -117,22 +118,23 @@ async fn main() -> io::Result<()> {
         }
     ).await?;
 
-    // XXX XXX XXX XXX XXX XXX XXX XXX
-    // fake the client requests for now,
-    // for testing purposes
-    // XXX XXX XXX XXX XXX XXX XXX XXX
     let tx = sys.node.my_tx.clone();
+
     tokio::spawn(async move {
-        for i in 0..i32::MAX {
-            let m = RequestMessage { value: i };
-            let m = SystemMessage::Request(m);
-            let m = Message::System(m);
-            tx.send(m).await.unwrap_or(());
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
+        sys.replica_loop().await.unwrap();
     });
 
-    sys.replica_loop().await
+    // fake the client requests for now,
+    // for testing purposes
+    for i in 0..i32::MAX {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        let m = RequestMessage { value: i };
+        let m = SystemMessage::Request(m);
+        let m = Message::System(m);
+        tx.send(m).await.unwrap_or(());
+    }
+
+    Ok(())
 }
 
 impl System {
@@ -214,7 +216,7 @@ impl System {
                         }
                     });
                 },
-                _ => unreachable!(),
+                m => panic!("{:?}", m),
             }
         }
 
@@ -260,7 +262,8 @@ impl System {
                         }
                         self.phase = ProtoPhase::PrePreparing;
                     }
-                    continue;
+                    let message = self.node.receive().await?;
+                    message
                 },
                 ProtoPhase::PrePreparing if get_queue => {
                     if let Some(m) = pop_message(&mut self.tbo_pre_prepare) {
@@ -315,7 +318,7 @@ impl System {
                     }
                 },
                 // ....
-                _ => panic!("oooooooooops"),
+                m => panic!("{:?}", m),
             };
         }
     }
