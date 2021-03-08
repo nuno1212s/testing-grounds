@@ -8,7 +8,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -34,7 +34,13 @@ enum Message {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 enum SystemMessage {
+    Request(RequestMessage),
     Consensus(ConsensusMessage),
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+struct RequestMessage {
+    value: i32,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -53,7 +59,7 @@ enum ConsensusMessageKind {
 
 #[derive(Debug, Copy, Clone)]
 enum ProtoPhase {
-    Boot,
+    Init,
     PrePreparing,
     Preparing(u32),
     Commiting(u32),
@@ -70,9 +76,9 @@ struct System {
     f: u32,
     node: Node,
     value: i32,
-    tbo_pre_prepare: Vec<Vec<ConsensusMessage>>,
-    tbo_prepare: Vec<Vec<ConsensusMessage>>,
-    tbo_commit: Vec<Vec<ConsensusMessage>>,
+    tbo_pre_prepare: VecDeque<VecDeque<ConsensusMessage>>,
+    tbo_prepare: VecDeque<VecDeque<ConsensusMessage>>,
+    tbo_commit: VecDeque<VecDeque<ConsensusMessage>>,
     requests: VecDeque<RequestMessage>,
 }
 
@@ -87,7 +93,7 @@ struct Node {
 
 #[derive(Debug)]
 enum SendTo {
-    Me(mpsc::Sender<ConsensusMessage>),
+    Me(mpsc::Sender<Message>),
     Others(Arc<Mutex<TcpStream>>),
 }
 
@@ -111,7 +117,7 @@ async fn main() -> io::Result<()> {
         }
     ).await?;
 
-    sys.replica_loop(&values).await
+    sys.replica_loop().await
 }
 
 impl System {
@@ -153,7 +159,7 @@ impl System {
                 for _ in 0..4 {
                     if let Ok(mut conn) = TcpStream::connect(addr).await {
                         conn.write_u32(id).await.unwrap();
-                        tx.send(Message::ConnectedTx(other_id, conn)).await.unwrap();
+                        tx.send(Message::ConnectedTx(other_id, conn)).await.unwrap_or(());
                         return;
                     }
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -178,17 +184,17 @@ impl System {
                             let mut size = [0; 4];
                             if let Err(_) = conn.read_exact(&mut size[..]).await {
                                 let m = Message::Error(ErrorKind::DisconnectedRx(id));
-                                tx.send(m).await.unwrap();
+                                tx.send(m).await.unwrap_or(());
                                 return;
                             }
                             let mut buf = vec![0; u32::from_be_bytes(size) as usize];
                             if let Err(_) = conn.read_exact(&mut buf[..]).await {
                                 let m = Message::Error(ErrorKind::DisconnectedRx(id));
-                                tx.send(m).await.unwrap();
+                                tx.send(m).await.unwrap_or(());
                                 return;
                             }
                             if let Ok(m) = bincode::deserialize(&buf) {
-                                tx.send(Message::System(m)).await.unwrap();
+                                tx.send(Message::System(m)).await.unwrap_or(());
                             }
                         }
                     });
@@ -197,7 +203,7 @@ impl System {
             }
         }
 
-        let phase = ProtoPhase::Boot;
+        let phase = ProtoPhase::Init;
         let node = Node {
             id,
             addrs: cfg.addrs,
@@ -211,9 +217,10 @@ impl System {
             seq: 0,
             leader: 0,
             value: 0,
-            tbo_pre_prepare: Vec::new(),
-            tbo_prepare: Vec::new(),
-            tbo_commit: Vec::new(),
+            requests: VecDeque::new(),
+            tbo_pre_prepare: VecDeque::new(),
+            tbo_prepare: VecDeque::new(),
+            tbo_commit: VecDeque::new(),
             phase,
             node,
         })
@@ -234,8 +241,13 @@ impl System {
         loop {
             let message = match self.phase {
                 ProtoPhase::End => return Ok(()),
-                ProtoPhase::Boot => {
-                    self.phase = ProtoPhase::PrePreparing;
+                ProtoPhase::Init => {
+                    if let Some(request) = self.requests.pop_front() {
+                        if self.leader == self.node.id {
+                            self.propose_value(request.value);
+                        }
+                        self.phase = ProtoPhase::PrePreparing;
+                    }
                     continue;
                 },
                 ProtoPhase::PrePreparing if get_queue => {
@@ -246,7 +258,7 @@ impl System {
                         continue;
                     }
                 },
-                ProtoPhase::Preparing if get_queue => {
+                ProtoPhase::Preparing(_) if get_queue => {
                     if let Some(m) = pop_message(&mut self.tbo_prepare) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -254,7 +266,7 @@ impl System {
                         continue;
                     }
                 },
-                ProtoPhase::Commiting if get_queue => {
+                ProtoPhase::Commiting(_) if get_queue => {
                     if let Some(m) = pop_message(&mut self.tbo_commit) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -270,8 +282,11 @@ impl System {
             match message {
                 Message::System(message) => {
                     match message {
+                        SystemMessage::Request(message) => {
+                            self.requests.push_back(message);
+                        },
                         SystemMessage::Consensus(message) => {
-                            let new_phase = self.process_consensus(m);
+                            let new_phase = self.process_consensus(message);
                             match (self.phase, new_phase) {
                                 (ProtoPhase::Executing, ProtoPhase::PrePreparing) => {
                                     advance_message_queue(&mut self.tbo_pre_prepare);
@@ -294,22 +309,15 @@ impl System {
     }
 
     #[inline]
-    async fn propose_value(&self, value: i32) -> io::Result<()> {
-        match self.phase {
-            ProtoPhase::PrePreparing if self.node.id == self.leader => {
-                let message = self.new_consensus_msg(ConsensusMessageKind::PrePrepare(value));
-                self.node.broadcast(message, 0_u32..self.n);
-                Ok(())
-            },
-            ProtoPhase::PrePreparing => Ok(()),
-            _ => Err(io::Error::new(io::ErrorKind::Other, "tried proposing on invalid phase"))
-        }
+    fn propose_value(&self, value: i32) {
+        let message = self.new_consensus_msg(ConsensusMessageKind::PrePrepare(value));
+        self.node.broadcast(message, 0_u32..self.n);
     }
 
     #[inline]
     fn process_consensus(&mut self, message: ConsensusMessage) -> ProtoPhase {
         match self.phase {
-            ProtoPhase::Boot | ProtoPhase::End => self.phase,
+            ProtoPhase::Init | ProtoPhase::End => self.phase,
             ProtoPhase::PrePreparing => {
                 self.value = match message.kind {
                     ConsensusMessageKind::PrePrepare(_) if message.seq != self.seq => {
@@ -380,7 +388,7 @@ impl System {
             },
             ProtoPhase::Executing => {
                 eprintln!("Value executed on r{} -> {}", self.node.id, self.value);
-                ProtoPhase::PrePreparing
+                ProtoPhase::Init
             },
         }
     }
@@ -410,16 +418,16 @@ impl Node {
         }
     }
 
-    async fn receive(&self) -> io::Result<Message> {
+    async fn receive(&mut self) -> io::Result<Message> {
         self.my_rx.recv().await
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "receive failed"))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "receive failed"))
     }
 }
 
 impl SendTo {
     async fn value(&self, m: SystemMessage) -> io::Result<()> {
         async fn me(m: SystemMessage, s: &mpsc::Sender<Message>) -> io::Result<()> {
-            Ok(s.send(Message::System(m)).await.unwrap())
+            Ok(s.send(Message::System(m)).await.unwrap_or(()))
         }
         async fn others(m: SystemMessage, l: &Mutex<TcpStream>) -> io::Result<()> {
             let mut s = l.lock().await;
@@ -441,15 +449,15 @@ impl ConsensusMessage {
     }
 }
 
-fn pop_message(tbo: &mut Vec<Vec<ConsensusMessage>>) -> Option<ConsensusMessage> {
+fn pop_message(tbo: &mut VecDeque<VecDeque<ConsensusMessage>>) -> Option<ConsensusMessage> {
     if tbo.is_empty() {
         None
     } else {
-        tbo[0].pop()
+        tbo[0].pop_front()
     }
 }
 
-fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<ConsensusMessage>>, m: ConsensusMessage) {
+fn queue_message(curr_seq: i32, tbo: &mut VecDeque<VecDeque<ConsensusMessage>>, m: ConsensusMessage) {
     let index = m.seq - curr_seq;
     if index < 0 {
         // drop old messages
@@ -458,13 +466,11 @@ fn queue_message(curr_seq: i32, tbo: &mut Vec<Vec<ConsensusMessage>>, m: Consens
     let index = index as usize;
     if index >= tbo.len() {
         let len = index - tbo.len() + 1;
-        tbo.extend(std::iter::repeat_with(Vec::new).take(len));
+        tbo.extend(std::iter::repeat_with(VecDeque::new).take(len));
     }
-    tbo[index].push(m);
+    tbo[index].push_back(m);
 }
 
-fn advance_message_queue(tbo: &mut Vec<Vec<ConsensusMessage>>) {
-    if !tbo.is_empty() {
-        tbo.remove(0);
-    }
+fn advance_message_queue(tbo: &mut VecDeque<VecDeque<ConsensusMessage>>) {
+    tbo.pop_front();
 }
