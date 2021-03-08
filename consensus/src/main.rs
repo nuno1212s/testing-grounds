@@ -73,6 +73,7 @@ struct System {
     tbo_pre_prepare: Vec<Vec<ConsensusMessage>>,
     tbo_prepare: Vec<Vec<ConsensusMessage>>,
     tbo_commit: Vec<Vec<ConsensusMessage>>,
+    requests: VecDeque<RequestMessage>,
 }
 
 #[derive(Debug)]
@@ -109,10 +110,6 @@ async fn main() -> io::Result<()> {
             ],
         }
     ).await?;
-
-    let values = std::env::args()
-        .nth(1)
-        .unwrap();
 
     sys.replica_loop(&values).await
 }
@@ -227,17 +224,12 @@ impl System {
     }
 
     #[inline]
-    async fn replica_loop(&mut self, values: &str) -> io::Result<()> {
+    async fn replica_loop(&mut self) -> io::Result<()> {
         // TODO:
-        //  - pick message to be processed from the queue
-        //  - self.seq += 1
-        //  - advance_message_queue()
-        //
-        //let mut input = values.split_whitespace();
-        //let mut buf = String::new();
-        //while !self.consensus_step(&mut input, &mut buf).await? {
-        //    // nothing
-        //}
+        //  - receive client requests
+        //  - queue client requests
+        //  - propose if leader
+        //  - handle errors
         let mut get_queue = false;
         loop {
             let message = match self.phase {
