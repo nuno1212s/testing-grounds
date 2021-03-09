@@ -143,7 +143,7 @@ async fn main() -> io::Result<()> {
             let m = SystemMessage::Request(m);
             let m = Message::System(m);
             tx.send(m).await.unwrap_or(());
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
     });
 
@@ -444,6 +444,17 @@ impl System {
                 }
             },
             ProtoPhase::Executing => {
+                match message.kind {
+                    ConsensusMessageKind::PrePrepare(_) => {
+                        queue_message(self.seq, &mut self.tbo_pre_prepare, message);
+                    },
+                    ConsensusMessageKind::Prepare => {
+                        queue_message(self.seq, &mut self.tbo_prepare, message);
+                    },
+                    ConsensusMessageKind::Commit => {
+                        queue_message(self.seq, &mut self.tbo_commit, message);
+                    },
+                };
                 eprintln!("Value executed on r{} -> {}", self.node.id, self.value);
                 ProtoPhase::Init
             },
