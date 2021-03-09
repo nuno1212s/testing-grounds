@@ -338,6 +338,9 @@ impl System {
 
     #[inline]
     fn process_consensus(&mut self, message: ConsensusMessage) -> ProtoPhase {
+        // TODO: make sure a replica doesn't vote twice
+        // by keeping track of who voted, and not just
+        // the amount of votes received
         match self.phase {
             ProtoPhase::End => self.phase,
             ProtoPhase::Init => {
