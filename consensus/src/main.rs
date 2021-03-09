@@ -88,14 +88,28 @@ struct Node {
     id: u32,
     addrs: Vec<SocketAddr>,
     others_tx: HashMap<u32, Arc<Mutex<TcpStream>>>,
-    my_tx: mpsc::Sender<Message>,
-    my_rx: mpsc::Receiver<Message>,
+    my_tx: MessageChannelTx,
+    my_rx: MessageChannelRx,
 }
 
 #[derive(Debug)]
 enum SendTo {
-    Me(mpsc::Sender<Message>),
+    Me(MessageChannelTx),
     Others(Arc<Mutex<TcpStream>>),
+}
+
+#[derive(Clone, Debug)]
+struct MessageChannelTx {
+    other: mpsc::Sender<Message>,
+    requests: mpsc::Sender<RequestMessage>,
+    consensus: mpsc::Sender<ConsensusMessage>,
+}
+
+#[derive(Debug)]
+struct MessageChannelRx {
+    other: mpsc::Receiver<Message>,
+    requests: mpsc::Receiver<RequestMessage>,
+    consensus: mpsc::Receiver<ConsensusMessage>,
 }
 
 #[tokio::main]
@@ -152,7 +166,7 @@ impl System {
         let listener = TcpListener::bind(cfg.addrs[id as usize]).await?;
         let mut others_tx = HashMap::new();
 
-        let (tx, mut rx) = mpsc::channel(128);
+        let (tx, mut rx) = new_message_channel(128);
 
         // rx side (accept conns from replica)
         let tx_clone = tx.clone();
@@ -469,7 +483,7 @@ impl Node {
 
 impl SendTo {
     async fn value(&self, m: SystemMessage) -> io::Result<()> {
-        async fn me(m: SystemMessage, s: &mpsc::Sender<Message>) -> io::Result<()> {
+        async fn me(m: SystemMessage, s: &MessageChannelTx) -> io::Result<()> {
             Ok(s.send(Message::System(m)).await.unwrap_or(()))
         }
         async fn others(m: SystemMessage, l: &Mutex<TcpStream>) -> io::Result<()> {
@@ -483,6 +497,63 @@ impl SendTo {
             SendTo::Me(ref inner) => me(m, inner).await,
             SendTo::Others(ref inner) => others(m, &*inner).await,
         }
+    }
+}
+
+fn new_message_channel(bound: usize) -> (MessageChannelTx, MessageChannelRx) {
+    let (c_tx, c_rx) = mpsc::channel(bound);
+    let (r_tx, r_rx) = mpsc::channel(bound);
+    let (o_tx, o_rx) = mpsc::channel(bound);
+    let tx = MessageChannelTx {
+        consensus: c_tx,
+        requests: r_tx,
+        other: o_tx,
+    };
+    let rx = MessageChannelRx {
+        consensus: c_rx,
+        requests: r_rx,
+        other: o_rx,
+    };
+    (tx, rx)
+}
+
+impl MessageChannelTx {
+    async fn send(&self, message: Message) -> Result<(), Message> {
+        match message {
+            Message::System(message) => {
+                match message {
+                    SystemMessage::Request(message) => {
+                        self.requests
+                            .send(message)
+                            .await
+                            .map_err(|e| Message::System(SystemMessage::Request(e.0)))
+                    },
+                    SystemMessage::Consensus(message) => {
+                        self.consensus
+                            .send(message)
+                            .await
+                            .map_err(|e| Message::System(SystemMessage::Consensus(e.0)))
+                    },
+                }
+            },
+            _ => {
+                self.other
+                    .send(message)
+                    .await
+                    .map_err(|e| e.0)
+            },
+        }
+    }
+}
+
+impl MessageChannelRx {
+    async fn recv(&mut self) -> Option<Message> {
+        let message = tokio::select! {
+            c = self.consensus.recv() => Message::System(SystemMessage::Consensus(c?)),
+            r = self.requests.recv() => Message::System(SystemMessage::Request(r?)),
+            o = self.other.recv() => o?,
+        };
+        Some(message)
     }
 }
 
