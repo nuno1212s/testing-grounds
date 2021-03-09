@@ -473,9 +473,9 @@ impl SendTo {
             Ok(s.send(Message::System(m)).await.unwrap_or(()))
         }
         async fn others(m: SystemMessage, l: &Mutex<TcpStream>) -> io::Result<()> {
-            let mut s = l.lock().await;
             let buf = bincode::serialize(&m).unwrap();
             let len = (buf.len() as u32).to_be_bytes();
+            let mut s = l.lock().await;
             s.write_all(&len).await?;
             s.write_all(&buf).await
         }
