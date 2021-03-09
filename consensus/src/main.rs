@@ -339,7 +339,23 @@ impl System {
     #[inline]
     fn process_consensus(&mut self, message: ConsensusMessage) -> ProtoPhase {
         match self.phase {
-            ProtoPhase::Init | ProtoPhase::End => self.phase,
+            ProtoPhase::End => self.phase,
+            ProtoPhase::Init => {
+                match message.kind {
+                    ConsensusMessageKind::PrePrepare(_) => {
+                        queue_message(self.seq, &mut self.tbo_pre_prepare, message);
+                        return self.phase;
+                    },
+                    ConsensusMessageKind::Prepare => {
+                        queue_message(self.seq, &mut self.tbo_prepare, message);
+                        return self.phase;
+                    },
+                    ConsensusMessageKind::Commit => {
+                        queue_message(self.seq, &mut self.tbo_commit, message);
+                        return self.phase;
+                    },
+                }
+            },
             ProtoPhase::PrePreparing => {
                 self.value = match message.kind {
                     ConsensusMessageKind::PrePrepare(_) if message.seq != self.seq => {
