@@ -1,5 +1,9 @@
 #!/bin/sh
 
+bar() {
+    echo '================================================================================'
+}
+
 if [ "$1" = '--release' ]; then
     export RUSTFLAGS='-C target-cpu=native'
     TARGET='release'
@@ -24,4 +28,7 @@ env ID=3 ./target/$TARGET/consensus > /tmp/consensus/output03 &
 
 # print output in order
 wait
-cat /tmp/consensus/output*
+cat /tmp/consensus/output00; bar
+cat /tmp/consensus/output01; bar
+cat /tmp/consensus/output02; bar
+cat /tmp/consensus/output03

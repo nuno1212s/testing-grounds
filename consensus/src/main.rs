@@ -114,7 +114,6 @@ struct MessageChannelRx {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    println!("========================");
     // our replica's id
     let id: u32 = std::env::var("ID")
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
