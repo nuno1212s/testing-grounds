@@ -262,7 +262,9 @@ impl System {
     #[inline]
     async fn replica_loop(&mut self) -> io::Result<()> {
         // TODO:
+        //  - message logs
         //  - handle errors
+        //  - maybe move execution to here
         let mut get_queue = false;
         loop {
             let message = match self.phase {
