@@ -67,6 +67,16 @@ async fn connect(ring: &Rio, addr: SocketAddr, order: Ordering) -> io::Result<Tc
 }
 
 #[inline(always)]
+fn listen(addr: SocketAddr) -> io::Result<TcpListener> {
+    TcpListener::bind(addr)
+}
+
+#[inline(always)]
+async fn accept(ring: &Rio, ls: &TcpListener) -> io::Result<TcpStream> {
+    ring.accept(&ls).await
+}
+
+#[inline(always)]
 async fn read<B: AsRef<[u8]> + AsMut<[u8]>>(ring: &Rio, sock: &TcpStream, buf: B, order: Ordering) -> io::Result<usize> {
     ring.recv_ordered(sock, &buf, order).await
 }
