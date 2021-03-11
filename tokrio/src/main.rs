@@ -18,6 +18,7 @@ async fn main() -> io::Result<()> {
         let sock = connect(&ring, addr, Ordering::Link).await?;
         tokio::spawn(write_loop(i, ring.clone(), sock));
     }
+    drop(ring);
     future::pending().await
 }
 
