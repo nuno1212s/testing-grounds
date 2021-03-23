@@ -112,6 +112,10 @@ struct MessageChannelRx {
     consensus: mpsc::Receiver<ConsensusMessage>,
 }
 
+struct PRNG {
+    seed: u64,
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
     // our replica's id
@@ -137,16 +141,43 @@ async fn main() -> io::Result<()> {
     let tx = sys.node.my_tx.clone();
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        for i in 1000.. {
+
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| (d.as_nanos() % 8192) as u64)
+            .unwrap();
+        let iterator = PRNG { seed }
+            .enumerate()
+            .map(|(i, dur)| {
+                let dur = 9 + (dur % 4);
+                let dur = tokio::time::Duration::from_millis(dur as u64);
+                let i = 1000 + i;
+                let i = i as i32;
+                (i, dur)
+            });
+
+        for (i, dur) in iterator {
             let m = RequestMessage { value: i };
             let m = SystemMessage::Request(m);
             let m = Message::System(m);
             tx.send(m).await.unwrap_or(());
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(dur).await;
         }
     });
 
     sys.replica_loop().await
+}
+
+impl Iterator for PRNG {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        const MAGIC: u64 = 6364136223846793005;
+        self.seed = MAGIC
+            .wrapping_mul(self.seed)
+            .wrapping_add(1);
+        Some((self.seed >> 33) as u32)
+    }
 }
 
 impl System {
