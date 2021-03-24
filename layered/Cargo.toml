@@ -9,5 +9,5 @@ jemalloc = ["jemallocator"]
 
 [dependencies]
 jemallocator = { version = "0.3", optional = true }
-ditto = { git = "https://github.com/ditto-bft/ditto", features = ["bench"] }
-#ditto = { path = "/home/sugo/Documents/tese/ditto-bft/ditto", features = ["bench"] }
+febft = { git = "https://github.com/febft/febft", rev = "6038a8ed46bbd14193ffbb3aaadedf764957cdf2", features = ["bench"] }
+#febft = { path = "/home/sugo/Documents/tese/febft/febft", rev = "6038a8ed46bbd14193ffbb3aaadedf764957cdf2", features = ["bench"] }
