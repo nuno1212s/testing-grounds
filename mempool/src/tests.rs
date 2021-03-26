@@ -32,7 +32,7 @@ fn bench_std(b: &mut test::Bencher) {
     let h = thread_pool.clone();
     b.iter(move || h.execute(|| {
         let mut work = Work::new();
-        let mut vec = std::hint::black_box(allocate());
+        let mut vec = allocate();
         work.fill(&mut vec);
     }));
     thread_pool.join();
