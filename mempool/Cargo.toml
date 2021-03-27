@@ -4,8 +4,12 @@ version = "0.1.0"
 authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
 edition = "2018"
 
+[features]
+jemalloc = ["jemallocator"]
+
 [dependencies]
 #refpool = "0.4"
+jemallocator = { version = "0.3", optional = true }
 object-pool = "0.5"
 threadpool = "1"
 lazy_static = "1"
