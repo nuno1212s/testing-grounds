@@ -13,3 +13,4 @@ jemallocator = { version = "0.3", optional = true }
 object-pool = "0.5"
 threadpool = "1"
 lazy_static = "1"
+smallvec = "1"
