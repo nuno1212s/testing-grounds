@@ -12,6 +12,9 @@ fi
 # cleanup at exit
 trap 'pkill consensus' EXIT INT
 
+# update path
+export PATH="$HOME/.cargo/bin:$PATH"
+
 # change dir
 cd $HOME/tg/consensus
 
