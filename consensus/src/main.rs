@@ -194,6 +194,9 @@ impl System {
         let id = cfg.id;
         let n = cfg.addrs.len() as u32;
 
+        // change our address
+        cfg.addrs[id as usize].set_ip("127.0.0.1".parse().unwrap());
+
         let listener = TcpListener::bind(cfg.addrs[id as usize]).await?;
         let mut others_tx = HashMap::new();
 
