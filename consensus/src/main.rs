@@ -129,10 +129,10 @@ async fn main() -> io::Result<()> {
             id,
             f: 1,
             addrs: vec![
-                "127.0.0.1:10001".parse().unwrap(),
-                "127.0.0.1:10002".parse().unwrap(),
-                "127.0.0.1:10003".parse().unwrap(),
-                "127.0.0.1:10004".parse().unwrap(),
+                "192.168.70.16:10000".parse().unwrap(),
+                "192.168.70.17:10000".parse().unwrap(),
+                "192.168.70.18:10000".parse().unwrap(),
+                "192.168.70.19:10000".parse().unwrap(),
             ],
         }
     ).await?;
@@ -303,7 +303,6 @@ impl System {
             let message = match self.phase {
                 ProtoPhase::End => return Ok(()),
                 ProtoPhase::Init => {
-                    println!("A");
                     if let Some(request) = self.requests.pop_front() {
                         if self.leader == self.node.id {
                             self.propose_value(request.value);
@@ -314,7 +313,6 @@ impl System {
                     message
                 },
                 ProtoPhase::PrePreparing if get_queue => {
-                    println!("B");
                     if let Some(m) = pop_message(&mut self.tbo_pre_prepare) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -323,7 +321,6 @@ impl System {
                     }
                 },
                 ProtoPhase::Preparing(_) if get_queue => {
-                    println!("C");
                     if let Some(m) = pop_message(&mut self.tbo_prepare) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -332,7 +329,6 @@ impl System {
                     }
                 },
                 ProtoPhase::Commiting(_) if get_queue => {
-                    println!("D");
                     if let Some(m) = pop_message(&mut self.tbo_commit) {
                         Message::System(SystemMessage::Consensus(m))
                     } else {
@@ -341,12 +337,10 @@ impl System {
                     }
                 },
                 _ => {
-                    println!("E");
                     let message = self.node.receive().await?;
                     message
                 },
             };
-            println!("{:?}", message);
             match message {
                 Message::System(message) => {
                     match message {
@@ -354,7 +348,6 @@ impl System {
                             self.requests.push_back(message);
                         },
                         SystemMessage::Consensus(message) => {
-                            println!("F");
                             let new_phase = self.process_consensus(message);
                             match (self.phase, new_phase) {
                                 (ProtoPhase::Executing, ProtoPhase::Init) => {
@@ -380,7 +373,6 @@ impl System {
     #[inline]
     fn propose_value(&self, value: i32) {
         let message = self.new_consensus_msg(ConsensusMessageKind::PrePrepare(value));
-        println!("{:?} ~> {:?}", self.phase, message);
         self.node.broadcast(message, 0_u32..self.n);
     }
 
@@ -425,7 +417,6 @@ impl System {
                 };
                 if self.node.id != self.leader {
                     let message = self.new_consensus_msg(ConsensusMessageKind::Prepare);
-                    println!("{:?} ~> {:?}", self.phase, message);
                     self.node.broadcast(message, 0_u32..self.n);
                 }
                 ProtoPhase::Preparing(0)
@@ -448,7 +439,6 @@ impl System {
                 };
                 if i == self.quorum() {
                     let message = self.new_consensus_msg(ConsensusMessageKind::Commit);
-                    println!("{:?} ~> {:?}", self.phase, message);
                     self.node.broadcast(message, 0_u32..self.n);
                     ProtoPhase::Commiting(0)
                 } else {
