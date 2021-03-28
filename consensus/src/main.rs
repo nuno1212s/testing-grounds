@@ -182,7 +182,7 @@ impl Iterator for PRNG {
 }
 
 impl System {
-    async fn boot(cfg: Config) -> io::Result<Self> {
+    async fn boot(mut cfg: Config) -> io::Result<Self> {
         if cfg.addrs.len() < (3*cfg.f as usize + 1) {
             let e = io::Error::new(io::ErrorKind::Other, "invalid no. of replicas");
             return Err(e);
