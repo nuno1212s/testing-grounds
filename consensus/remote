@@ -1,0 +1,26 @@
+#!/bin/sh
+
+if [ "$1" = '--release' ]; then
+    export RUSTFLAGS='-C target-cpu=native'
+    TARGET='release'
+    FLAG=$1
+    shift
+else
+    TARGET='debug'
+fi
+
+# cleanup at exit
+trap 'pkill consensus' EXIT INT
+
+# change dir
+cd $HOME/tg/consensus
+
+# build code
+cargo build $FLAG || exit 1
+
+# run code
+env ID=0 ./target/$TARGET/consensus &
+env ID=1 ./target/$TARGET/consensus &
+env ID=2 ./target/$TARGET/consensus &
+env ID=3 ./target/$TARGET/consensus &
+wait
