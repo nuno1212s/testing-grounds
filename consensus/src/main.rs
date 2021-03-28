@@ -7,6 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use smallvec::{smallvec, SmallVec};
 use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
@@ -116,6 +117,10 @@ struct PRNG {
     seed: u64,
 }
 
+struct SmallVecWriter<'a, T: smallvec::Array<Item = u8>> {
+    inner: &'a mut SmallVec<T>,
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
     // our replica's id
@@ -166,6 +171,20 @@ async fn main() -> io::Result<()> {
     });
 
     sys.replica_loop().await
+}
+
+impl<'a, T> std::io::Write for SmallVecWriter<'a, T>
+where
+    T: smallvec::Array<Item = u8>,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl Iterator for PRNG {
@@ -247,7 +266,8 @@ impl System {
                                 tx.send(m).await.unwrap_or(());
                                 return;
                             }
-                            let mut buf = vec![0; u32::from_be_bytes(size) as usize];
+                            let size = u32::from_be_bytes(size) as usize;
+                            let mut buf: SmallVec<[_; 8192]> = smallvec![0; size];
                             if let Err(_) = conn.read_exact(&mut buf[..]).await {
                                 let m = Message::Error(ErrorKind::DisconnectedRx(id));
                                 tx.send(m).await.unwrap_or(());
@@ -530,7 +550,11 @@ impl SendTo {
             Ok(s.send(Message::System(m)).await.unwrap_or(()))
         }
         async fn others(m: SystemMessage, l: &Mutex<TcpStream>) -> io::Result<()> {
-            let buf = bincode::serialize(&m).unwrap();
+            let mut buf: SmallVec<[_; 8192]> = SmallVec::new();
+            {
+                let writer = SmallVecWriter { inner: &mut buf };
+                bincode::serialize_into(writer, &m).unwrap();
+            }
             let len = (buf.len() as u32).to_be_bytes();
             let mut s = l.lock().await;
             s.write_all(&len).await?;
