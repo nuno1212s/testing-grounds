@@ -1,0 +1,7 @@
+#!/bin/sh
+trap 'pkill cargo' EXIT INT
+cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34016 sh &
+cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34017 sh &
+cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34018 sh &
+cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34019 sh &
+wait
