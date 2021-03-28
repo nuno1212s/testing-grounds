@@ -124,6 +124,10 @@ async fn main() -> io::Result<()> {
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
         .parse()
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    // sync after compiling
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
     let mut sys = System::boot(
         Config {
             id,
@@ -141,7 +145,7 @@ async fn main() -> io::Result<()> {
     // for testing purposes
     let tx = sys.node.my_tx.clone();
     tokio::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_secs(6)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
