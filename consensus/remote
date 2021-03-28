@@ -1,22 +1,15 @@
 #!/bin/sh
 
-if [ "$1" = '--release' ]; then
-    export RUSTFLAGS='-C target-cpu=native'
-    TARGET='release'
-    FLAG=$1
-    shift
-else
-    TARGET='debug'
-fi
-
 cleanup() {
+    pkill cargo
     pkill consensus
 }
 
 # cleanup at exit
 trap 'cleanup' EXIT INT
 
-# update path
+# update env
+export RUSTFLAGS='-C target-cpu=native'
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # change dir
@@ -26,11 +19,11 @@ cd $HOME/tg/consensus
 git pull
 
 # build code
-cargo build $FLAG || exit 1
+cargo build --release || exit 1
 
 # run code
-env ID=0 ./target/$TARGET/consensus &
-env ID=1 ./target/$TARGET/consensus &
-env ID=2 ./target/$TARGET/consensus &
-env ID=3 ./target/$TARGET/consensus &
+env ID=0 ./target/release/consensus &
+env ID=1 ./target/release/consensus &
+env ID=2 ./target/release/consensus &
+env ID=3 ./target/release/consensus &
 wait
