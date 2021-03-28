@@ -117,10 +117,6 @@ struct PRNG {
     seed: u64,
 }
 
-struct SmallVecWriter<'a, T: smallvec::Array<Item = u8>> {
-    inner: &'a mut SmallVec<T>,
-}
-
 #[tokio::main]
 async fn main() -> io::Result<()> {
     // our replica's id
@@ -171,20 +167,6 @@ async fn main() -> io::Result<()> {
     });
 
     sys.replica_loop().await
-}
-
-impl<'a, T> std::io::Write for SmallVecWriter<'a, T>
-where
-    T: smallvec::Array<Item = u8>,
-{
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 impl Iterator for PRNG {
@@ -551,10 +533,7 @@ impl SendTo {
         }
         async fn others(m: SystemMessage, l: &Mutex<TcpStream>) -> io::Result<()> {
             let mut buf: SmallVec<[_; 8192]> = SmallVec::new();
-            {
-                let writer = SmallVecWriter { inner: &mut buf };
-                bincode::serialize_into(writer, &m).unwrap();
-            }
+            bincode::serialize_into(&mut buf, &m).unwrap();
             let len = (buf.len() as u32).to_be_bytes();
             let mut s = l.lock().await;
             s.write_all(&len).await?;
