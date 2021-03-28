@@ -1,7 +1,20 @@
 #!/bin/sh
-trap 'pkill cargo' EXIT INT
+
+cleanup() {
+    ssh tcarvalho@ssh.dcc.fc.up.pt -p 34016 pkill cargo &
+    ssh tcarvalho@ssh.dcc.fc.up.pt -p 34017 pkill cargo &
+    ssh tcarvalho@ssh.dcc.fc.up.pt -p 34018 pkill cargo &
+    ssh tcarvalho@ssh.dcc.fc.up.pt -p 34019 pkill cargo &
+    wait
+}
+
+# cleanup at the end
+trap 'cleanup' EXIT INT
+
+# start jobs
 cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34016 sh &
 cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34017 sh &
 cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34018 sh &
 cat remote | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34019 sh &
+
 wait
