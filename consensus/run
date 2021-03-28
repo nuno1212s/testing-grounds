@@ -1,6 +1,6 @@
 #!/bin/sh
-st -e sh -c '(echo export ID=0 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34016' &
-st -e sh -c '(echo export ID=1 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34017' &
-st -e sh -c '(echo export ID=2 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34018' &
-st -e sh -c '(echo export ID=3 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34019' &
+(echo export ID=0 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34016 &
+(echo export ID=1 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34017 &
+(echo export ID=2 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34018 &
+(echo export ID=3 && cat remote) | ssh tcarvalho@ssh.dcc.fc.up.pt -p 34019 &
 wait

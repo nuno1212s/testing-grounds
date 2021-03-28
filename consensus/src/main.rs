@@ -223,14 +223,14 @@ impl System {
             let tx = tx.clone();
             let addr = cfg.addrs[other_id as usize];
             tokio::spawn(async move {
-                // try 4 times
-                for _ in 0..4 {
+                // try 10 times
+                for _ in 0..10 {
                     if let Ok(mut conn) = TcpStream::connect(addr).await {
                         conn.write_u32(id).await.unwrap();
                         tx.send(Message::ConnectedTx(other_id, conn)).await.unwrap_or(());
                         return;
                     }
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
                 panic!("something went wrong :]")
             });
