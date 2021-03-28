@@ -18,6 +18,9 @@ export PATH="$HOME/.cargo/bin:$PATH"
 # change dir
 cd $HOME/tg/consensus
 
+# update code
+git pull
+
 # build code
 cargo build $FLAG || exit 1
 
