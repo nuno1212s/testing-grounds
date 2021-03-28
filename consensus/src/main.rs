@@ -133,10 +133,10 @@ async fn main() -> io::Result<()> {
             id,
             f: 1,
             addrs: vec![
-                "192.168.70.16:55000".parse().unwrap(),
-                "192.168.70.17:55001".parse().unwrap(),
-                "192.168.70.18:55002".parse().unwrap(),
-                "192.168.70.19:55003".parse().unwrap(),
+                "192.168.70.16:52000".parse().unwrap(),
+                "192.168.70.17:52001".parse().unwrap(),
+                "192.168.70.18:52002".parse().unwrap(),
+                "192.168.70.19:52003".parse().unwrap(),
             ],
         }
     ).await?;
