@@ -9,8 +9,12 @@ else
     TARGET='debug'
 fi
 
+cleanup() {
+    pkill consensus
+}
+
 # cleanup at exit
-trap 'pkill consensus' EXIT INT
+trap 'cleanup' EXIT INT
 
 # update path
 export PATH="$HOME/.cargo/bin:$PATH"
