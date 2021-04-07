@@ -64,7 +64,7 @@ fn main() {
         (pk, sk)
     };
 
-    //eprintln!("sign-hmac-sodiumoxide,sign-ed25519-sodiumoxide,sign-ed25519-hacl-gcc,sign-ed25519-ring,sign-ed25519-openssl,verify-hmac-sodiumoxide,verify-ed25519-sodiumoxide,verify-ed25519-hacl-gcc,verify-ed25519-ring,verify-ed25519-openssl");
+    eprintln!("sign-hmac-sodiumoxide,sign-ed25519-sodiumoxide,sign-ed25519-hacl-gcc,sign-ed25519-ring,sign-ed25519-openssl,verify-hmac-sodiumoxide,verify-ed25519-sodiumoxide,verify-ed25519-hacl-gcc,verify-ed25519-ring,verify-ed25519-openssl");
 
     let sk = sodium_hmac_key.clone();
     let msg_cloned = msg_original.clone();
