@@ -8,7 +8,6 @@ targetCompatibility = 1.8
 
 repositories {
     jcenter()
-    mavenLocal()
     mavenCentral()
 
     maven { url 'https://jitpack.io' }
@@ -16,6 +15,7 @@ repositories {
 
 dependencies {
     implementation 'site.ycsb:core:0.17.0'
+    implementation 'net.java.dev.jna:jna:5.8.0'
     implementation 'commons-codec:commons-codec:1.15'
     implementation 'io.netty:netty-all:4.1.53.Final'
     implementation 'org.bouncycastle:bcprov-jdk15on:1.66'
