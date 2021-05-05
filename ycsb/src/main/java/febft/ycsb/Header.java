@@ -14,8 +14,8 @@ public class Header {
     private int to;
     private long nonce;
     private long length;
-    private digest byte[];
-    private signature byte[];
+    private byte[] digest;
+    private byte[] signature;
 
     private Header() {
         // nothing
@@ -29,9 +29,14 @@ public class Header {
         this.from = from;
         this.to = to;
         this.nonce = nonce;
-        this.digest = ctx.getOutput();
         this.length = payload.length;
         this.signature = new byte[SIGNATURE_LEN];
+        try {
+            this.digest = ctx.getOutput();
+        } catch (Exception e) {
+            System.err.println("Digest failed");
+            System.exit(1);
+        }
     }
 
     // buf needs to be in little endian mode

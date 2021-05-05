@@ -1,6 +1,6 @@
 package febft.ycsb;
 
-import java.util.Map;
+import java.util.*;
 import java.io.IOException;
 import java.security.Security;
 
@@ -23,10 +23,19 @@ public class YCSBClient extends DB {
         // empty constructor
     }
 
+    @Override
     public void init() {
         try {
+            this.node = new Node();
+            node.bootstrap();
+        } catch (Exception e) {
+            System.err.println("Failed to bootstrap node.");
+            System.exit(1);
+        }
+
+        try {
             String sep = System.getProperty("file.separator");
-            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log%s%d", sep, Node.ID), false));
+            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log%s%d", sep, node.getId()), false));
         } catch (IOException e) {
             System.err.println("Failed to create log file.");
             System.exit(1);

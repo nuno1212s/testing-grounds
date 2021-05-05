@@ -1,5 +1,6 @@
 package febft.ycsb;
 
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class IdCounter {
