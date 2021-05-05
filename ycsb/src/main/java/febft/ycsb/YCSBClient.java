@@ -33,6 +33,12 @@ public class YCSBClient extends DB {
         }
 
         Security.addProvider(new BouncyCastleProvider());
+
+        System.setProperty("javax.net.ssl.keyStore", "ca-root/keystore.jks");
+        System.setProperty("javax.net.ssl.keyStorePassword", "123456");
+
+        System.setProperty("javax.net.ssl.trustStore", "ca-root/truststore.jks");
+        System.setProperty("javax.net.ssl.trustStorePassword", "123456");
     }
 
     @Override
