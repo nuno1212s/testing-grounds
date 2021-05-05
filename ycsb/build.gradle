@@ -14,6 +14,7 @@ repositories {
 }
 
 dependencies {
+    implementation 'io.lktk:blake3jni:0.2.2'
     implementation 'site.ycsb:core:0.17.0'
     implementation 'net.java.dev.jna:jna:5.8.0'
     implementation 'commons-codec:commons-codec:1.15'
