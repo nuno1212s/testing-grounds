@@ -1,0 +1,13 @@
+https://docs.oracle.com/javase/8/docs/api/javax/net/ssl/SSLSocket.html
+https://docs.oracle.com/javase/8/docs/api/javax/net/ssl/SSLParameters.html
+https://docs.oracle.com/javase/8/docs/api/javax/net/ssl/SNIServerName.html
+
+https://docs.oracle.com/javase/tutorial/essential/concurrency/pools.html
+https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Executors.html#newFixedThreadPool-int-
+https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html
+
+https://docs.oracle.com/javase/8/docs/api/java/util/AbstractMap.SimpleEntry.html
+https://logging.apache.org/log4j/2.x/log4j-api/apidocs/org/apache/logging/log4j/Logger.html
+https://github.com/brianfrankcooper/YCSB/blob/0.17.0/core/src/main/java/site/ycsb/DB.java
+
+https://blog.gypsyengineer.com/en/security/an-example-of-tls-13-client-and-server-on-java.html
