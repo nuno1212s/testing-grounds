@@ -1,3 +1,6 @@
+# Ignore vim session files
+session.vim
+
 # Ignore Gradle project-specific cache directory
 .gradle
 
