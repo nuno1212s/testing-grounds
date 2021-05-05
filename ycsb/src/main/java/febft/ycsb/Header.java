@@ -4,7 +4,10 @@ import io.lktk.NativeBLAKE3;
 import java.nio.ByteBuffer;
 
 public class Header {
-    private static final CURRENT_VERSION = 0;
+    private static final int SIGNATURE_LEN = 64;
+    private static final int DIGEST_LEN = 32;
+
+    private static final int CURRENT_VERSION = 0;
 
     private int version;
     private int from;
@@ -28,7 +31,7 @@ public class Header {
         this.nonce = nonce;
         this.digest = ctx.getOutput();
         this.length = payload.length;
-        this.signature = new byte[64];
+        this.signature = new byte[SIGNATURE_LEN];
     }
 
     // buf needs to be in little endian mode
@@ -45,8 +48,8 @@ public class Header {
     // buf needs to be in little endian mode
     public static Header deserializeFrom(ByteBuffer buf) {
         Header header = new Header();
-        header.digest = new byte[32];
-        header.signature = new byte[64];
+        header.digest = new byte[DIGEST_LEN];
+        header.signature = new byte[SIGNATURE_LEN];
 
         header.version = buf.getInt();
         header.from = buf.getInt();
