@@ -41,4 +41,4 @@ requestdistribution=zipfian
 
 #maxexecutiontime=30
 
-smart-initkey=1000
+firstid=1000

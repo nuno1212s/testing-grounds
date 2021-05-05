@@ -8,6 +8,8 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import febft.ycsb.Node;
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.LogManager;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.SimpleLayout;
 import org.apache.log4j.BasicConfigurator;
@@ -17,6 +19,7 @@ import site.ycsb.Status;
 import site.ycsb.DB;
 
 public class YCSBClient extends DB {
+    private static final Logger LOG = LogManager.getLogger();
     private Node node;
 
     public YCSBClient() {
@@ -29,15 +32,14 @@ public class YCSBClient extends DB {
             this.node = new Node();
             node.bootstrap();
         } catch (Exception e) {
-            System.err.println("Failed to bootstrap node.");
+            System.err.printf("Failed to bootstrap node %d: %s\n", this.node.getId(), e);
             System.exit(1);
         }
 
         try {
-            String sep = System.getProperty("file.separator");
-            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log%s%d", sep, node.getId()), false));
+            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log/%02d.log", node.getId()), false));
         } catch (IOException e) {
-            System.err.println("Failed to create log file.");
+            System.err.printf("Failed to create log file on node %d: %s\n", this.node.getId(), e);
             System.exit(1);
         }
 
