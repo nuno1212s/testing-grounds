@@ -19,7 +19,7 @@ import site.ycsb.Status;
 import site.ycsb.DB;
 
 public class YCSBClient extends DB {
-    private static final Logger LOG = LogManager.getLogger();
+    private static final Logger LOG = LogManager.getLogger(YCSBClient.class);
     private Node node;
 
     public YCSBClient() {
@@ -28,18 +28,21 @@ public class YCSBClient extends DB {
 
     @Override
     public void init() {
+        int id = -1;
+
         try {
             this.node = new Node();
+            id = this.node.getConfig().getId();
             node.bootstrap();
         } catch (Exception e) {
-            System.err.printf("Failed to bootstrap node %d: %s\n", this.node.getId(), e);
+            System.err.printf("Failed to bootstrap node %d: %s\n", id, e);
             System.exit(1);
         }
 
         try {
-            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log/%02d.log", node.getId()), false));
+            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log/%02d.log", id), false));
         } catch (IOException e) {
-            System.err.printf("Failed to create log file on node %d: %s\n", this.node.getId(), e);
+            System.err.printf("Failed to create log file on node %d: %s\n", id, e);
             System.exit(1);
         }
 

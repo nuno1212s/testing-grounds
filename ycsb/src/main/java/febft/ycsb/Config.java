@@ -1,21 +1,43 @@
 package febft.ycsb;
 
-import java.util.List;
-import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
 public class Config {
-    public static List<Entry> parse(String configPath) {
-        String configLine;
-        List<Entry> config = new ArrayList<>();
+    private static final String REPLICAS_PATH = "config/replicas.config";
+    private static Map<Integer, Entry> REPLICAS = null;
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(configPath))) {
+    private static final String CLIENTS_PATH = "config/clients.config";
+    private static Map<Integer, Entry> CLIENTS = null;
+
+    public synchronized static Map<Integer, Entry> getClients() {
+        if (CLIENTS != null) {
+            return CLIENTS;
+        }
+        CLIENTS = parse(CLIENTS_PATH);
+        return CLIENTS; 
+    }
+
+    public synchronized static Map<Integer, Entry> getReplicas() {
+        if (REPLICAS != null) {
+            return REPLICAS;
+        }
+        REPLICAS = parse(REPLICAS_PATH);
+        return REPLICAS; 
+    }
+
+    private static Map<Integer, Entry> parse(String path) {
+        String configLine;
+        Map<Integer, Entry> config = new HashMap<>();
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
             while ((configLine = reader.readLine()) != null) {
                 Entry entry = Entry.parse(configLine);
                 if (entry != null) {
-                    config.add(entry);
+                    config.put(entry.getId(), entry);
                 }
             }
         } catch (IOException e) {
