@@ -57,7 +57,7 @@ public class YCSBClient extends DB {
         }
 
         try {
-            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log/%02d.log", id), false));
+            BasicConfigurator.configure(new FileAppender(new SimpleLayout(), String.format("log/%d.log", id), false));
         } catch (IOException e) {
             System.err.printf("Failed to create log file on node %d: %s\n", id, e);
             System.exit(1);
