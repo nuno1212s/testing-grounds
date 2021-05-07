@@ -10,7 +10,7 @@ public class Header {
     private static final int DIGEST_LEN = 32;
 
     public static final int LENGTH =
-        4 + 4 + 4 + 8 + 8 + DIGEST_LEN + SIGNATURE_LEN;
+        4 + 4 + 4 + 4 + 8 + 8 + DIGEST_LEN + SIGNATURE_LEN;
 
     private int version;
     private int from;
@@ -47,6 +47,7 @@ public class Header {
 
     // buf needs to be in little endian mode
     public void serializeInto(ByteBuffer buf) {
+        buf.putInt(0);
         buf.putInt(version);
         buf.putInt(from);
         buf.putInt(to);
@@ -62,6 +63,7 @@ public class Header {
         header.digest = new byte[DIGEST_LEN];
         header.signature = new byte[SIGNATURE_LEN];
 
+        int _align = buf.getInt();
         header.version = buf.getInt();
         header.from = buf.getInt();
         header.to = buf.getInt();
