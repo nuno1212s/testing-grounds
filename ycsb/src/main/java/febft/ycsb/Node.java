@@ -101,7 +101,7 @@ public class Node {
 
         // accept conns from replicas
         for (int i = 0; i < noReplicas; i++) {
-            printf("Accepting connection no. %d", i);
+            printf("Accepting connection no. %d\n", i);
             SSLSocket socket = (SSLSocket)listener.accept();
             InputStream reader = socket.getInputStream();
             println("Accepted, reading header");
