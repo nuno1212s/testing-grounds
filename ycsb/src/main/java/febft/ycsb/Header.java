@@ -5,10 +5,12 @@ import io.lktk.NativeBLAKE3;
 import java.nio.ByteBuffer;
 
 public class Header {
+    private static final int CURRENT_VERSION = 0;
     private static final int SIGNATURE_LEN = 64;
     private static final int DIGEST_LEN = 32;
 
-    private static final int CURRENT_VERSION = 0;
+    public static final int LENGTH =
+        4 + 4 + 4 + 8 + 8 + DIGEST_LEN + SIGNATURE_LEN;
 
     private int version;
     private int from;
@@ -23,9 +25,6 @@ public class Header {
     }
 
     public Header(int from, int to, long nonce, byte[] payload) {
-        NativeBLAKE3 ctx = new NativeBLAKE3();
-        ctx.update(payload);
-
         this.version = CURRENT_VERSION;
         this.from = from;
         this.to = to;
@@ -33,7 +32,13 @@ public class Header {
         this.length = payload.length;
         this.signature = new byte[SIGNATURE_LEN];
         try {
-            this.digest = ctx.getOutput();
+            if (payload != null && payload.length > 0) {
+                NativeBLAKE3 ctx = new NativeBLAKE3();
+                ctx.update(payload);
+                this.digest = ctx.getOutput();
+            } else {
+                this.digest = new byte[DIGEST_LEN];
+            }
         } catch (Exception e) {
             System.err.println("Digest failed");
             System.exit(1);

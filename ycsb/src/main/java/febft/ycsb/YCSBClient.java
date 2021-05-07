@@ -26,15 +26,30 @@ public class YCSBClient extends DB {
         // empty constructor
     }
 
+    // test
+    public static void main(String[] args) throws Exception {
+        YCSBClient client = new YCSBClient();
+        client.init();
+        Thread.sleep(60 * 60 * 1000);
+    }
+
     @Override
     public void init() {
+        Security.addProvider(new BouncyCastleProvider());
+
+        System.setProperty("javax.net.ssl.keyStore", "ca-root/keystore.jks");
+        System.setProperty("javax.net.ssl.keyStorePassword", "123456");
+
+        System.setProperty("javax.net.ssl.trustStore", "ca-root/truststore.jks");
+        System.setProperty("javax.net.ssl.trustStorePassword", "123456");
+
         int id = -1;
 
         try {
             this.node = new Node();
             id = this.node.getConfig().getId();
             node.bootstrap();
-        } catch (Exception e) {
+        } catch (IOException e) {
             System.err.printf("Failed to bootstrap node %d: %s\n", id, e);
             System.exit(1);
         }
@@ -45,14 +60,6 @@ public class YCSBClient extends DB {
             System.err.printf("Failed to create log file on node %d: %s\n", id, e);
             System.exit(1);
         }
-
-        Security.addProvider(new BouncyCastleProvider());
-
-        System.setProperty("javax.net.ssl.keyStore", "ca-root/keystore.jks");
-        System.setProperty("javax.net.ssl.keyStorePassword", "123456");
-
-        System.setProperty("javax.net.ssl.trustStore", "ca-root/truststore.jks");
-        System.setProperty("javax.net.ssl.trustStorePassword", "123456");
     }
 
     @Override
