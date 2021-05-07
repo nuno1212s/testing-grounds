@@ -29,7 +29,9 @@ public class YCSBClient extends DB {
     // test
     public static void main(String[] args) throws Exception {
         YCSBClient client = new YCSBClient();
+        System.err.println("Initializing...");
         client.init();
+        System.err.println("Done.");
         Thread.sleep(60 * 60 * 1000);
     }
 
