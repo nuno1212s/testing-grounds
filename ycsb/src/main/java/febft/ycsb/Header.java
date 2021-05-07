@@ -29,10 +29,10 @@ public class Header {
         this.from = from;
         this.to = to;
         this.nonce = nonce;
-        this.length = payload.length;
+        this.length = (payload != null && payload.length > 0) ? payload.length : 0;
         this.signature = new byte[SIGNATURE_LEN];
         try {
-            if (payload != null && payload.length > 0) {
+            if (this.length > 0) {
                 NativeBLAKE3 ctx = new NativeBLAKE3();
                 ctx.update(payload);
                 this.digest = ctx.getOutput();
@@ -99,5 +99,19 @@ public class Header {
 
     public byte[] getSignature() {
         return signature;
+    }
+
+    public String toString() {
+        return (new StringBuilder())
+            .append("Header { version: ")
+            .append(version)
+            .append(", from: ")
+            .append(from)
+            .append(", to: ")
+            .append(to)
+            .append(", nonce: ")
+            .append(nonce)
+            .append(", .. }")
+            .toString();
     }
 }

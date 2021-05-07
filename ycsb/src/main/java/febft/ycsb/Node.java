@@ -27,6 +27,8 @@ import febft.ycsb.Config;
 import febft.ycsb.IdCounter;
 
 public class Node {
+    private static final Object LOG_MUX = new Object();
+
     private static final int BUF_CAP = 1024 * 1024; // 1 MiB
 
     private static final String[] PROTOCOLS = {"TLSv1.3"};
@@ -41,7 +43,7 @@ public class Node {
 
     public Node() {
         config = Config.getClients().get(new Integer(IdCounter.nextId()));
-        txBuf = ByteBuffer.allocateDirect(BUF_CAP).order(LITTLE_ENDIAN);
+        txBuf = ByteBuffer.allocate(BUF_CAP).order(LITTLE_ENDIAN);
         rng = new Random();
     }
 
@@ -71,11 +73,13 @@ public class Node {
 
         // connect to replicas
         for (Entry replicaConfig : replicas.values()) {
+            printf("Connecting to node %d\n", replicaConfig.getId());
             OutputStream writer = connect(
                 replicaConfig.getHostname(),
                 replicaConfig.getIpAddr(),
                 replicaConfig.getPortNo()
             );
+            printf("Connected to node %d\n", replicaConfig.getId());
 
             Header header = new Header(
                 config.getId(),
@@ -84,9 +88,12 @@ public class Node {
                 null
             );
 
+            printf("Writing header to node %d\n", replicaConfig.getId());
             txBuf.clear();
             header.serializeInto(txBuf);
             writer.write(txBuf.array(), 0, txBuf.position());
+            writer.flush();
+            printf("Written: %s\n", header);
 
             tx.put(replicaConfig.getId(), writer);
             noReplicas++;
@@ -94,15 +101,36 @@ public class Node {
 
         // accept conns from replicas
         for (int i = 0; i < noReplicas; i++) {
+            printf("Accepting connection no. %d", i);
             SSLSocket socket = (SSLSocket)listener.accept();
             InputStream reader = socket.getInputStream();
+            println("Accepted, reading header");
 
             txBuf.clear();
             reader.read(txBuf.array(), 0, Header.LENGTH);
             txBuf.limit(Header.LENGTH);
 
             Header header = Header.deserializeFrom(txBuf);
+            printf("Read header: %s\n", header);
+
             rx.put(header.getFrom(), reader);
+        }
+    }
+
+    private void printf(String f, Object... args) {
+        synchronized (LOG_MUX) {
+            System.err.printf(
+                (new StringBuilder()).append(config.getId()).append(": ").append(f).toString(),
+                args
+            );
+        }
+    }
+
+    private void println(String s) {
+        synchronized (LOG_MUX) {
+            System.err.println(
+                (new StringBuilder()).append(config.getId()).append(": ").append(s).toString()
+            );
         }
     }
 

@@ -16,12 +16,12 @@ repositories {
 dependencies {
     implementation 'io.lktk:blake3jni:0.2.2'
     implementation 'site.ycsb:core:0.17.0'
-    implementation 'commons-codec:commons-codec:1.15'
+    //implementation 'commons-codec:commons-codec:1.15'
     //implementation 'io.netty:netty-all:4.1.53.Final'
-    implementation 'org.bouncycastle:bcprov-jdk15on:1.66'
-    implementation 'org.bouncycastle:bcpkix-jdk15on:1.66'
-    implementation 'org.slf4j:slf4j-api:1.7.30'
-    implementation 'org.slf4j:slf4j-log4j12:1.7.30'
+    //implementation 'org.bouncycastle:bcprov-jdk15on:1.66'
+    //implementation 'org.bouncycastle:bcpkix-jdk15on:1.66'
+    //implementation 'org.slf4j:slf4j-api:1.7.30'
+    //implementation 'org.slf4j:slf4j-log4j12:1.7.30'
 }
 
 jar {
