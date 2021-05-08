@@ -11,12 +11,12 @@ public abstract class SystemMessage {
         throw new UnsupportedOperationException();
     }
 
-    public SystemMessage deserializeFrom(ByteBuffer buf) {
+    protected SystemMessage deserialize(ByteBuffer buf) {
         throw new UnsupportedOperationException();
     }
 
-    public static SystemMessage deserialize(ByteBuffer buf) {
-        return INSTANCE.deserializeFrom(buf);
+    public static <T extends SystemMessage> SystemMessage deserializeAs(Class<T> kls, ByteBuffer buf) {
+        return kls.cast(INSTANCE).deserialize(buf);
     }
 
     public abstract MessageKind getKind();
