@@ -16,6 +16,7 @@ repositories {
 dependencies {
     implementation 'io.lktk:blake3jni:0.2.2'
     implementation 'site.ycsb:core:0.17.0'
+    implementation 'org.capnproto:runtime:0.1.5'
     //implementation 'commons-codec:commons-codec:1.15'
     //implementation 'io.netty:netty-all:4.1.53.Final'
     //implementation 'org.bouncycastle:bcprov-jdk15on:1.66'

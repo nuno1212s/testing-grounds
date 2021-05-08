@@ -10,14 +10,4 @@ public class UnsupportedMessage extends SystemMessage {
     public MessageKind getKind() {
         return MessageKind.UNSUPPORTED;
     }
-
-    @Override
-    public void serializeInto(ByteBuffer buf) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public SystemMessage deserializeFrom(ByteBuffer buf) {
-        throw new UnsupportedOperationException();
-    }
 }

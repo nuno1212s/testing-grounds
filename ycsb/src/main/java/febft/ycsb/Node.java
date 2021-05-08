@@ -12,8 +12,6 @@ import java.nio.ByteBuffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 import javax.net.ssl.SSLSocket;
@@ -27,6 +25,7 @@ import javax.net.ssl.SNIHostName;
 import static febft.ycsb.Config.Entry;
 import febft.ycsb.Config;
 import febft.ycsb.IdCounter;
+//import febft.ycsb.Pool;
 
 public class Node {
     private static final Object LOG_MUX = new Object();
@@ -37,7 +36,6 @@ public class Node {
     private static final String[] CIPHER_SUITES = {"TLS_AES_128_GCM_SHA256"};
 
     private Entry config;
-    private ExecutorService executorService = null;
     private SSLServerSocket listener = null;
     private Map<Integer, OutputStream> tx;
     private Map<Integer, InputStream> rx;
@@ -47,15 +45,10 @@ public class Node {
     public Node() {
         config = Config.getClients().get(new Integer(IdCounter.nextId()));
         txBuf = ByteBuffer.allocate(BUF_CAP).order(LITTLE_ENDIAN);
-        executorService = Executors.newWorkStealingPool();
         rng = new Random();
     }
 
     public void close() {
-        if (executorService != null) {
-            executorService.shutdown();
-        }
-
         // NOTE: only close the listener for now,
         // since we haven't implemented handling
         // disconnected clients in `febft` yet
