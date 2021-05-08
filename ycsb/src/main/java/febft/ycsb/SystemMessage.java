@@ -5,8 +5,6 @@ import java.nio.ByteBuffer;
 import febft.ycsb.MessageKind;
 
 public abstract class SystemMessage {
-    private static SystemMessage INSTANCE = (SystemMessage)new Object();
-
     public ByteBuffer serialize() {
         throw new UnsupportedOperationException();
     }
@@ -16,7 +14,11 @@ public abstract class SystemMessage {
     }
 
     public static <T extends SystemMessage> SystemMessage deserializeAs(Class<T> kls, ByteBuffer buf) {
-        return kls.cast(INSTANCE).deserialize(buf);
+        try {
+            return kls.newInstance().deserialize(buf);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public abstract MessageKind getKind();

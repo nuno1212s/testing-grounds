@@ -3,7 +3,6 @@ package febft.ycsb;
 import java.util.*;
 import java.io.IOException;
 import java.security.Security;
-import java.util.stream.Collectors;
 
 //import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -52,14 +51,6 @@ public class YCSBClient extends DB {
 
     @Override
     public Status update(String table, String key, Map<String, ByteIterator> valuesIter) {
-        Map<String, byte[]> values = valuesIter
-            .entrySet()
-            .stream()
-            .collect(Collectors.toMap(
-                (pair) -> pair.getKey(),
-                (pair) -> pair.getValue().toArray()
-            ));
-
         // TODO: implement update
         return Status.NOT_IMPLEMENTED;
     }

@@ -12,7 +12,6 @@ import febft.ycsb.capnp.Messages.Value;
 
 import site.ycsb.ByteIterator;
 
-import org.capnproto.Serialize;
 import org.capnproto.StructList;
 import org.capnproto.MessageBuilder;
 
@@ -52,8 +51,8 @@ public class RequestMessage extends SystemMessage {
             ++i;
         }
 
-        long size = Serialize.computeSerializedSizeInWords(message);
-        ByteBuffer output = ByteBuffer.allocate((int)size);
+        // 512 KiB per message should be enough I reckon
+        ByteBuffer output = ByteBuffer.allocate(512 * 1024);
 
         ByteBuffer[] segments = message.getSegmentsForOutput();
         int tableSize = (segments.length + 2) & (~1);
