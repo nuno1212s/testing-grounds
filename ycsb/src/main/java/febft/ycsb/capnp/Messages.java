@@ -33,6 +33,7 @@ public final class Messages {
         switch(_getShortField(0)) {
           case 0 : return Which.REQUEST;
           case 1 : return Which.REPLY;
+          case 2 : return Which.CONSENSUS;
           default: return Which._NOT_IN_SCHEMA;
         }
       }
@@ -71,6 +72,22 @@ public final class Messages {
         _setShortField(0, (short)System.Which.REPLY.ordinal());
         return _initPointerField(febft.ycsb.capnp.Messages.Reply.factory,0, 0);
       }
+      public final boolean isConsensus() {
+        return which() == System.Which.CONSENSUS;
+      }
+      public final febft.ycsb.capnp.Messages.Consensus.Builder getConsensus() {
+        assert which() == System.Which.CONSENSUS:
+                    "Must check which() before get()ing a union member.";
+        return _getPointerField(febft.ycsb.capnp.Messages.Consensus.factory, 0, null, 0);
+      }
+      public final void setConsensus(febft.ycsb.capnp.Messages.Consensus.Reader value) {
+        _setShortField(0, (short)System.Which.CONSENSUS.ordinal());
+        _setPointerField(febft.ycsb.capnp.Messages.Consensus.factory,0, value);
+      }
+      public final febft.ycsb.capnp.Messages.Consensus.Builder initConsensus() {
+        _setShortField(0, (short)System.Which.CONSENSUS.ordinal());
+        return _initPointerField(febft.ycsb.capnp.Messages.Consensus.factory,0, 0);
+      }
     }
 
     public static final class Reader extends org.capnproto.StructReader {
@@ -82,6 +99,7 @@ public final class Messages {
         switch(_getShortField(0)) {
           case 0 : return Which.REQUEST;
           case 1 : return Which.REPLY;
+          case 2 : return Which.CONSENSUS;
           default: return Which._NOT_IN_SCHEMA;
         }
       }
@@ -109,11 +127,24 @@ public final class Messages {
         return _getPointerField(febft.ycsb.capnp.Messages.Reply.factory,0,null, 0);
       }
 
+      public final boolean isConsensus() {
+        return which() == System.Which.CONSENSUS;
+      }
+      public boolean hasConsensus() {
+        return !_pointerFieldIsNull(0);
+      }
+      public febft.ycsb.capnp.Messages.Consensus.Reader getConsensus() {
+        assert which() == System.Which.CONSENSUS:
+                    "Must check which() before get()ing a union member.";
+        return _getPointerField(febft.ycsb.capnp.Messages.Consensus.factory,0,null, 0);
+      }
+
     }
 
     public enum Which {
       REQUEST,
       REPLY,
+      CONSENSUS,
       _NOT_IN_SCHEMA,
     }
   }
@@ -357,6 +388,154 @@ public final class Messages {
   }
 
 
+  public static class Consensus {
+    public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)1);
+    public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
+      public Factory() {
+      }
+      public final Reader constructReader(org.capnproto.SegmentReader segment, int data,int pointers, int dataSize, short pointerCount, int nestingLimit) {
+        return new Reader(segment,data,pointers,dataSize,pointerCount,nestingLimit);
+      }
+      public final Builder constructBuilder(org.capnproto.SegmentBuilder segment, int data,int pointers, int dataSize, short pointerCount) {
+        return new Builder(segment, data, pointers, dataSize, pointerCount);
+      }
+      public final org.capnproto.StructSize structSize() {
+        return Consensus.STRUCT_SIZE;
+      }
+      public final Reader asReader(Builder builder) {
+        return builder.asReader();
+      }
+    }
+    public static final Factory factory = new Factory();
+    public static final org.capnproto.StructList.Factory<Builder,Reader> listFactory =
+      new org.capnproto.StructList.Factory<Builder, Reader>(factory);
+    public static final class Builder extends org.capnproto.StructBuilder {
+      Builder(org.capnproto.SegmentBuilder segment, int data, int pointers,int dataSize, short pointerCount){
+        super(segment, data, pointers, dataSize, pointerCount);
+      }
+      public Which which() {
+        switch(_getShortField(2)) {
+          case 0 : return Which.PRE_PREPARE;
+          case 1 : return Which.PREPARE;
+          case 2 : return Which.COMMIT;
+          default: return Which._NOT_IN_SCHEMA;
+        }
+      }
+      public final Reader asReader() {
+        return new Reader(segment, data, pointers, dataSize, pointerCount, 0x7fffffff);
+      }
+      public final int getSeqNo() {
+        return _getIntField(0);
+      }
+      public final void setSeqNo(int value) {
+        _setIntField(0, value);
+      }
+
+      public final boolean isPrePrepare() {
+        return which() == Consensus.Which.PRE_PREPARE;
+      }
+      public final boolean hasPrePrepare() {
+        if (which() != Consensus.Which.PRE_PREPARE) return false;
+        return !_pointerFieldIsNull(0);
+      }
+      public final org.capnproto.Data.Builder getPrePrepare() {
+        return _getPointerField(org.capnproto.Data.factory, 0, null, 0, 0);
+      }
+      public final void setPrePrepare(org.capnproto.Data.Reader value) {
+        _setShortField(2, (short)Consensus.Which.PRE_PREPARE.ordinal());
+        _setPointerField(org.capnproto.Data.factory, 0, value);
+      }
+      public final void setPrePrepare(byte [] value) {
+        _setShortField(2, (short)Consensus.Which.PRE_PREPARE.ordinal());
+        _setPointerField(org.capnproto.Data.factory, 0, new org.capnproto.Data.Reader(value));
+      }
+      public final org.capnproto.Data.Builder initPrePrepare(int size) {
+        _setShortField(2, (short)Consensus.Which.PRE_PREPARE.ordinal());
+        return _initPointerField(org.capnproto.Data.factory, 0, size);
+      }
+      public final boolean isPrepare() {
+        return which() == Consensus.Which.PREPARE;
+      }
+      public final org.capnproto.Void getPrepare() {
+        assert which() == Consensus.Which.PREPARE:
+                    "Must check which() before get()ing a union member.";
+        return org.capnproto.Void.VOID;
+      }
+      public final void setPrepare(org.capnproto.Void value) {
+        _setShortField(2, (short)Consensus.Which.PREPARE.ordinal());
+      }
+
+      public final boolean isCommit() {
+        return which() == Consensus.Which.COMMIT;
+      }
+      public final org.capnproto.Void getCommit() {
+        assert which() == Consensus.Which.COMMIT:
+                    "Must check which() before get()ing a union member.";
+        return org.capnproto.Void.VOID;
+      }
+      public final void setCommit(org.capnproto.Void value) {
+        _setShortField(2, (short)Consensus.Which.COMMIT.ordinal());
+      }
+
+    }
+
+    public static final class Reader extends org.capnproto.StructReader {
+      Reader(org.capnproto.SegmentReader segment, int data, int pointers,int dataSize, short pointerCount, int nestingLimit){
+        super(segment, data, pointers, dataSize, pointerCount, nestingLimit);
+      }
+
+      public Which which() {
+        switch(_getShortField(2)) {
+          case 0 : return Which.PRE_PREPARE;
+          case 1 : return Which.PREPARE;
+          case 2 : return Which.COMMIT;
+          default: return Which._NOT_IN_SCHEMA;
+        }
+      }
+      public final int getSeqNo() {
+        return _getIntField(0);
+      }
+
+      public final boolean isPrePrepare() {
+        return which() == Consensus.Which.PRE_PREPARE;
+      }
+      public boolean hasPrePrepare() {
+        if (which() != Consensus.Which.PRE_PREPARE) return false;
+        return !_pointerFieldIsNull(0);
+      }
+      public org.capnproto.Data.Reader getPrePrepare() {
+        return _getPointerField(org.capnproto.Data.factory, 0, null, 0, 0);
+      }
+
+      public final boolean isPrepare() {
+        return which() == Consensus.Which.PREPARE;
+      }
+      public final org.capnproto.Void getPrepare() {
+        assert which() == Consensus.Which.PREPARE:
+                    "Must check which() before get()ing a union member.";
+        return org.capnproto.Void.VOID;
+      }
+
+      public final boolean isCommit() {
+        return which() == Consensus.Which.COMMIT;
+      }
+      public final org.capnproto.Void getCommit() {
+        assert which() == Consensus.Which.COMMIT:
+                    "Must check which() before get()ing a union member.";
+        return org.capnproto.Void.VOID;
+      }
+
+    }
+
+    public enum Which {
+      PRE_PREPARE,
+      PREPARE,
+      COMMIT,
+      _NOT_IN_SCHEMA,
+    }
+  }
+
+
 
 public static final class Schemas {
 public static final org.capnproto.SegmentReader b_a0433cc6d0d8c642 =
@@ -365,12 +544,12 @@ public static final org.capnproto.SegmentReader b_a0433cc6d0d8c642 =
    "\u0042\u00c6\u00d8\u00d0\u00c6\u003c\u0043\u00a0" +
    "\u002e\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
    "\u0005\u00e8\u0059\u00c3\u00f6\u003d\u00a4\u0094" +
-   "\u0001\u0000\u0007\u0000\u0000\u0000\u0002\u0000" +
+   "\u0001\u0000\u0007\u0000\u0000\u0000\u0003\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u00aa\u0001\u0000\u0000" +
    "\u002d\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\u0077\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u00af\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0073\u0072\u0063\u002f\u006d\u0061\u0069\u006e" +
@@ -381,21 +560,28 @@ public static final org.capnproto.SegmentReader b_a0433cc6d0d8c642 =
    "\u0063\u0061\u0070\u006e\u0070\u003a\u0053\u0079" +
    "\u0073\u0074\u0065\u006d\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
-   "\u0008\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u000c\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
    "\u0000\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0045\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0024\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0030\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0040\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u004c\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0001\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u002d\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
+   "\u0049\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0028\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0034\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0044\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0050\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0002\u0000\u00fd\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004d\u0000\u0000\u0000\u0052\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u004c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0058\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0072\u0065\u0071\u0075\u0065\u0073\u0074\u0000" +
    "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u00bd\u00a8\u0069\u00a4\u008d\u006f\u0034\u009c" +
@@ -407,6 +593,15 @@ public static final org.capnproto.SegmentReader b_a0433cc6d0d8c642 =
    "\u0072\u0065\u0070\u006c\u0079\u0000\u0000\u0000" +
    "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u007a\u00e5\u00c6\u0034\u0003\u00ba\u0097\u00c6" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0063\u006f\u006e\u0073\u0065\u006e\u0073\u0075" +
+   "\u0073\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u007d\u00c9\u00a9\u0016\u00d1\u00bc\u00cd\u00d3" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
@@ -573,6 +768,90 @@ public static final org.capnproto.SegmentReader b_c697ba0334c6e57a =
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
+public static final org.capnproto.SegmentReader b_d3cdbcd116a9c97d =
+   org.capnproto.GeneratedClassSupport.decodeRawBytes(
+   "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
+   "\u007d\u00c9\u00a9\u0016\u00d1\u00bc\u00cd\u00d3" +
+   "\u002e\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u0005\u00e8\u0059\u00c3\u00f6\u003d\u00a4\u0094" +
+   "\u0001\u0000\u0007\u0000\u0000\u0000\u0003\u0000" +
+   "\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0015\u0000\u0000\u0000\u00c2\u0001\u0000\u0000" +
+   "\u002d\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u00e7\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0073\u0072\u0063\u002f\u006d\u0061\u0069\u006e" +
+   "\u002f\u006a\u0061\u0076\u0061\u002f\u0066\u0065" +
+   "\u0062\u0066\u0074\u002f\u0079\u0063\u0073\u0062" +
+   "\u002f\u0063\u0061\u0070\u006e\u0070\u002f\u004d" +
+   "\u0065\u0073\u0073\u0061\u0067\u0065\u0073\u002e" +
+   "\u0063\u0061\u0070\u006e\u0070\u003a\u0043\u006f" +
+   "\u006e\u0073\u0065\u006e\u0073\u0075\u0073\u0000" +
+   "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u0010\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0061\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\\\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0068\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0001\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0065\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0064\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0070\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0002\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u006d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0068\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0074\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0003\u0000\u00fd\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0003\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0071\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u006c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u0078\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0073\u0065\u0071\u004e\u006f\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0070\u0072\u0065\u0050\u0072\u0065\u0070\u0061" +
+   "\u0072\u0065\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\r\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\r\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0070\u0072\u0065\u0070\u0061\u0072\u0065\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0063\u006f\u006d\u006d\u0069\u0074\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" + "");
 }

@@ -6,8 +6,9 @@ $Java.outerClassname("Messages");
 
 struct System {
     union {
-        request @0 :Request;
-        reply   @1 :Reply;
+        request   @0 :Request;
+        reply     @1 :Reply;
+        consensus @2 :Consensus;
     }
 }
 
@@ -24,4 +25,13 @@ struct Value {
 
 struct Reply {
     status @0 :UInt32;
+}
+
+struct Consensus {
+    seqNo @0 :UInt32;
+    union {
+        prePrepare @1 :Data;
+        prepare    @2 :Void;
+        commit     @3 :Void;
+    }
 }
