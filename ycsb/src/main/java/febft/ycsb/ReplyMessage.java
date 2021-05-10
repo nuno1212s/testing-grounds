@@ -41,4 +41,8 @@ public class ReplyMessage extends SystemMessage {
 
         return new ReplyMessage(status);
     }
+
+    public Status getStatus() {
+        return status;
+    }
 }
