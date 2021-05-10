@@ -50,4 +50,8 @@ public class ReplyMessage extends SystemMessage {
     public Status getStatus() {
         return status;
     }
+
+    public byte[] getDigest() {
+        return digest;
+    }
 }

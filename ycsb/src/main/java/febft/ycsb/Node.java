@@ -144,6 +144,7 @@ public class Node {
                     nextNonce(),
                     requestBuf.array()
                 );
+                byte[] requestDigest = header.getDigest();
 
                 output.write(headerBuf.array());
                 output.write(requestBuf.array());
@@ -156,6 +157,8 @@ public class Node {
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
                 input.read(payloadBuf.array());
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
+
+                assert Arrays.equals(requestDigest, reply.getDigest());
 
                 return reply.getStatus();
             });
