@@ -159,9 +159,8 @@ public class Node {
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
 
                 if (reply == null) {
-                    return Status.ERR;
+                    return Status.ERROR;
                 }
-
                 assert Arrays.equals(requestDigest, reply.getDigest());
 
                 return reply.getStatus();
