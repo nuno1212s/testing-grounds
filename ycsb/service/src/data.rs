@@ -1,6 +1,4 @@
-use febft::bft::collections::{
-    HashMap,
-};
+use febft::bft::collections::HashMap;
 
 pub struct Request {
     pub table: String,

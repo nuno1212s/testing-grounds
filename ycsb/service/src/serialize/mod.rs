@@ -5,6 +5,7 @@ use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::message::{
     SystemMessage,
+    RequestMessage,
     ConsensusMessage,
     ConsensusMessageKind,
 };
@@ -12,10 +13,18 @@ use febft::bft::communication::serialize::{
     SharedData,
     ReplicaData,
 };
+use febft::bft::collections::{
+    self,
+    HashMap,
+};
 
-use crate::data::Update;
+use crate::data::{Update, Request};
 
 pub struct YcsbData;
+
+impl ReplicaData for YcsbData {
+    type State = HashMap<String, HashMap<String, HashMap<String, Vec<u8>>>>;
+}
 
 impl SharedData for YcsbData {
     type Request = Update;
@@ -63,9 +72,48 @@ impl SharedData for YcsbData {
 
         match sys_msg_which {
             messages_capnp::system::Which::Reply(_) => unimplemented!(),
-            messages_capnp::system::Which::Request(request) => {
-                //Ok(SystemMessage::Request(RequestMessage::new(())))
-                unimplemented!()
+            messages_capnp::system::Which::Request(Ok(updates)) => {
+                let updates = updates
+                    .get_requests()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get requests")?;
+                let mut decoded_update = Update { requests: Vec::new() };
+
+                for request in updates.iter() {
+                    let values_reader = request
+                        .get_values()
+                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request values")?;
+
+                    let table = request
+                        .get_table()
+                        .map(String::from)
+                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request table")?;
+                    let key = request
+                        .get_key()
+                        .map(String::from)
+                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request key")?;
+                    let mut values = collections::hash_map();
+
+                    for value in values_reader.iter() {
+                        let key = value
+                            .get_key()
+                            .map(String::from)
+                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request key")?;
+                        let value = value
+                            .get_value()
+                            .map(Vec::from)
+                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request value")?;
+
+                        values.insert(key, value);
+                    }
+
+                    decoded_update.requests.push(Request { table, key, values });
+                }
+
+                Ok(SystemMessage::Request(RequestMessage::new(decoded_update)))
+            },
+            messages_capnp::system::Which::Request(_) => {
+                Err("Failed to read request message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
             },
             messages_capnp::system::Which::Consensus(Ok(consensus)) => {
                 let seq = consensus
