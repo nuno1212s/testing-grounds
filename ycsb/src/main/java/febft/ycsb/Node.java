@@ -8,10 +8,12 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.Callable;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 import javax.net.ssl.SSLSocket;
@@ -22,10 +24,16 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SNIHostName;
 
+import site.ycsb.Status;
+import site.ycsb.ByteIterator;
+
 import static febft.ycsb.Config.Entry;
+import febft.ycsb.SystemMessage;
+import febft.ycsb.RequestMessage;
+import febft.ycsb.ReplyMessage;
 import febft.ycsb.Config;
 import febft.ycsb.IdCounter;
-//import febft.ycsb.Pool;
+import febft.ycsb.Pool;
 
 public class Node {
     private static final Object LOG_MUX = new Object();
@@ -36,6 +44,7 @@ public class Node {
     private static final String[] CIPHER_SUITES = {"TLS_AES_128_GCM_SHA256"};
 
     private Entry config;
+    private int noReplicas;
     private SSLServerSocket listener = null;
     private Map<Integer, OutputStream> tx;
     private Map<Integer, InputStream> rx;
@@ -66,7 +75,7 @@ public class Node {
     public void bootstrap() throws IOException {
         listener = listen(config.getHostname(), config.getPortNo());
 
-        int noReplicas = 0;
+        noReplicas = 0;
         final Map<Integer, Entry> replicas = Config.getReplicas();
 
         this.tx = new HashMap<>();
@@ -116,6 +125,45 @@ public class Node {
 
             rx.put(header.getFrom(), reader);
         }
+    }
+
+    public Status callService(String table, String key, Map<String, ByteIterator> values) throws IOException {
+        List<Callable<Status>> callables = new ArrayList<>(noReplicas);
+        for (int i = 0; i < noReplicas; i++) {
+            final int nodeId = i;
+            final InputStream input = rx.get(nodeId);
+            final OutputStream output = tx.get(nodeId);
+            callables.add(() -> {
+                ByteBuffer requestBuf = (new RequestMessage(table, key, values)).serialize();
+                ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH);
+
+                Header header = new Header(
+                    config.getId(),
+                    nodeId,
+                    nextNonce(),
+                    requestBuf.array()
+                );
+
+                output.write(headerBuf.array());
+                output.write(requestBuf.array());
+                output.flush();
+
+                requestBuf.clear();
+                input.read(headerBuf.array());
+                header = Header.deserializeFrom(headerBuf);
+
+                ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
+                input.read(payloadBuf.array());
+                ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
+
+                return reply.getStatus();
+            });
+        }
+        return Pool.call(callables);
+    }
+
+    private synchronized long nextNonce() {
+        return rng.nextLong();
     }
 
     private void printf(String f, Object... args) {
