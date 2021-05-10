@@ -29,6 +29,7 @@ struct Value {
 
 struct Reply {
     status @0 :UInt32;
+    digest @1 :Data;
 }
 
 struct Consensus {
