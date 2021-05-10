@@ -7,13 +7,18 @@ import java.security.Security;
 //import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import febft.ycsb.Node;
+import febft.ycsb.Update;
 
 import site.ycsb.ByteIterator;
 import site.ycsb.Status;
 import site.ycsb.DB;
 
 public class YCSBClient extends DB {
+    private static final int UPDATE_MAX = 128;
+
     private Node node;
+    private int updateCount;
+    private Update[] updates;
 
     public YCSBClient() {
         // empty constructor
@@ -47,12 +52,26 @@ public class YCSBClient extends DB {
             System.err.printf("Failed to bootstrap node %d: %s\n", id, e);
             System.exit(1);
         }
+
+        this.updates = new Update[UPDATE_MAX];
+        this.updateCount = 0;
     }
 
     @Override
-    public Status update(String table, String key, Map<String, ByteIterator> valuesIter) {
-        // TODO: implement update
-        return Status.NOT_IMPLEMENTED;
+    public Status update(String table, String key, Map<String, ByteIterator> values) {
+        updates[updateCount++] = new Update(table, key, values);
+
+        if (updateCount % UPDATE_MAX == 0) {
+            updateCount = 0;
+            try {
+                return node.callService(updates);
+            } catch (IOException e) {
+                node.printf("Exception: %s\n", e);
+                System.exit(1);
+            }
+        }
+
+        return Status.OK;
     }
 
     @Override

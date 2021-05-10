@@ -170,7 +170,7 @@ public class Node {
         return rng.nextLong();
     }
 
-    private void printf(String f, Object... args) {
+    public void printf(String f, Object... args) {
         synchronized (LOG_MUX) {
             System.err.printf(
                 (new StringBuilder()).append(config.getId()).append(": ").append(f).toString(),
@@ -179,7 +179,7 @@ public class Node {
         }
     }
 
-    private void println(String s) {
+    public void println(String s) {
         synchronized (LOG_MUX) {
             System.err.println(
                 (new StringBuilder()).append(config.getId()).append(": ").append(s).toString()
