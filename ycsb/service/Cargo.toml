@@ -12,6 +12,7 @@ git = "https://github.com/febft/febft"
 rev = "31f53d642bf215cd6b65754865440deb0068454f"
 default-features = false
 features = [
+    "expose_impl",
     "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_tokio_tcp",
