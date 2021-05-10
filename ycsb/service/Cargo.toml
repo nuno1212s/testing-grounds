@@ -1,0 +1,25 @@
+[package]
+name = "service"
+version = "0.1.0"
+authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
+edition = "2018"
+
+[dependencies.capnp]
+version = "0.14"
+
+[dependencies.febft]
+git = "https://github.com/febft/febft"
+rev = "31f53d642bf215cd6b65754865440deb0068454f"
+default-features = false
+features = [
+    "async_runtime_tokio",
+    "threadpool_crossbeam",
+    "socket_tokio_tcp",
+    "channel_futures_mpsc",
+    "crypto_signature_ring_ed25519",
+    "crypto_hash_blake3_blake3",
+    "collections_randomstate_twox_hash"
+]
+
+[build-dependencies.capnpc]
+version = "0.14"
