@@ -1,8 +1,11 @@
+use std::default::Default;
 use std::io::{Read, Write};
 
 use febft::bft::error::*;
+use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::message::{
     SystemMessage,
+    ConsensusMessage,
     ConsensusMessageKind,
 };
 use febft::bft::communication::serialize::{
@@ -22,40 +25,77 @@ impl SharedData for YcsbData {
     where
         W: Write
     {
-        let mut root = capnp::message::Builder::new(HeapAllocator::new());
-        let mut sys_msg: messages_capnp::system::Builder = root.init_root();
+        let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
+        let sys_msg: messages_capnp::system::Builder = root.init_root();
         match m {
-            SystemMessage::Request(_) => {
-
-            },
+            SystemMessage::Request(_) => unimplemented!(),
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
-                reply.set_status(m.payload());
-                reply.set_digest(m.digest());
+                reply.set_status(*m.payload());
+                reply.set_digest(m.digest().as_ref());
             },
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
-                consensus.set_sequence_number(m.sequence_number());
-
-                let mut message_kind = consensus.init_message_kind();
+                consensus.set_seq_no(m.sequence_number().into());
                 match m.kind() {
-                    ConsensusMessageKind::PrePrepare(digest) => {
-                        let d = digest.as_ref();
-                        let pre_prepare = message_kind.init_pre_prepare(d.len() as u32);
-                        pre_prepare.copy_from_slice(d);
-                    },
-                    ConsensusMessageKind::Prepare => message_kind.set_prepare(()),
-                    ConsensusMessageKind::Commit => message_kind.set_commit(()),
+                    ConsensusMessageKind::PrePrepare(digest) => consensus.set_pre_prepare(digest.as_ref()),
+                    ConsensusMessageKind::Prepare => consensus.set_prepare(()),
+                    ConsensusMessageKind::Commit => consensus.set_commit(()),
                 }
             },
         }
+        capnp::serialize::write_message(w, &root)
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
     fn deserialize_message<R>(r: R) -> Result<SystemMessage<Update, u32>>
     where
         R: Read
     {
-        unimplemented!()
+        let reader = capnp::serialize::read_message(r, Default::default())
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
+        let sys_msg: messages_capnp::system::Reader = reader
+            .get_root()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message root")?;
+        let sys_msg_which = sys_msg
+            .which()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message kind")?;
+
+        match sys_msg_which {
+            messages_capnp::system::Which::Reply(_) => unimplemented!(),
+            messages_capnp::system::Which::Request(request) => {
+                //Ok(SystemMessage::Request(RequestMessage::new(())))
+                unimplemented!()
+            },
+            messages_capnp::system::Which::Consensus(Ok(consensus)) => {
+                let seq = consensus
+                    .reborrow()
+                    .get_seq_no();
+                let message_kind = consensus
+                    .which()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
+
+                let kind = match message_kind {
+                    messages_capnp::consensus::Which::PrePrepare(Ok(digest_reader)) => {
+                        let digest = Digest::from_bytes(digest_reader)
+                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                        ConsensusMessageKind::PrePrepare(digest)
+                    },
+                    messages_capnp::consensus::Which::PrePrepare(_) => {
+                        return Err("Failed to read consensus message kind")
+                            .wrapped(ErrorKind::CommunicationSerialize);
+                    },
+                    messages_capnp::consensus::Which::Prepare(_) => ConsensusMessageKind::Prepare,
+                    messages_capnp::consensus::Which::Commit(_) => ConsensusMessageKind::Commit,
+                };
+
+                Ok(SystemMessage::Consensus(ConsensusMessage::new(seq.into(), kind)))
+            },
+            messages_capnp::system::Which::Consensus(_) => {
+                Err("Failed to read consensus message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
+            },
+        }
     }
 }
 
