@@ -1,6 +1,7 @@
 package febft.ycsb;
 
 import java.nio.ByteBuffer;
+import java.io.IOException;
 
 import febft.ycsb.MessageKind;
 
@@ -9,7 +10,7 @@ public abstract class SystemMessage {
         throw new UnsupportedOperationException();
     }
 
-    protected SystemMessage deserialize(ByteBuffer buf) {
+    protected SystemMessage deserialize(ByteBuffer buf) throws IOException {
         throw new UnsupportedOperationException();
     }
 
