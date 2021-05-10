@@ -9,7 +9,7 @@ version = "0.14"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "31f53d642bf215cd6b65754865440deb0068454f"
+rev = "678d9f07caa51f9c058390980e20f8b1a75b6ba5"
 default-features = false
 features = [
     "expose_impl",
