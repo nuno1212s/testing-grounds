@@ -158,6 +158,10 @@ public class Node {
                 input.read(payloadBuf.array());
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
 
+                if (reply == null) {
+                    return Status.ERR;
+                }
+
                 assert Arrays.equals(requestDigest, reply.getDigest());
 
                 return reply.getStatus();
