@@ -4,8 +4,11 @@ version = "0.1.0"
 authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
 edition = "2018"
 
-[dependencies.capnp]
-version = "0.14"
+[dependencies]
+capnp = "0.14"
+rustls = "0.19"
+futures = "0.3"
+oneshot = "0.1"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
