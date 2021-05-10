@@ -4,11 +4,14 @@ import java.util.Map;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 
+import febft.ycsb.Update;
 import febft.ycsb.MessageKind;
 import febft.ycsb.SystemMessage;
 import febft.ycsb.capnp.Messages.System;
 import febft.ycsb.capnp.Messages.Request;
 import febft.ycsb.capnp.Messages.Value;
+import febft.ycsb.capnp.Messages.System;
+import febft.ycsb.capnp.Messages;
 
 import site.ycsb.ByteIterator;
 
@@ -16,13 +19,10 @@ import org.capnproto.StructList;
 import org.capnproto.MessageBuilder;
 
 public class RequestMessage extends SystemMessage {
-    private String table, key;
-    private Map<String, ByteIterator> values;
+    private Update[] updates;
 
-    public RequestMessage(String table, String key, Map<String, ByteIterator> values) {
-        this.table = table;
-        this.key = key;
-        this.values = values;
+    public RequestMessage(Update... updates) {
+        this.updates = updates;
     }
 
     @Override
@@ -34,21 +34,27 @@ public class RequestMessage extends SystemMessage {
     public ByteBuffer serialize() {
         MessageBuilder message = new MessageBuilder();
         System.Builder systemMessage = message.initRoot(System.factory);
-        Request.Builder request = systemMessage.initRequest();
+        Messages.Update.Builder updateRequest = systemMessage.initRequest();
+        StructList.Builder<Request.Builder> updateReqs = updateRequest.initRequests(updates.length);
 
-        request.setTable(table);
-        request.setKey(key);
+        for (int k = 0; k < updates.length; k++) {
+            Request.Builder request = updateReqs.get(k);
 
-        int i = 0;
-        StructList.Builder<Value.Builder> reqVals = request.initValues(values.size());
+            request.setTable(updates[k].getTable());
+            request.setKey(updates[k].getKey());
 
-        for (Map.Entry<String, ByteIterator> pair : values.entrySet()) {
-            Value.Builder entry = reqVals.get(i);
+            int i = 0;
+            Map<String, ByteIterator> values = updates[k].getValues();
+            StructList.Builder<Value.Builder> reqVals = request.initValues(values.size());
 
-            entry.setKey(pair.getKey());
-            entry.setValue(pair.getValue().toArray());
+            for (Map.Entry<String, ByteIterator> pair : values.entrySet()) {
+                Value.Builder entry = reqVals.get(i);
 
-            ++i;
+                entry.setKey(pair.getKey());
+                entry.setValue(pair.getValue().toArray());
+
+                ++i;
+            }
         }
 
         // 512 KiB per message should be enough I reckon
@@ -62,7 +68,7 @@ public class RequestMessage extends SystemMessage {
 
         table.putInt(0, segments.length - 1);
 
-        for (i = 0; i < segments.length; ++i) {
+        for (int i = 0; i < segments.length; ++i) {
             table.putInt(4 * (i + 1), segments[i].limit() / 8);
         }
 

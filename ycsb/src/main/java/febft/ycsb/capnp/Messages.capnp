@@ -6,10 +6,14 @@ $Java.outerClassname("Messages");
 
 struct System {
     union {
-        request   @0 :Request;
+        request   @0 :Update;
         reply     @1 :Reply;
         consensus @2 :Consensus;
     }
+}
+
+struct Update {
+    requests @0 :List(Request);
 }
 
 struct Request {

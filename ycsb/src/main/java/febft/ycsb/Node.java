@@ -33,6 +33,7 @@ import febft.ycsb.RequestMessage;
 import febft.ycsb.ReplyMessage;
 import febft.ycsb.Config;
 import febft.ycsb.IdCounter;
+import febft.ycsb.Update;
 import febft.ycsb.Pool;
 
 public class Node {
@@ -127,14 +128,14 @@ public class Node {
         }
     }
 
-    public Status callService(String table, String key, Map<String, ByteIterator> values) throws IOException {
+    public Status callService(Update... updates) throws IOException {
         List<Callable<Status>> callables = new ArrayList<>(noReplicas);
         for (int i = 0; i < noReplicas; i++) {
             final int nodeId = i;
             final InputStream input = rx.get(nodeId);
             final OutputStream output = tx.get(nodeId);
             callables.add(() -> {
-                ByteBuffer requestBuf = (new RequestMessage(table, key, values)).serialize();
+                ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH);
 
                 Header header = new Header(
