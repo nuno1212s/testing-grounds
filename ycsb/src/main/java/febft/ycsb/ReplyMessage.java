@@ -7,6 +7,7 @@ import febft.ycsb.MessageKind;
 import febft.ycsb.SystemMessage;
 import febft.ycsb.UnsupportedMessage;
 import febft.ycsb.capnp.Messages.System;
+import febft.ycsb.capnp.Messages.Reply;
 
 import site.ycsb.Status;
 
@@ -15,9 +16,11 @@ import org.capnproto.MessageReader;
 
 public class ReplyMessage extends SystemMessage {
     private Status status;
+    private byte[] digest;
 
-    public ReplyMessage(Status status) {
+    public ReplyMessage(Status status, byte[] digest) {
         this.status = status;
+        this.digest = digest;
     }
 
     @Override
@@ -36,10 +39,12 @@ public class ReplyMessage extends SystemMessage {
             return new UnsupportedMessage();
         }
 
-        boolean ok = systemMessage.getReply().getStatus() == 0;
+        Reply.Reader reply = systemMessage.getReply();
+        boolean ok = reply.getStatus() == 0;
+        byte[] digest = reply.getDigest().toArray();
         Status status = ok ? Status.OK : Status.ERROR;
 
-        return new ReplyMessage(status);
+        return new ReplyMessage(status, digest);
     }
 
     public Status getStatus() {
