@@ -57,8 +57,7 @@ public class RequestMessage extends SystemMessage {
             }
         }
 
-        // 512 KiB per message should be enough I reckon
-        ByteBuffer output = ByteBuffer.allocate(512 * 1024);
+        ByteBuffer output = ByteBuffer.allocate(2 * 1024 * 1024);
 
         ByteBuffer[] segments = message.getSegmentsForOutput();
         int tableSize = (segments.length + 2) & (~1);
