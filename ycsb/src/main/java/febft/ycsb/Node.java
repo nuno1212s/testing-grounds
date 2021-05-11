@@ -135,8 +135,11 @@ public class Node {
             final InputStream input = rx.get(nodeId);
             final OutputStream output = tx.get(nodeId);
             callables.add(() -> {
+                // FIXME: this code is hanging forever
+
                 ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH);
+                println("Serialized request");
 
                 Header header = new Header(
                     config.getId(),
@@ -149,14 +152,17 @@ public class Node {
                 output.write(headerBuf.array());
                 output.write(requestBuf.array());
                 output.flush();
+                println("Sent header and request pair over the wire");
 
                 requestBuf.clear();
                 input.read(headerBuf.array());
                 header = Header.deserializeFrom(headerBuf);
+                println("Read and deserialized header from the wire");
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
                 input.read(payloadBuf.array());
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
+                println("Read and deserialized payload from the wire");
 
                 if (reply == null) {
                     return Status.ERROR;

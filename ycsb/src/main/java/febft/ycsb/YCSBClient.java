@@ -64,6 +64,7 @@ public class YCSBClient extends DB {
         if (updateCount % UPDATE_MAX == 0) {
             updateCount = 0;
             try {
+                node.println("Calling service");
                 return node.callService(updates);
             } catch (IOException e) {
                 node.printf("Exception: %s\n", e);
