@@ -1,5 +1,8 @@
+# 8 * batch size = 8 * 128 = 1024
+operationcount=1024
 recordcount=1000
-operationcount=1000
+fieldcount=1
+fieldlength=1024
 workload=site.ycsb.workloads.CoreWorkload
 
 readallfields=true
@@ -11,4 +14,4 @@ insertproportion=0
 
 requestdistribution=zipfian
 
-maxexecutiontime=30
+#maxexecutiontime=30
