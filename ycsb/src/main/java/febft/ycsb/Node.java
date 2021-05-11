@@ -138,7 +138,7 @@ public class Node {
                 // FIXME: this code is hanging forever
 
                 ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
-                ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH);
+                ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
                 println("Serialized request");
 
                 Header header = new Header(
@@ -147,17 +147,19 @@ public class Node {
                     nextNonce(),
                     requestBuf.array()
                 );
+                header.serializeInto(headerBuf);
                 byte[] requestDigest = header.getDigest();
 
                 output.write(headerBuf.array());
-                output.write(requestBuf.array());
+                output.write(requestBuf.array(), 0, requestBuf.position());
                 output.flush();
-                println("Sent header and request pair over the wire");
+                printf("Sent header and request pair over the wire: %s\n", header);
 
-                requestBuf.clear();
-                input.read(headerBuf.array());
+                headerBuf.clear();
+                input.read(headerBuf.array(), 0, Header.LENGTH);
+                headerBuf.limit(Header.LENGTH);
                 header = Header.deserializeFrom(headerBuf);
-                println("Read and deserialized header from the wire");
+                printf("Read and deserialized header from the wire: from %d\n", header.getFrom());
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
                 input.read(payloadBuf.array());
@@ -171,6 +173,7 @@ public class Node {
 
                 return reply.getStatus();
             });
+            printf("Added callable to node %d\n", i);
         }
         return Pool.call(callables);
     }
