@@ -12,7 +12,7 @@ oneshot = "0.1"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "678d9f07caa51f9c058390980e20f8b1a75b6ba5"
+rev = "f16b4196ef77f2004f222391a012df0b4dddfb4c"
 default-features = false
 features = [
     "expose_impl",
