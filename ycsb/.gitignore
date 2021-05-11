@@ -9,3 +9,4 @@ build
 
 # Ignore log files from replicas and clients
 log
+*.log
