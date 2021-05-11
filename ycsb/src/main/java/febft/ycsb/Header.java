@@ -1,6 +1,6 @@
 package febft.ycsb;
 
-import io.lktk.NativeBLAKE3;
+import io.github.rctcwyvrn.blake3.Blake3;
 
 import java.nio.ByteBuffer;
 
@@ -31,17 +31,12 @@ public class Header {
         this.nonce = nonce;
         this.length = (payload != null && payload.length > 0) ? payload.length : 0;
         this.signature = new byte[SIGNATURE_LEN];
-        try {
-            if (this.length > 0) {
-                NativeBLAKE3 ctx = new NativeBLAKE3();
-                ctx.update(payload);
-                this.digest = ctx.getOutput();
-            } else {
-                this.digest = new byte[DIGEST_LEN];
-            }
-        } catch (Exception e) {
-            System.err.println("Digest failed");
-            System.exit(1);
+        if (this.length > 0) {
+            Blake3 ctx = Blake3.newInstance();
+            ctx.update(payload);
+            this.digest = ctx.digest();
+        } else {
+            this.digest = new byte[DIGEST_LEN];
         }
     }
 
