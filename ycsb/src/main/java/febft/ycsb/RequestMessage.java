@@ -51,6 +51,8 @@ public class RequestMessage extends SystemMessage {
                 Value.Builder entry = reqVals.get(i);
 
                 entry.setKey(pair.getKey());
+                // FIXME: set length to positive value through reflection if
+                // it is negative...
                 entry.setValue(pair.getValue().toArray());
 
                 ++i;
