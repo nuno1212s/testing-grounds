@@ -21,6 +21,7 @@ public class Pool {
         T result = null;
         try {
             List<Future<T>> futures = new ArrayList<>();
+            List<Integer> toRemove = new ArrayList<>();
             for (Callable<T> callable : callables) {
                 futures.add(INSTANCE.submit(callable));
             }
@@ -30,9 +31,15 @@ public class Pool {
                     Future<T> fut = futures.get(i);
                     if (fut.isDone()) {
                         result = fut.get();
-                        futures.remove(i);
+                        toRemove.add(i);
+                        resolved++;
                     }
                 }
+                for (Integer index : toRemove) {
+                    int i = index;
+                    futures.remove(i);
+                }
+                toRemove.clear();
                 Thread.sleep(100);
             }
         } catch (ExecutionException e) {
