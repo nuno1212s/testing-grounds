@@ -1,0 +1,25 @@
+#!/bin/sh
+
+load_conf() {
+    touch run.conf
+    . run.conf
+
+    DB=febft.ycsb.YCSBClient
+    JAR=build/libs/febft-ycsb-all.jar
+    WORKLOAD=config/workloads/throughput
+}
+
+build_jar() {
+    stat $JAR 2>/dev/null
+    if [ $? -ne 0 ]; then
+        ./gradlew shadowJar
+    fi
+}
+
+ycsb_main() {
+    ${YCSB_HOME}/bin/ycsb run $DB -cp $JAR -P $WORKLOAD
+}
+
+load_conf
+build_jar
+ycsb_main

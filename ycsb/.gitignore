@@ -10,3 +10,6 @@ build
 # Ignore log files from replicas and clients
 log
 *.log
+
+# Ignore the config for running YCSB
+run.conf
