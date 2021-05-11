@@ -42,7 +42,8 @@ public class Pool {
                 Thread.sleep(100);
             }
         } catch (ExecutionException e) {
-            System.err.printf("FATAL: Execution exception: %s", e);
+            System.err.printf("FATAL: Execution exception: %s\n", e.getCause());
+            e.printStackTrace();
             System.exit(1);
         } catch (InterruptedException e) {
             return null;
