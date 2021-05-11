@@ -11,4 +11,4 @@ insertproportion=0
 
 requestdistribution=zipfian
 
-maxexecutiontime=10
+maxexecutiontime=30
