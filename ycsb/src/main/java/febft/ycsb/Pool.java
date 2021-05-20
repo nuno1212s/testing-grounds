@@ -16,7 +16,6 @@ public class Pool {
     private static ExecutorService INSTANCE = Executors.newCachedThreadPool();
     //private static ExecutorService INSTANCE = Executors.newWorkStealingPool();
 
-    // TODO: wait only for a quorum
     public static <T> T call(Collection<? extends Callable<T>> callables) {
         T result = null;
         try {
