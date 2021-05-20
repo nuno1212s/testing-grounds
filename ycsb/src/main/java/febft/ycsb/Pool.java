@@ -38,7 +38,6 @@ public class Pool {
                     futures.remove(fut);
                 }
                 toRemove.clear();
-                Thread.sleep(100);
             }
         } catch (ExecutionException e) {
             System.err.printf("FATAL: Execution exception: %s\n", e.getCause());
