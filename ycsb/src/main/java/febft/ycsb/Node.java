@@ -49,12 +49,10 @@ public class Node {
     private SSLServerSocket listener = null;
     private Map<Integer, OutputStream> tx;
     private Map<Integer, InputStream> rx;
-    private ByteBuffer txBuf;
     private Random rng;
 
     public Node() {
         config = Config.getClients().get(new Integer(IdCounter.nextId()));
-        txBuf = ByteBuffer.allocate(BUF_CAP).order(LITTLE_ENDIAN);
         rng = new Random();
     }
 
@@ -81,6 +79,8 @@ public class Node {
 
         this.tx = new HashMap<>();
         this.rx = new HashMap<>();
+
+        ByteBuffer txBuf = ByteBuffer.allocate(BUF_CAP).order(LITTLE_ENDIAN);
 
         // connect to replicas
         for (Entry replicaConfig : replicas.values()) {
@@ -139,7 +139,7 @@ public class Node {
 
                 ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
-                println("Serialized request");
+                printf("Serialized request (len=%d)\n", requestBuf.position());
 
                 Header header = new Header(
                     config.getId(),
@@ -150,7 +150,7 @@ public class Node {
                 header.serializeInto(headerBuf);
                 byte[] requestDigest = header.getDigest();
 
-                output.write(headerBuf.array());
+                output.write(headerBuf.array(), 0, headerBuf.position());
                 output.write(requestBuf.array(), 0, requestBuf.position());
                 output.flush();
                 printf("Sent header and request pair over the wire: %s\n", header);
@@ -162,7 +162,7 @@ public class Node {
                 printf("Read and deserialized header from the wire: from %d\n", header.getFrom());
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
-                input.read(payloadBuf.array());
+                input.read(payloadBuf.array(), 0, (int)header.getLength());
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
                 println("Read and deserialized payload from the wire");
 
