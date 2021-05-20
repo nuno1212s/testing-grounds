@@ -25,11 +25,16 @@ public class Header {
     }
 
     public Header(int from, int to, long nonce, byte[] payload) {
+        this(from, to, nonce, payload,
+            (payload != null && payload.length > 0) ? payload.length : 0);
+    }
+
+    public Header(int from, int to, long nonce, byte[] payload, long length) {
         this.version = CURRENT_VERSION;
         this.from = from;
         this.to = to;
         this.nonce = nonce;
-        this.length = (payload != null && payload.length > 0) ? payload.length : 0;
+        this.length = length;
         this.signature = new byte[SIGNATURE_LEN];
         if (this.length > 0) {
             Blake3 ctx = Blake3.newInstance();

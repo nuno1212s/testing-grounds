@@ -145,7 +145,8 @@ public class Node {
                     config.getId(),
                     nodeId,
                     nextNonce(),
-                    requestBuf.array()
+                    requestBuf.array(),
+                    requestBuf.position()
                 );
                 header.serializeInto(headerBuf);
                 byte[] requestDigest = header.getDigest();
