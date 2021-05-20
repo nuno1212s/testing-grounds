@@ -6,6 +6,7 @@ fieldlength=1024
 workload=site.ycsb.workloads.CoreWorkload
 
 readallfields=true
+writeallfields=true
 
 readproportion=0
 updateproportion=1
