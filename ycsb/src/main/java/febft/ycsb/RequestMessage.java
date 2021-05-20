@@ -49,17 +49,17 @@ public class RequestMessage extends SystemMessage {
 
             for (Map.Entry<String, ByteIterator> pair : values.entrySet()) {
                 Value.Builder entry = reqVals.get(i);
+                long n = pair.getValue().bytesLeft();
 
                 entry.setKey(pair.getKey());
-                // FIXME: set length to positive value through reflection if
-                // it is negative...
-                entry.setValue(pair.getValue().toArray());
+                entry.setValue(new byte[(int)(n < 0 ? -n : n)]);
 
                 ++i;
             }
         }
 
-        ByteBuffer output = ByteBuffer.allocate(2 * 1024 * 1024);
+        ByteBuffer output = ByteBuffer.allocate(20 * 1024 * 1024);
+        output.clear();
 
         ByteBuffer[] segments = message.getSegmentsForOutput();
         int tableSize = (segments.length + 2) & (~1);
