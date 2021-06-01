@@ -39,6 +39,7 @@ gencert() {
         -out $targetdir/csr
     openssl x509 -req -in $targetdir/csr -CA $CA_ROOT/crt -CAkey $CA_ROOT/key -CAcreateserial \
         -out $targetdir/crt -days $DAYS -sha256 -extfile $(output_ext_file $target)
+    rm $targetdir/csr
 }
 
 regenerate() {
