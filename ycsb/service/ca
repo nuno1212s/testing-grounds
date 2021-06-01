@@ -15,12 +15,13 @@ updatecwd() {
 regenerate() {
     echo Removing old CA
     rm -rf $CA_ROOT
+    mkdir $CA_ROOT
 
     echo Generating new root key
-    openssl genrsa -des3 -out root.key 2048
+    openssl genrsa -des3 -out $CA_ROOT/root.key 2048
 
     echo Generating new root certificate
-    openssl req -x509 -new -nodes -key root.key -sha256 -days 999999 -out root.crt
+    openssl req -x509 -new -nodes -key $CA_ROOT/root.key -sha256 -days 999999 -out $CA_ROOT/root.crt
 }
 
 main() {
