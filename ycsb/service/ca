@@ -3,7 +3,9 @@
 CA_ROOT=ca-root
 DAYS=999999
 
+CLI_BASE=1000
 CLI_AMT=1000
+SRV_BASE=0
 SRV_AMT=13
 
 CLI_PREFIX=cli
@@ -11,6 +13,18 @@ SRV_PREFIX=cop
 
 updatecwd() {
     cd "$(dirname $0)"
+}
+
+output_ext_file() {
+    cat << EOF >/tmp/.ca_ext
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = $1
+EOF
 }
 
 regenerate() {
@@ -24,6 +38,20 @@ regenerate() {
     echo Generating new root certificate
     openssl req -new -x509 -subj "/CN=localhost" -sha256 -key $CA_ROOT/root.key -nodes \
         -days $DAYS -out $CA_ROOT/root.crt
+
+    for i in `seq 0 $(expr $SRV_AMT - 1)`; do
+        target=${SRV_PREFIX}${i}
+        targetdir=${CA_ROOT}/${target}
+        echo Generating certificate for replica $target
+        mkdir $targetdir
+        openssl genrsa -out $targetdir/key 2048
+        openssl req -new -subj "/CN=localhost" -sha256 -key $targetdir/key -nodes \
+            -out $targetdir/csr
+    done
+
+    #for i in `seq 0 $(expr $CLI_AMT - 1)`; do
+    #    echo Generating certificate for client ${CLI_PREFIX}${i}
+    #done
 }
 
 main() {
