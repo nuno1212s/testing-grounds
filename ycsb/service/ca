@@ -9,14 +9,17 @@ SRV_BASE=0
 SRV_AMT=13
 
 CLI_PREFIX=cli
-SRV_PREFIX=cop
+SRV_PREFIX=srv
+
+EXT_TMP=/tmp/.ca_ext
+CONC=$(nproc --all)
 
 updatecwd() {
     cd "$(dirname $0)"
 }
 
 output_ext_file() {
-    cat << EOF >/tmp/.ca_ext
+    cat << EOF >$EXT_TMP
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
@@ -25,6 +28,17 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = $1
 EOF
+    echo $EXT_TMP
+}
+
+gencert() {
+    echo Generating certificate $target
+    mkdir $targetdir
+    openssl genrsa -out $targetdir/key 2048
+    openssl req -new -subj "/CN=localhost" -sha256 -key $targetdir/key -nodes \
+        -out $targetdir/csr
+    openssl x509 -req -in $targetdir/csr -CA $CA_ROOT/crt -CAkey $CA_ROOT/key -CAcreateserial \
+        -out $targetdir/crt -days $DAYS -sha256 -extfile $(output_ext_file $target)
 }
 
 regenerate() {
@@ -33,25 +47,42 @@ regenerate() {
     mkdir $CA_ROOT
 
     echo Generating new root key
-    openssl genrsa -out $CA_ROOT/root.key 2048
+    openssl genrsa -out $CA_ROOT/key 2048
 
     echo Generating new root certificate
-    openssl req -new -x509 -subj "/CN=localhost" -sha256 -key $CA_ROOT/root.key -nodes \
-        -days $DAYS -out $CA_ROOT/root.crt
+    openssl req -new -x509 -subj "/CN=localhost" -sha256 -key $CA_ROOT/key -nodes \
+        -days $DAYS -out $CA_ROOT/crt
 
-    for i in `seq 0 $(expr $SRV_AMT - 1)`; do
-        target=${SRV_PREFIX}${i}
-        targetdir=${CA_ROOT}/${target}
-        echo Generating certificate for replica $target
-        mkdir $targetdir
-        openssl genrsa -out $targetdir/key 2048
-        openssl req -new -subj "/CN=localhost" -sha256 -key $targetdir/key -nodes \
-            -out $targetdir/csr
+    for kind in $SRV_PREFIX $CLI_PREFIX; do
+        case $kind in
+            $SRV_PREFIX)
+                prefix=$SRV_PREFIX
+                base=$SRV_BASE
+                amt=$SRV_AMT
+                ;;
+            $CLI_PREFIX)
+                prefix=$CLI_PREFIX
+                base=$CLI_BASE
+                amt=$CLI_AMT
+                ;;
+            *)
+                echo Fatal error: Invalid node prefix.
+        esac
+
+
+        for i in `seq 0 $(expr $amt - 1)`; do
+            target=${prefix}$(expr $base + $i)
+            targetdir=${CA_ROOT}/${target}
+
+            gencert 2>/dev/null &
+
+            if [ $(expr $i % $CONC) -eq 0 ]; then
+                wait
+            fi
+        done
     done
 
-    #for i in `seq 0 $(expr $CLI_AMT - 1)`; do
-    #    echo Generating certificate for client ${CLI_PREFIX}${i}
-    #done
+    wait
 }
 
 main() {
