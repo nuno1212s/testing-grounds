@@ -1,6 +1,7 @@
 #!/bin/sh
 
 CA_ROOT=ca-root
+DAYS=999999
 
 CLI_AMT=1000
 SRV_AMT=13
@@ -18,10 +19,11 @@ regenerate() {
     mkdir $CA_ROOT
 
     echo Generating new root key
-    openssl genrsa -des3 -out $CA_ROOT/root.key 2048
+    openssl genrsa -out $CA_ROOT/root.key 2048
 
     echo Generating new root certificate
-    openssl req -x509 -new -nodes -key $CA_ROOT/root.key -sha256 -days 999999 -out $CA_ROOT/root.crt
+    openssl req -new -x509 -subj "/CN=localhost" -sha256 -key $CA_ROOT/root.key -nodes \
+        -days $DAYS -out $CA_ROOT/root.crt
 }
 
 main() {
