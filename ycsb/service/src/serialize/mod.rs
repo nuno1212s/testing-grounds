@@ -24,6 +24,21 @@ pub struct YcsbData;
 
 impl ReplicaData for YcsbData {
     type State = HashMap<String, HashMap<String, HashMap<String, Vec<u8>>>>;
+
+    fn serialize_state<W>(mut w: W, _s: &Self::State) -> Result<()>
+    where
+        W: Write
+    {
+        w.write_all(b"OK")
+            .wrapped(ErrorKind::Communication)
+    }
+
+    fn deserialize_state<R>(_r: R) -> Result<Self::State>
+    where
+        R: Read
+    {
+        unimplemented!()
+    }
 }
 
 impl SharedData for YcsbData {
