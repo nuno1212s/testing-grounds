@@ -1,0 +1,31 @@
+#!/bin/sh
+
+CA_ROOT=ca-root
+
+CLI_AMT=1000
+SRV_AMT=13
+
+CLI_PREFIX=cli
+SRV_PREFIX=cop
+
+updatecwd() {
+    cd "$(dirname $0)"
+}
+
+regenerate() {
+    echo Removing old CA
+    rm -rf $CA_ROOT
+
+    echo Generating new root key
+    openssl genrsa -des3 -out root.key 2048
+
+    echo Generating new root certificate
+    openssl req -x509 -new -nodes -key root.key -sha256 -days 999999 -out root.crt
+}
+
+main() {
+    updatecwd
+    regenerate
+}
+
+main
