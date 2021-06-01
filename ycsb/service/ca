@@ -67,6 +67,8 @@ regenerate() {
                 ;;
             *)
                 echo Fatal error: Invalid node prefix.
+                exit 1
+                ;;
         esac
 
 
