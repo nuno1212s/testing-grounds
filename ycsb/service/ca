@@ -11,7 +11,7 @@ SRV_AMT=13
 CLI_PREFIX=cli
 SRV_PREFIX=srv
 
-EXT_TMP=/tmp/.ca_ext
+EXT_PREFIX=/tmp/.ca_ext.
 CONC=$(nproc --all)
 
 updatecwd() {
@@ -19,7 +19,7 @@ updatecwd() {
 }
 
 output_ext_file() {
-    cat << EOF >$EXT_TMP
+    cat << EOF >${EXT_PREFIX}${1}
 authorityKeyIdentifier=keyid,issuer
 basicConstraints=CA:FALSE
 keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
@@ -28,7 +28,7 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = $1
 EOF
-    echo $EXT_TMP
+    echo ${EXT_PREFIX}${1}
 }
 
 gencert() {
@@ -83,6 +83,7 @@ regenerate() {
     done
 
     wait
+    rm ${EXT_PREFIX}*
 }
 
 main() {
