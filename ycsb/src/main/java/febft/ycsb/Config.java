@@ -78,7 +78,9 @@ public class Config {
         public static Entry parse(String configLine) {
             final String[] entries = configLine.trim().split("([ ]+)", 4);
 
-            if (entries.length != 4 || entries[0].charAt(0) == '#') {
+            if (entries.length == 4 && entries[0].charAt(0) != '#') {
+                // noop
+            } else {
                 return null;
             }
 

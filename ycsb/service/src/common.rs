@@ -99,7 +99,9 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
         .find_iter(line)
         .collect();
 
-    if matches.len() != 4 || matches[0].as_str().find('#') == Some(0) {
+    if matches.len() == 4 && matches[0].as_str().chars().next() != Some('#') {
+        // noop
+    } else {
         return None;
     }
 
