@@ -82,11 +82,10 @@ pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
         match file.read_line(&mut buf) {
             Ok(0) | Err(_) => break,
             _ => {
-                let entry = match parse_entry(&re, &buf) {
-                    Some(e) => e,
-                    None => continue,
-                };
-                config.push(entry);
+                match parse_entry(&re, &buf) {
+                    Some(entry) => config.push(entry),
+                    None => (),
+                }
                 buf.clear();
             },
         }
