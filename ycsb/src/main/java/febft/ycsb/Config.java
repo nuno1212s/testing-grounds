@@ -2,9 +2,11 @@ package febft.ycsb;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Scanner;
 import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.File;
 
 public class Config {
     private static final String REPLICAS_PATH = "config/replicas.config";
@@ -41,7 +43,14 @@ public class Config {
     }
 
     private static int parseBatch(String path) {
-        return 1;
+        int batchSize = -1;
+        try (Scanner scanner = new Scanner(new File(BATCH_SIZE_PATH))) {
+            batchSize = scanner.nextInt();
+        } catch (Exception e) {
+            // noop
+        } finally {
+            return batchSize;
+        }
     }
 
     private static Map<Integer, Entry> parse(String path) {
