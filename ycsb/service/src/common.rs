@@ -61,6 +61,31 @@ macro_rules! map {
      }};
 }
 
+pub struct ConfigEntry {
+    pub portno: u16,
+    pub id: u32,
+    pub hostname: String,
+    pub ipaddr: String,
+}
+
+
+fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
+    let matches: Vec<_> = re
+        .find_iter(line)
+        .collect();
+
+    if matches.len() != 4 || matches[0].as_str().find('#') == Some(0) {
+        return None;
+    }
+
+    let id: u32 = matches[0].as_str().parse().ok()?;
+    let hostname: String = matches[1].as_str().to_string();
+    let ipaddr: String = matches[2].as_str().to_string();
+    let portno: u16 = matches[3].as_str().trim_end().parse().ok()?;
+
+    Some(ConfigEntry { id, hostname, ipaddr, portno })
+}
+
 pub fn debug_rogue(rogue: Vec<Message<Update, u32>>) -> String {
     let mut buf = String::new();
     buf.push_str("[ ");
