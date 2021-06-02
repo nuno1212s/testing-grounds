@@ -166,7 +166,7 @@ async fn get_server_config(t: &ThreadPool, id: NodeId) -> ServerConfig {
 
         // read ca file
         let certs = {
-            let mut file = open_file("./ca-root/root.crt");
+            let mut file = open_file("./ca-root/crt");
             pemfile::certs(&mut file).expect("root cert")
         };
         root_store.add(&certs[0]).unwrap();
@@ -177,21 +177,21 @@ async fn get_server_config(t: &ThreadPool, id: NodeId) -> ServerConfig {
 
         // configure our cert chain and secret key
         let sk = {
-            let mut file = if id < 4 {
-                open_file(&format!("./ca-root/cop0{}/cop0{}.key", id+1, id+1))
+            let mut file = if id < 1000 {
+                open_file(&format!("./ca-root/srv{}/key", id))
             } else {
-                open_file(&format!("./ca-root/cli{}/cli{}.key", id, id))
+                open_file(&format!("./ca-root/cli{}/key", id))
             };
             let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
             sk.remove(0)
         };
         let chain = {
-            let mut file = if id < 4 {
-                open_file(&format!("./ca-root/cop0{}/cop0{}.crt", id+1, id+1))
+            let mut file = if id < 1000 {
+                open_file(&format!("./ca-root/srv{}/crt", id))
             } else {
-                open_file(&format!("./ca-root/cli{}/cli{}.crt", id, id))
+                open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("cop cert");
+            let mut c = pemfile::certs(&mut file).expect("srv cert");
             c.extend(certs);
             c
         };
@@ -210,28 +210,28 @@ async fn get_client_config(t: &ThreadPool, id: NodeId) -> ClientConfig {
 
         // configure ca file
         let certs = {
-            let mut file = open_file("./ca-root/root.crt");
+            let mut file = open_file("./ca-root/crt");
             pemfile::certs(&mut file).expect("root cert")
         };
         cfg.root_store.add(&certs[0]).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
-            let mut file = if id < 4 {
-                open_file(&format!("./ca-root/cop0{}/cop0{}.key", id+1, id+1))
+            let mut file = if id < 1000 {
+                open_file(&format!("./ca-root/srv{}/key", id))
             } else {
-                open_file(&format!("./ca-root/cli{}/cli{}.key", id, id))
+                open_file(&format!("./ca-root/cli{}/key", id))
             };
             let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
             sk.remove(0)
         };
         let chain = {
-            let mut file = if id < 4 {
-                open_file(&format!("./ca-root/cop0{}/cop0{}.crt", id+1, id+1))
+            let mut file = if id < 1000 {
+                open_file(&format!("./ca-root/srv{}/crt", id))
             } else {
-                open_file(&format!("./ca-root/cli{}/cli{}.crt", id, id))
+                open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("cop cert");
+            let mut c = pemfile::certs(&mut file).expect("srv cert");
             c.extend(certs);
             c
         };
