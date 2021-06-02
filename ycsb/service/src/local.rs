@@ -1,7 +1,6 @@
 use crate::common::*;
 
 use febft::bft::threadpool;
-use febft::bft::collections::HashMap;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
 use febft::bft::{
@@ -11,6 +10,10 @@ use febft::bft::{
 use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
+};
+use febft::bft::collections::{
+    self,
+    HashMap,
 };
 
 pub fn main() {
@@ -22,6 +25,9 @@ pub fn main() {
 }
 
 async fn async_main() {
+    let clients_config = parse_config("../config/clients.config").unwrap();
+    let replicas_config = parse_config("../config/replicas.config").unwrap();
+
     let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
         .take(4)
         .enumerate()
@@ -33,19 +39,24 @@ async fn async_main() {
         .collect();
 
     let pool = threadpool::Builder::new()
-        .num_threads(4)
+        .num_threads(num_cpus::get() >> 1)
         .build();
 
-    for id in NodeId::targets(0..4) {
-        let addrs = crate::map! {
-            // replicas
-            NodeId::from(0u32) => crate::addr!("cop01" => "127.0.0.1:10001"),
-            NodeId::from(1u32) => crate::addr!("cop02" => "127.0.0.1:10002"),
-            NodeId::from(2u32) => crate::addr!("cop03" => "127.0.0.1:10003"),
-            NodeId::from(3u32) => crate::addr!("cop04" => "127.0.0.1:10004"),
-
-            // clients
-            NodeId::from(1000u32) => crate::addr!("cli1000" => "127.0.0.1:11000")
+    for replica in &replicas_config {
+        let id = NodeId::from(replica.id);
+        let addrs = {
+            let mut addrs = collections::hash_map();
+            for other in &replicas_config {
+                let id = NodeId::from(other.id);
+                let addr = format!("{}:{}", other.ipaddr, other.portno);
+                addrs.insert(id, crate::addr!(&other.hostname => addr));
+            }
+            for client in &clients_config {
+                let id = NodeId::from(client.id);
+                let addr = format!("{}:{}", client.ipaddr, client.portno);
+                addrs.insert(id, crate::addr!(&client.hostname => addr));
+            }
+            addrs
         };
         let sk = secret_keys.remove(&id).unwrap();
         let fut = setup_replica(
