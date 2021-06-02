@@ -8,13 +8,15 @@ import java.security.Security;
 
 import febft.ycsb.Node;
 import febft.ycsb.Update;
+import febft.ycsb.Config;
 
 import site.ycsb.ByteIterator;
 import site.ycsb.Status;
 import site.ycsb.DB;
 
 public class YCSBClient extends DB {
-    private static final int UPDATE_MAX = 128;
+    // TODO: change ycsb workload to reflect this new value
+    private static final int UPDATE_MAX = Config.getBatchSize();
 
     private Node node;
     private int updateCount;
