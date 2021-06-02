@@ -13,6 +13,17 @@ public class Config {
     private static final String CLIENTS_PATH = "config/clients.config";
     private static Map<Integer, Entry> CLIENTS = null;
 
+    private static final String BATCH_SIZE_PATH = "config/batch.config";
+    private static int BATCH_SIZE = 0;
+
+    public synchronized static int getBatchSize() {
+        if (BATCH_SIZE != 0) {
+            return BATCH_SIZE;
+        }
+        BATCH_SIZE = parseBatch(BATCH_SIZE_PATH);
+        return BATCH_SIZE;
+    }
+
     public synchronized static Map<Integer, Entry> getClients() {
         if (CLIENTS != null) {
             return CLIENTS;
@@ -27,6 +38,10 @@ public class Config {
         }
         REPLICAS = parse(REPLICAS_PATH);
         return REPLICAS; 
+    }
+
+    private static int parseBatch(String path) {
+        return 1;
     }
 
     private static Map<Integer, Entry> parse(String path) {
