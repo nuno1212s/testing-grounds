@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
 use std::fs::File;
-use std::io::BufReader;
 use std::net::SocketAddr;
+use std::io::{BufReader, BufRead};
 
+use regex::Regex;
 use rustls::{
     internal::pemfile,
     ServerConfig,
@@ -68,6 +69,28 @@ pub struct ConfigEntry {
     pub ipaddr: String,
 }
 
+pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
+    let re = Regex::new("([^ ]+)").ok()?;
+
+    let file = File::open(path).ok()?;
+    let mut file = BufReader::new(file);
+
+    let mut buf = String::new();
+    let mut config = Vec::new();
+
+    loop {
+        match file.read_line(&mut buf) {
+            Ok(0) | Err(_) => break,
+            _ => {
+                let entry = parse_entry(&re, &buf)?;
+                config.push(entry);
+                buf.clear();
+            },
+        }
+    }
+
+    Some(config)
+}
 
 fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
     let matches: Vec<_> = re
