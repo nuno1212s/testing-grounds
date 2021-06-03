@@ -8,7 +8,15 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.File;
 
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.SSLServerSocketFactory;
+
+import nl.altindag.ssl.SSLFactory;
+
 public class Config {
+    private static final String CA_ROOT_PATH = "ca-root/";
+    private static SSLFactory sslFactory = null;
+
     private static final String REPLICAS_PATH = "config/replicas.config";
     private static Map<Integer, Entry> REPLICAS = null;
 
@@ -17,6 +25,14 @@ public class Config {
 
     private static final String BATCH_SIZE_PATH = "config/batch.config";
     private static int BATCH_SIZE = 0;
+
+    public synchronized static SSLSocketFactory getSslSocketFactory() {
+        return null;
+    }
+
+    public synchronized static SSLServerSocketFactory getSslServerSocketFactory() {
+        return null;
+    }
 
     public synchronized static int getBatchSize() {
         if (BATCH_SIZE != 0) {
