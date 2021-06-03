@@ -32,7 +32,7 @@ regenerate() {
         echo Generating PKCS12 KeyStore for $target
         openssl pkcs12 -export \
             -in $cli/crt -inkey $cli/key -CAfile $SERVICE_CA/crt \
-            -password 'pass:' -out $CA_ROOT/${target}.pfx
+            -password "pass:$PASS" -out $CA_ROOT/${target}.pfx
     done
 }
 
