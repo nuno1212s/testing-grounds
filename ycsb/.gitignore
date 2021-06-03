@@ -1,15 +1,18 @@
 # Ignore vim session files
-session.vim
+/session.vim
 
 # Ignore Gradle project-specific cache directory
-.gradle
+/.gradle
 
 # Ignore Gradle build output directory
-build
+/build
 
 # Ignore log files from replicas and clients
-log
-*.log
+/log
+/*.log
 
 # Ignore the config for running YCSB
-run.conf
+/run.conf
+
+# Ignore the CA root directory
+/ca-root
