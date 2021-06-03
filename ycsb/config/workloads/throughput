@@ -1,6 +1,7 @@
-# 8 * batch size = 8 * 128 = 1024
-operationcount=1024
-recordcount=1000
+# max int value representable in java
+operationcount=2147483647
+#operationcount=1
+recordcount=20000
 fieldcount=1
 fieldlength=1024
 workload=site.ycsb.workloads.CoreWorkload
@@ -15,4 +16,4 @@ insertproportion=0
 
 requestdistribution=zipfian
 
-#maxexecutiontime=30
+maxexecutiontime=300
