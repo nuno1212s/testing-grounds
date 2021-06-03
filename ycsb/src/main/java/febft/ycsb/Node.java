@@ -18,8 +18,6 @@ import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SNIHostName;
@@ -207,7 +205,7 @@ public class Node {
     
     private static OutputStream connect(String sni, String host, int port) throws IOException {
         SSLSocket socket = (SSLSocket)
-            SSLSocketFactory.getDefault().createSocket(host, port);
+            Config.getSslSocketFactory().createSocket(host, port);
 
         SSLParameters params = socket.getSSLParameters();
         List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));
@@ -222,7 +220,7 @@ public class Node {
     
     private static SSLServerSocket listen(String sni, int port) throws IOException {
         SSLServerSocket socket = (SSLServerSocket)
-            SSLServerSocketFactory.getDefault().createServerSocket(port);
+            Config.getSslServerSocketFactory().createServerSocket(port);
 
         SSLParameters params = socket.getSSLParameters();
         List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));

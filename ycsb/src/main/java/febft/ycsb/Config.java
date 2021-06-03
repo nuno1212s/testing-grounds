@@ -14,7 +14,12 @@ import javax.net.ssl.SSLServerSocketFactory;
 import nl.altindag.ssl.SSLFactory;
 
 public class Config {
-    private static final String CA_ROOT_PATH = "ca-root/";
+    private static final String CLI_PREFIX = "cli";
+    private static final int CLI_BASE = 1000;
+    private static final int CLI_AMT = 1000;
+    private static final int CLI_COUNT = CLI_BASE + CLI_AMT;
+
+    private static final String CA_ROOT_PATH = "ca-root";
     private static SSLFactory sslFactory = null;
 
     private static final String REPLICAS_PATH = "config/replicas.config";
@@ -27,11 +32,29 @@ public class Config {
     private static int BATCH_SIZE = 0;
 
     public synchronized static SSLSocketFactory getSslSocketFactory() {
-        return null;
+        return getSslFactory().getSslSocketFactory();
     }
 
     public synchronized static SSLServerSocketFactory getSslServerSocketFactory() {
-        return null;
+        return getSslFactory().getSslServerSocketFactory();
+    }
+
+    private static SSLFactory getSslFactory() {
+        if (sslFactory == null) {
+            final char[] password = "123456".toCharArray();
+
+            SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder()
+                .withTrustMaterial(CA_ROOT_PATH + "/truststore.jks", password);
+
+            for (int i = CLI_BASE; i < CLI_COUNT; ++i) {
+                final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, i);
+                sslFactoryBuilder = sslFactoryBuilder
+                    .withIdentityMaterial(path, password);
+            }
+
+            sslFactory = sslFactoryBuilder.build();
+        }
+        return sslFactory;
     }
 
     public synchronized static int getBatchSize() {
