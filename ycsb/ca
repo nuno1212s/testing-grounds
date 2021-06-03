@@ -1,0 +1,47 @@
+#!/bin/sh
+
+PASS=123456
+
+CA_ROOT=ca-root
+KEYSTORE=$CA_ROOT/keystore.jks
+TRUSTSTORE=$CA_ROOT/truststore.jks
+
+SERVICE_CA=service/$CA_ROOT
+CLI_PREFIX=cli
+CLI_TMP=/tmp/.ca_cli.pkcs12
+
+updatecwd() {
+    cd "$(dirname $0)"
+}
+
+regenerateca() {
+    ./service/ca
+}
+
+regenerate() {
+    echo Removing old Java CA
+    rm -rf $CA_ROOT
+    mkdir $CA_ROOT
+
+    #regenerateca
+
+    echo Generating new Java TrustStore
+    yes | keytool -keystore $TRUSTSTORE -import -file $SERVICE_CA/crt -storepass $PASS
+
+    for cli in $(find $SERVICE_CA -name "${CLI_PREFIX}*" -type d); do
+        echo Importing certificate for $(basename $cli)
+        openssl pkcs12 -export -in $cli/crt -inkey $cli/key -out $CLI_TMP -CAfile $SERVICE_CA/crt
+        yes | keytool -importkeystore -srcstorepass '' -deststorepass $PASS \
+            -destkeystore $KEYSTORE -srckeystore $CLI_TMP \
+            -srcstoretype PKCS12
+    done
+
+    rm $CLI_TMP
+}
+
+main() {
+    updatecwd
+    regenerate
+}
+
+main
