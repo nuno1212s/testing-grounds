@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Scanner;
 import java.io.IOException;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.File;
 
@@ -42,14 +43,24 @@ public class Config {
     private static SSLFactory getSslFactory() {
         if (sslFactory == null) {
             final char[] password = "123456".toCharArray();
+            SSLFactory.Builder sslFactoryBuilder = null;
 
-            SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder()
-                .withTrustMaterial(CA_ROOT_PATH + "/truststore.jks", password);
+            try (FileInputStream file = new FileInputStream(CA_ROOT_PATH + "/truststore.jks")) {
+                sslFactoryBuilder = SSLFactory.builder()
+                    .withTrustMaterial(file, password, "jks");
 
-            for (int i = CLI_BASE; i < CLI_COUNT; ++i) {
-                final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, i);
-                sslFactoryBuilder = sslFactoryBuilder
-                    .withIdentityMaterial(path, password);
+                for (int i = CLI_BASE; i < CLI_COUNT; ++i) {
+                    final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, i);
+
+                    try (FileInputStream file2 = new FileInputStream(path)) {
+                        sslFactoryBuilder = sslFactoryBuilder
+                            .withIdentityMaterial(file2, password);
+                    } catch (SecurityException | IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            } catch (SecurityException | IOException e) {
+                throw new RuntimeException(e);
             }
 
             sslFactory = sslFactoryBuilder.build();
