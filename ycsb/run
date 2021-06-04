@@ -17,7 +17,7 @@ build_jar() {
 }
 
 ycsb_main() {
-    ${YCSB_HOME}/bin/ycsb run $DB -cp $JAR -P $WORKLOAD
+    ${YCSB_HOME}/bin/ycsb run $DB -cp $JAR -P $WORKLOAD -threads ${CLIENTS:-1}
 }
 
 load_conf
