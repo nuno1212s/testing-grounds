@@ -12,7 +12,6 @@ CLI_PREFIX=cli
 SRV_PREFIX=srv
 
 EXT_PREFIX=/tmp/.ca_ext.
-CONC=$(nproc --all)
 
 updatecwd() {
     cd "$(dirname $0)"
@@ -35,11 +34,12 @@ gencert() {
     echo Generating certificate $target
     mkdir $targetdir
     openssl genrsa -out $targetdir/key 2048
-    openssl req -new -subj "/CN=localhost" -sha256 -key $targetdir/key -nodes \
+    openssl req -new -subj "/CN=${target}" -sha256 -key $targetdir/key -nodes \
         -out $targetdir/csr
     openssl x509 -req -in $targetdir/csr -CA $CA_ROOT/crt -CAkey $CA_ROOT/key -CAcreateserial \
         -out $targetdir/crt -days $DAYS -sha256 -extfile $(output_ext_file $target)
     rm $targetdir/csr
+    cat $targetdir/crt $CA_ROOT/crt > $targetdir/chain
 }
 
 regenerate() {
@@ -72,20 +72,14 @@ regenerate() {
                 ;;
         esac
 
-
         for i in `seq 0 $(expr $amt - 1)`; do
             target=${prefix}$(expr $base + $i)
             targetdir=${CA_ROOT}/${target}
 
-            gencert 2>/dev/null &
-
-            if [ $(expr $i % $CONC) -eq 0 ]; then
-                wait
-            fi
+            gencert 2>/dev/null
         done
     done
 
-    wait
     rm ${EXT_PREFIX}*
 }
 
