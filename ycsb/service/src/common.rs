@@ -95,13 +95,17 @@ pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
 }
 
 fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
+    let line = line.trim();
+
+    if line.chars().next() == Some('#') {
+        return None;
+    }
+
     let matches: Vec<_> = re
         .find_iter(line)
         .collect();
 
-    if matches.len() == 4 && matches[0].as_str().chars().next() != Some('#') {
-        // noop
-    } else {
+    if matches.len() != 4 {
         return None;
     }
 
