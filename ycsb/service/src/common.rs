@@ -142,6 +142,7 @@ pub fn debug_msg(m: Message<Update, u32>) -> &'static str {
 
 async fn node_config(
     t: &ThreadPool,
+    n: usize,
     id: NodeId,
     sk: KeyPair,
     addrs: HashMap<NodeId, (SocketAddr, String)>,
@@ -157,8 +158,8 @@ async fn node_config(
     // build the node conf
     NodeConfig {
         id,
-        n: 4,
-        f: 1,
+        n,
+        f: (n - 1) / 3,
         sk,
         pk,
         addrs,
@@ -170,12 +171,13 @@ async fn node_config(
 
 pub async fn setup_client(
     t: ThreadPool,
+    n: usize,
     id: NodeId,
     sk: KeyPair,
     addrs: HashMap<NodeId, (SocketAddr, String)>,
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<Client<YcsbData>> {
-    let node = node_config(&t, id, sk, addrs, pk).await;
+    let node = node_config(&t, n, id, sk, addrs, pk).await;
     let conf = client::ClientConfig {
         node,
     };
@@ -184,12 +186,13 @@ pub async fn setup_client(
 
 pub async fn setup_replica(
     t: ThreadPool,
+    n: usize,
     id: NodeId,
     sk: KeyPair,
     addrs: HashMap<NodeId, (SocketAddr, String)>,
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<Replica<YcsbService>> {
-    let node = node_config(&t, id, sk, addrs, pk).await;
+    let node = node_config(&t, n, id, sk, addrs, pk).await;
     let conf = ReplicaConfig {
         node,
         next_consensus_seq: SeqNo::from(0),
@@ -201,12 +204,13 @@ pub async fn setup_replica(
 
 pub async fn setup_node(
     t: ThreadPool,
+    n: usize,
     id: NodeId,
     sk: KeyPair,
     addrs: HashMap<NodeId, (SocketAddr, String)>,
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<(Node<YcsbData>, Vec<Message<Update, u32>>)> {
-    let conf = node_config(&t, id, sk, addrs, pk).await;
+    let conf = node_config(&t, n, id, sk, addrs, pk).await;
     Node::bootstrap(conf).await
 }
 

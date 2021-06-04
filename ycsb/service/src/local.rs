@@ -61,6 +61,7 @@ async fn async_main() {
         let sk = secret_keys.remove(&id).unwrap();
         let fut = setup_replica(
             pool.clone(),
+            replicas_config.len(),
             id,
             sk,
             addrs,
