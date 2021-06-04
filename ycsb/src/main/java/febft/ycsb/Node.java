@@ -70,7 +70,7 @@ public class Node {
     }
 
     public void bootstrap() throws IOException {
-        listener = listen(config.getHostname(), config.getPortNo());
+        listener = listen(config.getId(), config.getHostname(), config.getPortNo());
 
         noReplicas = 0;
         final Map<Integer, Entry> replicas = Config.getReplicas();
@@ -84,6 +84,7 @@ public class Node {
         for (Entry replicaConfig : replicas.values()) {
             printf("Connecting to node %d\n", replicaConfig.getId());
             OutputStream writer = connect(
+                config.getId(),
                 replicaConfig.getHostname(),
                 replicaConfig.getIpAddr(),
                 replicaConfig.getPortNo()
@@ -203,9 +204,9 @@ public class Node {
     }
     
     
-    private static OutputStream connect(String sni, String host, int port) throws IOException {
+    private static OutputStream connect(int id, String sni, String host, int port) throws IOException {
         SSLSocket socket = (SSLSocket)
-            Config.getSslSocketFactory().createSocket(host, port);
+            Config.getSslSocketFactory(id).createSocket(host, port);
 
         SSLParameters params = socket.getSSLParameters();
         List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));
@@ -218,9 +219,9 @@ public class Node {
         return socket.getOutputStream();
     }
     
-    private static SSLServerSocket listen(String sni, int port) throws IOException {
+    private static SSLServerSocket listen(int id, String sni, int port) throws IOException {
         SSLServerSocket socket = (SSLServerSocket)
-            Config.getSslServerSocketFactory().createServerSocket(port);
+            Config.getSslServerSocketFactory(id).createServerSocket(port);
 
         SSLParameters params = socket.getSSLParameters();
         List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));

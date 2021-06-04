@@ -16,13 +16,7 @@ import nl.altindag.ssl.SSLFactory;
 
 public class Config {
     private static final String CLI_PREFIX = "cli";
-    private static final int CLI_BASE = 1000;
-    private static final int CLI_AMT = 1000;
-    private static final int CLI_COUNT = CLI_BASE + CLI_AMT;
-
     private static final String CA_ROOT_PATH = "ca-root";
-    private static SSLFactory SSL_FAC = null;
-    private static Object SSL_FAC_MUX = new Object();
 
     private static final String REPLICAS_PATH = "config/replicas.config";
     private static Map<Integer, Entry> REPLICAS = null;
@@ -33,44 +27,37 @@ public class Config {
     private static final String BATCH_SIZE_PATH = "config/batch.config";
     private static int BATCH_SIZE = 0;
 
-    public static SSLSocketFactory getSslSocketFactory() {
-        synchronized (SSL_FAC_MUX) {
-            return getSslFactory().getSslSocketFactory();
-        }
+    public static SSLSocketFactory getSslSocketFactory(int id) {
+        SSLFactory sslFactory = initSslFactory(id);
+        return sslFactory.getSslSocketFactory();
     }
 
-    public static SSLServerSocketFactory getSslServerSocketFactory() {
-        synchronized (SSL_FAC_MUX) {
-            return getSslFactory().getSslServerSocketFactory();
-        }
+    public static SSLServerSocketFactory getSslServerSocketFactory(int id) {
+        SSLFactory sslFactory = initSslFactory(id);
+        return sslFactory.getSslServerSocketFactory();
     }
 
-    private static SSLFactory getSslFactory() {
-        if (SSL_FAC == null) {
-            final char[] password = "123456".toCharArray();
-            SSLFactory.Builder sslFactoryBuilder = null;
+    private static SSLFactory initSslFactory(int id) {
+        final char[] password = "123456".toCharArray();
+        SSLFactory.Builder sslFactoryBuilder = null;
 
-            try (FileInputStream file = new FileInputStream(CA_ROOT_PATH + "/truststore.jks")) {
-                sslFactoryBuilder = SSLFactory.builder()
-                    .withTrustMaterial(file, password, "jks");
+        try (FileInputStream file = new FileInputStream(CA_ROOT_PATH + "/truststore.jks")) {
+            sslFactoryBuilder = SSLFactory.builder()
+                .withTrustMaterial(file, password, "jks");
 
-                for (int i = CLI_BASE; i < CLI_COUNT; ++i) {
-                    final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, i);
+            final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, id);
 
-                    try (FileInputStream file2 = new FileInputStream(path)) {
-                        sslFactoryBuilder = sslFactoryBuilder
-                            .withIdentityMaterial(file2, password);
-                    } catch (SecurityException | IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+            try (FileInputStream file2 = new FileInputStream(path)) {
+                sslFactoryBuilder = sslFactoryBuilder
+                    .withIdentityMaterial(file2, password);
             } catch (SecurityException | IOException e) {
                 throw new RuntimeException(e);
             }
-
-            SSL_FAC = sslFactoryBuilder.build();
+        } catch (SecurityException | IOException e) {
+            throw new RuntimeException(e);
         }
-        return SSL_FAC;
+
+        return sslFactoryBuilder.build();
     }
 
     public synchronized static int getBatchSize() {
@@ -114,7 +101,7 @@ public class Config {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
             while ((configLine = reader.readLine()) != null) {
-                Entry entry = Entry.parse(configLine);
+                Entry entry = Entry.parse(configLine.trim());
                 if (entry != null) {
                     config.put(entry.getId(), entry);
                 }
@@ -131,11 +118,13 @@ public class Config {
         private String hostname, ipAddr;
 
         public static Entry parse(String configLine) {
-            final String[] entries = configLine.trim().split("([ ]+)", 4);
+            if (configLine.charAt(0) == '#') {
+                return null;
+            }
 
-            if (entries.length == 4 && entries[0].charAt(0) != '#') {
-                // noop
-            } else {
+            final String[] entries = configLine.split("([ ]+)", 4);
+
+            if (entries.length != 4) {
                 return null;
             }
 
