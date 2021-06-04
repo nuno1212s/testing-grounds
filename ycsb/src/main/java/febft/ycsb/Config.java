@@ -21,7 +21,8 @@ public class Config {
     private static final int CLI_COUNT = CLI_BASE + CLI_AMT;
 
     private static final String CA_ROOT_PATH = "ca-root";
-    private static SSLFactory sslFactory = null;
+    private static SSLFactory SSL_FAC = null;
+    private static Object SSL_FAC_MUX = new Object();
 
     private static final String REPLICAS_PATH = "config/replicas.config";
     private static Map<Integer, Entry> REPLICAS = null;
@@ -32,16 +33,20 @@ public class Config {
     private static final String BATCH_SIZE_PATH = "config/batch.config";
     private static int BATCH_SIZE = 0;
 
-    public synchronized static SSLSocketFactory getSslSocketFactory() {
-        return getSslFactory().getSslSocketFactory();
+    public static SSLSocketFactory getSslSocketFactory() {
+        synchronized (SSL_FAC_MUX) {
+            return getSslFactory().getSslSocketFactory();
+        }
     }
 
-    public synchronized static SSLServerSocketFactory getSslServerSocketFactory() {
-        return getSslFactory().getSslServerSocketFactory();
+    public static SSLServerSocketFactory getSslServerSocketFactory() {
+        synchronized (SSL_FAC_MUX) {
+            return getSslFactory().getSslServerSocketFactory();
+        }
     }
 
     private static SSLFactory getSslFactory() {
-        if (sslFactory == null) {
+        if (SSL_FAC == null) {
             final char[] password = "123456".toCharArray();
             SSLFactory.Builder sslFactoryBuilder = null;
 
@@ -63,9 +68,9 @@ public class Config {
                 throw new RuntimeException(e);
             }
 
-            sslFactory = sslFactoryBuilder.build();
+            SSL_FAC = sslFactoryBuilder.build();
         }
-        return sslFactory;
+        return SSL_FAC;
     }
 
     public synchronized static int getBatchSize() {
