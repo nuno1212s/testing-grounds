@@ -7,7 +7,7 @@ load_conf() {
 
     DB=febft.ycsb.YCSBClient
     JAR=build/libs/febft-ycsb-all.jar
-    WORKLOAD=config/workload
+    WORKLOAD=config/workload.config
 }
 
 build_jar() {
