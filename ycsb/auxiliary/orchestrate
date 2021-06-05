@@ -30,6 +30,23 @@ RESULTS=results
 cd "$(dirname $0)"
 cd ..
 
+# ask to continue
+echo "Run tests? This will purge any old results!"
+while true; do
+    read -p "(y/n)?" yn
+    case $yn in
+        [Yy]*)
+            break
+            ;;
+        [Nn]*)
+            exit 0
+            ;;
+        *)
+            echo "Please answer (y)es or (n)o."
+            ;;
+    esac
+done
+
 # kill old replica processes, if
 # an error occurred before
 for i in `seq 1 4`; do
@@ -58,6 +75,7 @@ bigcooldown
 
 # execute benchmarks
 log Beginning tests
+rm -rf $RESULTS # purge old results
 mkdir -p $RESULTS
 for no_replicas in $(echo $REPLICAS); do
     log Init of benchmarking $no_replicas replicas
