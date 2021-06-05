@@ -8,6 +8,17 @@ log() {
     echo $(date +%s): $@ >&2
 }
 
+smallcooldown() {
+    log Waiting 'for' 5 seconds
+    sleep 5
+}
+
+bigcooldown() {
+    log Waiting 'for' 1 minute
+    sleep 60
+}
+
+# config params
 REPLICAS="4 7 10 13"
 BATCHES="8 16 32 128 512 1024"
 CLIENTS="1 10 30 60 100 1000"
@@ -15,9 +26,10 @@ CLIENTS="1 10 30 60 100 1000"
 # rebuild rust service in each cop node
 for i in `seq 1 4`; do
     cop=cop0${i}
-    ssh $cop "cd tg/ycsb/service; git pull; env RUSTFLAGS='-C target-cpu=native' cargo build --release"
+    ssh $cop ". .cargo/env; cd tg/ycsb/service; git pull; env RUSTFLAGS='-C target-cpu=native' cargo build --release"
 done
 exit 0
+bigcooldown
 
 # execute benchmarks
 mkdir -p results
