@@ -25,7 +25,8 @@ CLIENTS="1 10 30 60 100 1000"
 RESULTS=results
 
 # update cwd
-cd "../$(dirname $0)"
+cd "$(dirname $0)"
+cd ..
 ls
 exit 0
 
