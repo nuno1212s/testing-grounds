@@ -16,3 +16,6 @@
 
 # Ignore config files
 /config
+
+# Ignore results
+/results
