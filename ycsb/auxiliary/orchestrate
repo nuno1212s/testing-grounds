@@ -116,6 +116,14 @@ for no_replicas in $(echo $REPLICAS); do
                     exit 1
                 fi
 
+                # kill replicas
+                for i in `1 4`; do
+                    cop=cop0${i}
+                    log Killing all replicas 'in' $cop
+                    ssh $cop "pkill -f service" &
+                done
+                bigcooldown
+
                 log Finished run $run_no successfully
             done
 
