@@ -9,13 +9,33 @@ check_args() {
 
 load_conf() {
     if [ -f config/generate ]; then
+        cd config
         ./config/generate $@ || exit 1
+
+        stat clients.config 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo Error: Missing config/clients.config! >&2
+            exit 1
+        fi
+
+        stat replicas.config 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo Error: Missing config/replicas.config! >&2
+            exit 1
+        fi
+
+        stat batch.config 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo Error: Missing config/batch.config! >&2
+            exit 1
+        fi
+
+        . ./run.config
+        cd ..
     else
         echo Error: Config generating script is absent! >&2
         exit 1
     fi
-
-    . ./config/run.config
 
     DB=febft.ycsb.YCSBClient
     JAR=build/libs/febft-ycsb-all.jar
