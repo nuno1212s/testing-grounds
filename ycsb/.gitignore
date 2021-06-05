@@ -11,8 +11,8 @@
 /log
 /*.log
 
-# Ignore the config for running YCSB
-/run.conf
-
 # Ignore the CA root directory
 /ca-root
+
+# Ignore config files
+/config

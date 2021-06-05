@@ -1,12 +1,13 @@
 #!/bin/sh
 
 load_conf() {
-    touch ./run.conf
-    . ./run.conf
+    mkdir -p config
+    touch ./config/run.config
+    . ./config/run.config
 
     DB=febft.ycsb.YCSBClient
     JAR=build/libs/febft-ycsb-all.jar
-    WORKLOAD=config/workloads/throughput
+    WORKLOAD=config/workload
 }
 
 build_jar() {
