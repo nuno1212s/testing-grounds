@@ -10,7 +10,7 @@ check_args() {
 load_conf() {
     if [ -f config/generate ]; then
         cd config
-        ./config/generate $@ || exit 1
+        ./generate $@ || exit 1
 
         stat clients.config 2>/dev/null
         if [ $? -ne 0 ]; then
