@@ -5,7 +5,7 @@ trap '' INT
 
 # helper funs
 log() {
-    echo $(date +%s): $@ >&2
+    echo $(date): $@ >&2
 }
 
 smallcooldown() {
@@ -30,7 +30,8 @@ RESULTS=results
 cd "$(dirname $0)"
 cd ..
 
-# rebuild rust service in each cop node
+# rebuild software
+log Building Rust YCSB service
 for i in `seq 1 4`; do
     cop=cop0${i}
     ssh $cop '. .cargo/env; cd tg; git pull; cd ycsb/service; env RUSTFLAGS="-C target-cpu=native" cargo build --release'
@@ -39,30 +40,50 @@ for i in `seq 1 4`; do
         exit 1
     fi
 done
-
-# rebuild ycsb client
+log Building Java YCSB client
 ./gradlew shadowJar
+pkill -f java
 
 # wait for systems to recover
-#bigcooldown
-exit 0
+bigcooldown
 
 # execute benchmarks
+log Beginning tests
 mkdir -p $RESULTS
 for no_replicas in $(echo $REPLICAS); do
+    log Init of benchmarking $no_replicas replicas
+
     for batch_size in $(echo $BATCHES); do
+        log Init of testing a batch size of $batch_size
+
         for no_clients in $(echo $CLIENTS); do
-            targetdir="${RESULTS}/r=${no_replicas}/b=${batch_size}/c=${no_clients}"
-            start=${targetdir}/start
-            end=${targetdir}/end
-
-            mkdir -p $targetdir
-            date +%s > $start
-
-            log Benchmarking with params: r=$no_replicas b=$batch_size c=$no_clients
+            log Init of benchmarking $no_clients clients
 
             # run each test 3 times, each test runs for 5min
             for run_no in `seq 0 2`; do
+                log Init of run no. $run_no
+
+                targetdir="${RESULTS}/r=${no_replicas}/b=${batch_size}/c=${no_clients}/run=${run_no}"
+                start=${targetdir}/start
+                end=${targetdir}/end
+
+                mkdir -p $targetdir
+                date +%s > $start
+
+                log Run no. $run_no: Benchmarking with params: r=$no_replicas b=$batch_size c=$no_clients
+
+                # generate remote configs
+                for i in `1 4`; do
+                    cop=cop0${i}
+                    log Generating configs 'for' $cop
+                    ssh $cop \
+                        "cd tg/ycsb; mkdir -p config; cp auxiliary/generate config; cd config; ./generate $no_clients $no_replicas $batch_size"
+                    if [ $? -ne 0 ]; then
+                        log Error: "Couldn't generatte configs for $cop"
+                        exit 1
+                    fi
+                done
+
                 # start replicas in cop0?
                 for i in `seq 0 $(expr $no_replicas - 1)`; do
                     ippart=$(expr $i % 4)
@@ -70,10 +91,41 @@ for no_replicas in $(echo $REPLICAS); do
                     ip=192.168.70.$(expr 16 + $ippart)
 
                     log Starting replica id=$i 'in' $cop "($ip)"
+                    ssh $cop \
+                        "cd tg/ycsb/service; env ID=$i ./target/release/service" \
+                        >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
+                    if [ $? -ne 0 ]; then
+                        log Error: "Couldn't start replica $i in $cop"
+                        exit 1
+                    fi
 
-                    #ssh $cop "cd tg; "
+                    smallcooldown
                 done
+
+                # copy config generator
+                log Generating local configs
+                mkdir -p config
+                cp auxiliary/generate config
+
+                # run ycsb client
+                log Starting YCSB client
+                ./run $no_clients $no_replicas $batch_size \
+                    >${targetdir}/client_stdout 2>${targetdir}/client_stderr
+                if [ $? -ne 0 ]; then
+                    log Error: "YCSB client exited with an error, check its stderr"
+                    exit 1
+                fi
+
+                log Finished run $run_no successfully
             done
+
+            log Finished benchmarking $no_clients clients
         done
+
+        log Finished benchmarking a batch size of $batch_size
     done
+
+    log Finished benchmarking $no_replicas replicas
 done
+
+log All tests finished successfully
