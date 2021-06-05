@@ -152,6 +152,7 @@ for no_replicas in $(echo $REPLICAS); do
                 bigcooldown
 
                 log Finished run $run_no successfully
+                date +%s > $end
             done
 
             log Finished benchmarking $no_clients clients
