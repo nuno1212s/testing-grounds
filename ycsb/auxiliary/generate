@@ -1,0 +1,31 @@
+#!/bin/sh
+
+CLIENTS=$1
+REPLICAS=$2
+BATCH=$3
+
+cp ../workloads/throughput workload.config
+
+cat << EOF > run.config
+CLIENTS=$CLIENTS
+YCSB_HOME=/home/tcarvalho/ycsb-0.17.0
+EOF
+
+echo $BATCH > batch.config
+
+rm -f clients.config
+for i in `seq 0 $(expr $CLIENTS - 1)`; do
+    id=$(expr 1000 + $i)
+    sni=cli${id}
+    port=$(expr 11000 + $i)
+    echo $id $sni 192.168.70.20 $port >> clients.config
+done
+
+rm -f replicas.config
+for id in `seq 0 $(expr $REPLICAS - 1)`; do
+    sni=srv${id}
+    port=$(expr 10000 + $id)
+    host=$(expr $id % 4)
+    host=$(expr 16 + $host)
+    echo $id $sni 192.168.70.$host $port >> replicas.config
+done

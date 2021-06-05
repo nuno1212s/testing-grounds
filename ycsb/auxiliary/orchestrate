@@ -1,0 +1,13 @@
+#!/bin/sh
+
+REPLICAS="4 7 10 13"
+BATCHES="8 16 32 128 512 1024"
+CLIENTS="1 10 30 60 100 1000"
+
+for no_replicas in $(echo $REPLICAS); do
+    for batch_size in $(echo $BATCHES); do
+        for no_clients in $(echo $CLIENTS); do
+            echo $no_replicas $batch_size $no_clients
+        done
+    done
+done
