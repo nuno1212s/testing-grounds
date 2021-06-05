@@ -12,28 +12,39 @@ REPLICAS="4 7 10 13"
 BATCHES="8 16 32 128 512 1024"
 CLIENTS="1 10 30 60 100 1000"
 
-mkdir -p results
+# rebuild rust service in each cop node
+for i in `seq 1 4`; do
+    cop=cop0${i}
+    ssh $cop "cd tg/ycsb/service; git pull; env RUSTFLAGS='-C target-cpu=native' cargo build --release"
+done
+exit 0
 
+# execute benchmarks
+mkdir -p results
 for no_replicas in $(echo $REPLICAS); do
     for batch_size in $(echo $BATCHES); do
         for no_clients in $(echo $CLIENTS); do
             targetdir="results/r=${no_replicas}/b=${batch_size}/c=${no_clients}"
             start=${targetdir}/start
+            end=${targetdir}/end
 
             mkdir -p $targetdir
             date +%s > $start
 
             log Benchmarking with params: r=$no_replicas b=$batch_size c=$no_clients
 
-            # start replicas in cop0?
-            for i in `seq 0 $(expr $no_replicas - 1)`; do
-                ippart=$(expr $i % 4)
-                cop=cop${ippart}
-                ip=192.168.70.$(expr 16 + $ippart)
+            # run each test 3 times, each test runs for 5min
+            for run_no in `seq 0 3`; do
+                # start replicas in cop0?
+                for i in `seq 0 $(expr $no_replicas - 1)`; do
+                    ippart=$(expr $i % 4)
+                    cop=cop0$(expr $ippart + 1)
+                    ip=192.168.70.$(expr 16 + $ippart)
 
-                log '>' Starting replica $i 'in' $cop "($ip)"
+                    log '>' Starting replica id=$i 'in' $cop "($ip)"
 
-                #ssh $cop "cd tg; "
+                    #ssh $cop "cd tg; "
+                done
             done
         done
     done
