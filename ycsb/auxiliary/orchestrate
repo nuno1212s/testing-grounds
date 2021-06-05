@@ -30,6 +30,15 @@ RESULTS=results
 cd "$(dirname $0)"
 cd ..
 
+# kill old replica processes, if
+# an error occurred before
+for i in `seq 1 4`; do
+    cop=cop0${i}
+    log Killing all replicas 'in' $cop
+    ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+done
+smallcooldown
+
 # rebuild software
 log Building Rust YCSB service
 for i in `seq 1 4`; do
@@ -120,7 +129,7 @@ for no_replicas in $(echo $REPLICAS); do
                 for i in `seq 1 4`; do
                     cop=cop0${i}
                     log Killing all replicas 'in' $cop
-                    ssh $cop "pkill -f service" &
+                    ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
                 done
                 bigcooldown
 
