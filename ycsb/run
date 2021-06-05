@@ -1,8 +1,20 @@
 #!/bin/sh
 
+check_args() {
+    if [ $# -lt 4 ]; then
+        echo Usage: $0 '<num-clients>' '<num-replicas>' '<batch-size>' >&2
+        exit 1
+    fi
+}
+
 load_conf() {
-    mkdir -p config
-    touch ./config/run.config
+    if [ -f config/generate ]; then
+        ./config/generate $@ || exit 1
+    else
+        echo Error: Config generating script is absent! >&2
+        exit 1
+    fi
+
     . ./config/run.config
 
     DB=febft.ycsb.YCSBClient
@@ -21,6 +33,7 @@ ycsb_main() {
     ${YCSB_HOME}/bin/ycsb run $DB -cp $JAR -P $WORKLOAD -threads ${CLIENTS:-1}
 }
 
-load_conf
+check_args $@
+load_conf $@
 build_jar
 ycsb_main
