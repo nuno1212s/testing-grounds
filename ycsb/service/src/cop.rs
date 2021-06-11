@@ -35,9 +35,13 @@ async fn async_main(id: NodeId) {
         let replicas_config = parse_config("../config/replicas.config").unwrap();
 
         let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
-            .take(4)
+            .take(clients_config.len())
             .enumerate()
-            .map(|(id, sk)| (NodeId::from(id), sk))
+            .map(|(id, sk)| (NodeId::from(1000 + id), sk))
+            .chain(sk_stream()
+                .take(replicas_config.len())
+                .enumerate()
+                .map(|(id, sk)| (NodeId::from(id), sk)))
             .collect();
         let public_keys: HashMap<NodeId, PublicKey> = secret_keys
             .iter()

@@ -52,7 +52,24 @@ impl SharedData for YcsbData {
         let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
         let sys_msg: messages_capnp::system::Builder = root.init_root();
         match m {
-            SystemMessage::Request(_) => unimplemented!(),
+            SystemMessage::Request(m) => {
+                let update = sys_msg.init_request();
+                let mut requests = update.init_requests(m.operation().requests.len() as u32);
+                for i in 0..m.operation().requests.len() {
+                    let r = &m.operation().requests[i];
+                    let mut request = requests.reborrow().get(i as u32);
+                    request.set_table(&r.table);
+                    request.set_key(&r.key);
+                    let mut values = request.init_values(r.values.len() as u32);
+                    let mut i = 0;
+                    for (k, v) in r.values.iter() {
+                        let mut value = values.reborrow().get(i);
+                        value.set_key(k);
+                        value.set_value(v);
+                        i += 1;
+                    }
+                }
+            },
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
                 reply.set_status(*m.payload());

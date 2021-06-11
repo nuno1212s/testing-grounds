@@ -11,10 +11,11 @@ rustls = "0.19"
 futures = "0.3"
 oneshot = "0.1"
 num_cpus = "1"
+futures-timer = "3"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "2b9dcd6ddafd8d0199c75f982963c9690a522b13"
+rev = "40313c5395291b0827b478dab95c9f8669443daa"
 default-features = false
 features = [
     "expose_impl",
