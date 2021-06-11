@@ -186,11 +186,12 @@ fn sk_stream() -> impl Iterator<Item = KeyPair> {
 }
 
 async fn run_client(mut client: Client<YcsbData>, throughput: Arc<AtomicI32>) {
+    const BATCH: usize = 128;
     let mut s = String::new();
     let mut ch = 0u8;
     loop {
-        let mut requests = Vec::with_capacity(1024);
-        for _i in 0..1024 {
+        let mut requests = Vec::with_capacity(BATCH);
+        for _i in 0..BATCH {
             s.push(ch as char);
             ch += 1;
             let mut values = collections::hash_map();
@@ -208,9 +209,7 @@ async fn run_client(mut client: Client<YcsbData>, throughput: Arc<AtomicI32>) {
                 s.pop();
             }
         }
-        eprintln!("Done preparing update, sending");
         client.update(Update { requests }).await;
-        throughput.fetch_add(1, Ordering::Relaxed);
-        eprintln!("Sent update");
+        throughput.fetch_add(BATCH as i32, Ordering::Relaxed);
     }
 }
