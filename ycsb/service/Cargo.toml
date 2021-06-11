@@ -15,7 +15,7 @@ futures-timer = "3"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "5a281ee220af0d358b9d828aba0444123640c919"
+rev = "f65e04d4cbc602c3cae3a9cade57b6090dbbacfd"
 default-features = false
 features = [
     "expose_impl",
