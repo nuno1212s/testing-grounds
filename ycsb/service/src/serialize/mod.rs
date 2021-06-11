@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::message::{
+    ReplyMessage,
     SystemMessage,
     RequestMessage,
     ConsensusMessage,
@@ -103,7 +104,20 @@ impl SharedData for YcsbData {
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message kind")?;
 
         match sys_msg_which {
-            messages_capnp::system::Which::Reply(_) => unimplemented!(),
+            messages_capnp::system::Which::Reply(Ok(reply)) => {
+                let status = reply.get_status();
+                let digest_reader = reply
+                    .get_digest()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
+                let digest = Digest::from_bytes(digest_reader)
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+
+                Ok(SystemMessage::Reply(ReplyMessage::new(digest, status)))
+            },
+            messages_capnp::system::Which::Reply(_) => {
+                Err("Failed to read reply message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
+            },
             messages_capnp::system::Which::Request(Ok(updates)) => {
                 let updates = updates
                     .get_requests()
