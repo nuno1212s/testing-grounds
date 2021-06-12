@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.DataInputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Callable;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
@@ -46,7 +46,7 @@ public class Node {
     private int noReplicas;
     private SSLServerSocket listener = null;
     private Map<Integer, OutputStream> tx;
-    private Map<Integer, InputStream> rx;
+    private Map<Integer, DataInputStream> rx;
     private Random rng;
 
     public Node() {
@@ -113,11 +113,11 @@ public class Node {
         for (int i = 0; i < noReplicas; i++) {
             printf("Accepting connection no. %d\n", i);
             SSLSocket socket = (SSLSocket)listener.accept();
-            InputStream reader = socket.getInputStream();
+            DataInputStream reader = new DataInputStream(socket.getInputStream());
             println("Accepted, reading header");
 
             txBuf.clear();
-            reader.read(txBuf.array(), 0, Header.LENGTH);
+            reader.readFully(txBuf.array(), 0, Header.LENGTH);
             txBuf.limit(Header.LENGTH);
 
             Header header = Header.deserializeFrom(txBuf);
@@ -131,11 +131,9 @@ public class Node {
         List<Callable<Status>> callables = new ArrayList<>(noReplicas);
         for (int i = 0; i < noReplicas; i++) {
             final int nodeId = i;
-            final InputStream input = rx.get(nodeId);
+            final DataInputStream input = rx.get(nodeId);
             final OutputStream output = tx.get(nodeId);
             callables.add(() -> {
-                // FIXME: this code is hanging forever
-
                 ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
                 printf("Serialized request (len=%d)\n", requestBuf.position());
@@ -156,13 +154,13 @@ public class Node {
                 printf("Sent header and request pair over the wire: %s\n", header);
 
                 headerBuf.clear();
-                input.read(headerBuf.array(), 0, Header.LENGTH);
+                input.readFully(headerBuf.array(), 0, Header.LENGTH);
                 headerBuf.limit(Header.LENGTH);
                 header = Header.deserializeFrom(headerBuf);
                 printf("Read and deserialized header from the wire: from %d\n", header.getFrom());
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
-                input.read(payloadBuf.array(), 0, (int)header.getLength());
+                input.readFully(payloadBuf.array(), 0, (int)header.getLength());
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
                 println("Read and deserialized payload from the wire");
 
