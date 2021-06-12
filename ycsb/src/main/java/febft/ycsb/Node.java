@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.io.DataInputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Callable;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
 import javax.net.ssl.SSLSocket;
@@ -45,9 +47,12 @@ public class Node {
     private Entry config;
     private int noReplicas;
     private SSLServerSocket listener = null;
+    private Random rng;
+
     private Map<Integer, OutputStream> tx;
     private Map<Integer, DataInputStream> rx;
-    private Random rng;
+    private Map<Integer, Lock> readLocks;
+    private Map<Integer, Lock> writeLocks;
 
     public Node() {
         config = Config.getClients().get(new Integer(IdCounter.nextId()));
@@ -77,6 +82,8 @@ public class Node {
 
         this.tx = new HashMap<>();
         this.rx = new HashMap<>();
+        this.readLocks = new HashMap<>();
+        this.writeLocks = new HashMap<>();
 
         ByteBuffer txBuf = ByteBuffer.allocate(BUF_CAP).order(LITTLE_ENDIAN);
 
@@ -124,6 +131,8 @@ public class Node {
             printf("Read header: %s\n", header);
 
             rx.put(header.getFrom(), reader);
+            readLocks.put(header.getFrom(), new ReentrantLock());
+            writeLocks.put(header.getFrom(), new ReentrantLock());
         }
     }
 
@@ -133,6 +142,8 @@ public class Node {
             final int nodeId = i;
             final DataInputStream input = rx.get(nodeId);
             final OutputStream output = tx.get(nodeId);
+            final Lock readLock = readLocks.get(nodeId);
+            final Lock writeLock = writeLocks.get(nodeId);
             callables.add(() -> {
                 ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
@@ -148,12 +159,15 @@ public class Node {
                 header.serializeInto(headerBuf);
                 byte[] requestDigest = header.getDigest();
 
+                writeLock.lock();
                 output.write(headerBuf.array(), 0, headerBuf.position());
                 output.write(requestBuf.array(), 0, requestBuf.position());
                 output.flush();
+                writeLock.unlock();
                 printf("Sent header and request pair over the wire: %s\n", header);
 
                 headerBuf.clear();
+                readLock.lock();
                 input.readFully(headerBuf.array(), 0, Header.LENGTH);
                 headerBuf.limit(Header.LENGTH);
                 header = Header.deserializeFrom(headerBuf);
@@ -161,6 +175,7 @@ public class Node {
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
                 input.readFully(payloadBuf.array(), 0, (int)header.getLength());
+                readLock.unlock();
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
                 println("Read and deserialized payload from the wire");
 
