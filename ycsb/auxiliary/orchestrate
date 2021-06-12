@@ -139,8 +139,18 @@ for no_replicas in $(echo $REPLICAS); do
                 ./run $no_clients $no_replicas $batch_size \
                     >${targetdir}/client_stdout 2>${targetdir}/client_stderr
                 if [ $? -ne 0 ]; then
-                    log Error: "YCSB client exited with an error, check its stderr"
-                    exit 1
+                    log Error: "YCSB client exited with an error, check its stderr; skipping to next test case"
+
+                    # kill replicas
+                    for i in `seq 1 4`; do
+                        cop=cop0${i}
+                        log Killing all replicas 'in' $cop
+                        ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+                    done
+                    bigcooldown
+                    date +%s > $end
+
+                    continue
                 fi
 
                 # kill replicas
