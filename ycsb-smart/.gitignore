@@ -9,3 +9,6 @@ log
 
 # Ignore current view
 config/currentView
+
+# Vim session
+session.vim
