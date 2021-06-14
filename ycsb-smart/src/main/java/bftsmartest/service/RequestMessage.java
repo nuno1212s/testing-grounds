@@ -1,6 +1,7 @@
 package bftsmartest.service;
 
 import java.util.Map;
+import java.util.HashMap;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 
@@ -11,9 +12,12 @@ import bftsmartest.service.capnp.Messages.System;
 import bftsmartest.service.capnp.Messages;
 
 import site.ycsb.ByteIterator;
+import site.ycsb.ByteArrayByteIterator;
 
+import org.capnproto.Serialize;
 import org.capnproto.StructList;
 import org.capnproto.MessageBuilder;
+import org.capnproto.MessageReader;
 
 public class RequestMessage extends SystemMessage {
     private Update[] updates;
@@ -25,6 +29,45 @@ public class RequestMessage extends SystemMessage {
     @Override
     public MessageKind getKind() {
         return MessageKind.REQUEST;
+    }
+
+    @Override
+    protected SystemMessage deserialize(ByteBuffer buf) throws IOException {
+        MessageReader reader = Serialize.read(buf);
+        System.Reader systemMessage = reader.getRoot(System.factory);
+
+        switch (systemMessage.which()) {
+        case REPLY:
+        case CONSENSUS:
+            return new UnsupportedMessage();
+        }
+
+        Messages.Update.Reader updateRequest = systemMessage.getRequest();
+        StructList.Reader<Request.Reader> updateReqs = updateRequest.getRequests();
+
+        Update[] updates = new Update[updateReqs.size()];
+
+        for (int k = 0; k < updateReqs.size(); k++) {
+            Request.Reader request = updateReqs.get(k);
+            StructList.Reader<Value.Reader> reqVals = request.getValues();
+
+            String tableName = request.getTable().toString();
+            String rowKey = request.getKey().toString();
+            Map<String, ByteIterator> row = new HashMap<>();
+
+            for (int i = 0; i < reqVals.size(); i++) {
+                Value.Reader entry = reqVals.get(i);
+
+                String key = entry.getKey().toString();
+                byte[] value = entry.getValue().toArray();
+
+                row.put(key, new ByteArrayByteIterator(value));
+            }
+
+            updates[k] = new Update(tableName, rowKey, row);
+        }
+
+        return new RequestMessage(updates);
     }
 
     @Override
