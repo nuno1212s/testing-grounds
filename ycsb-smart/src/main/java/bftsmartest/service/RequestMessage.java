@@ -120,4 +120,8 @@ public class RequestMessage extends SystemMessage {
 
         return output;
     }
+
+    public Update[] getUpdates() {
+        return updates;
+    }
 }

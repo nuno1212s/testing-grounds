@@ -2,10 +2,14 @@ package bftsmartest.service;
 
 import java.io.*;
 import java.util.*;
+import java.nio.ByteBuffer;
 
 import bftsmart.tom.MessageContext;
 import bftsmart.tom.ServiceReplica;
 import bftsmart.tom.server.defaultservices.DefaultSingleRecoverable;
+
+import site.ycsb.Status;
+import site.ycsb.ByteIterator;
 
 public class Replica extends DefaultSingleRecoverable {
     private Map<String, Map<String, Map<String, byte[]>>> databases;
@@ -21,6 +25,22 @@ public class Replica extends DefaultSingleRecoverable {
 
     @Override
     public byte[] appExecuteOrdered(byte[] command, MessageContext msgCtx) {
+        RequestMessage message = SystemMessage.deserializeAs(RequestMessage.class, ByteBuffer.wrap(command));
+        Update[] updates = message.getUpdates();
+
+        for (Update update : updates) {
+            Map<String, Map<String, byte[]>> rows = databases.computeIfAbsent(update.getTable(), (k) -> new HashMap<>());
+            Map<String, byte[]> row = new HashMap<>();
+
+            for (Map.Entry<String, ByteIterator> pair : update.values.entrySet()) {
+                long n = pair.getValue().bytesLeft();
+                row.put(pair.getKey(), new byte[(int)(n < 0 ? -n : n)]);
+            }
+
+            rows.put(update.getKey(), row);
+        }
+
+        return (new ReplyMessage(Status.OK, new byte[]{0})).serialize().array();
     }
 
     @Override
