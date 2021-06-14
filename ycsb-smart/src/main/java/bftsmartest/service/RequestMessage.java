@@ -1,17 +1,14 @@
-package bftsmartest;
+package bftsmartest.service;
 
 import java.util.Map;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 
-import febft.ycsb.Update;
-import febft.ycsb.MessageKind;
-import febft.ycsb.SystemMessage;
-import febft.ycsb.capnp.Messages.System;
-import febft.ycsb.capnp.Messages.Request;
-import febft.ycsb.capnp.Messages.Value;
-import febft.ycsb.capnp.Messages.System;
-import febft.ycsb.capnp.Messages;
+import bftsmartest.service.capnp.Messages.System;
+import bftsmartest.service.capnp.Messages.Request;
+import bftsmartest.service.capnp.Messages.Value;
+import bftsmartest.service.capnp.Messages.System;
+import bftsmartest.service.capnp.Messages;
 
 import site.ycsb.ByteIterator;
 

@@ -1,4 +1,4 @@
-package bftsmartest;
+package bftsmartest.service;
 
 import java.util.Map;
 

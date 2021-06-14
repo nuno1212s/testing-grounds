@@ -1,13 +1,10 @@
-package febft.ycsb;
+package bftsmartest.service;
 
 import java.nio.ByteBuffer;
 import java.io.IOException;
 
-import febft.ycsb.MessageKind;
-import febft.ycsb.SystemMessage;
-import febft.ycsb.UnsupportedMessage;
-import febft.ycsb.capnp.Messages.System;
-import febft.ycsb.capnp.Messages.Reply;
+import bftsmartest.service.capnp.Messages.System;
+import bftsmartest.service.capnp.Messages.Reply;
 
 import site.ycsb.Status;
 

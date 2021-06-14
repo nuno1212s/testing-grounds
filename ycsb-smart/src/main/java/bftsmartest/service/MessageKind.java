@@ -1,4 +1,4 @@
-package febft.ycsb;
+package bftsmartest.service;
 
 public enum MessageKind {
     UNSUPPORTED,
