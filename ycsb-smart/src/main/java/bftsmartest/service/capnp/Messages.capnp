@@ -1,7 +1,7 @@
 @0x94a43df6c359e805;
 
 using Java = import "/capnp/java.capnp";
-$Java.package("febft.ycsb.capnp");
+$Java.package("bftsmartest.service.capnp");
 $Java.outerClassname("Messages");
 
 struct System {
