@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
+import java.io.IOException;
 
 import bftsmartest.service.capnp.Messages.System;
 import bftsmartest.service.capnp.Messages.Request;

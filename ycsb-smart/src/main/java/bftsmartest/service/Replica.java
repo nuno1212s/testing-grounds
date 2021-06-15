@@ -15,7 +15,7 @@ public class Replica extends DefaultSingleRecoverable {
     private Map<String, Map<String, Map<String, byte[]>>> databases;
 
     public Replica(int nodeId) {
-        state = new HashMap<>();
+        databases = new HashMap<>();
         new ServiceReplica(nodeId, this, this);
     }
 
@@ -25,14 +25,15 @@ public class Replica extends DefaultSingleRecoverable {
 
     @Override
     public byte[] appExecuteOrdered(byte[] command, MessageContext msgCtx) {
-        RequestMessage message = SystemMessage.deserializeAs(RequestMessage.class, ByteBuffer.wrap(command));
+        RequestMessage message = (RequestMessage)
+            SystemMessage.deserializeAs(RequestMessage.class, ByteBuffer.wrap(command));
         Update[] updates = message.getUpdates();
 
         for (Update update : updates) {
             Map<String, Map<String, byte[]>> rows = databases.computeIfAbsent(update.getTable(), (k) -> new HashMap<>());
             Map<String, byte[]> row = new HashMap<>();
 
-            for (Map.Entry<String, ByteIterator> pair : update.values.entrySet()) {
+            for (Map.Entry<String, ByteIterator> pair : update.getValues().entrySet()) {
                 long n = pair.getValue().bytesLeft();
                 row.put(pair.getKey(), new byte[(int)(n < 0 ? -n : n)]);
             }
@@ -54,7 +55,7 @@ public class Replica extends DefaultSingleRecoverable {
         try {
             ByteArrayInputStream bis = new ByteArrayInputStream(state);
             ObjectInput in = new ObjectInputStream(bis);
-            databases = (HashMap<String, HashMap<String, HashMap<String, byte[]>>>) in.readObject();
+            databases = (Map<String, Map<String, Map<String, byte[]>>>)in.readObject();
             in.close();
             bis.close();
         } catch (IOException | ClassNotFoundException e) {

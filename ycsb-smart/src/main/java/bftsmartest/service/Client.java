@@ -2,6 +2,7 @@ package bftsmartest.service;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.nio.ByteBuffer;
 
 import site.ycsb.ByteArrayByteIterator;
 import site.ycsb.ByteIterator;
@@ -29,12 +30,17 @@ public class Client {
         Thread testCase = new Thread(() -> {
             Client client = new Client(1001);
             for (;;) {
-                client.update(/* ... */);
+                //client.update(/* ... */);
                 throughput.getAndAdd(1);
             }
         });
         testCase.start();
-        Thread.sleep(30);
+
+        try {
+            Thread.sleep(30);
+        } catch (InterruptedException e) {
+            System.exit(1);
+        }
         System.out.println("Throughput per sec: " + (throughput.get() / 30));
     }
 
@@ -45,7 +51,8 @@ public class Client {
             updateCount = 0;
             byte[] request = (new RequestMessage(updates)).serialize().array();
             byte[] reply = serviceProxy.invokeOrdered(request);
-            RequestMessage message = SystemMessage.deserializeAs(ReplyMessage.class, ByteBuffer.wrap(reply));
+            ReplyMessage message = (ReplyMessage)
+                SystemMessage.deserializeAs(ReplyMessage.class, ByteBuffer.wrap(reply));
             return message.getStatus();
         }
 

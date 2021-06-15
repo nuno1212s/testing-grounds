@@ -1,9 +1,7 @@
-package febft.ycsb;
+package bftsmartest.service;
 
 import java.nio.ByteBuffer;
 import java.io.IOException;
-
-import febft.ycsb.MessageKind;
 
 public abstract class SystemMessage {
     public ByteBuffer serialize() {

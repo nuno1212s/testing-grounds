@@ -1,9 +1,6 @@
-package febft.ycsb;
+package bftsmartest.service;
 
 import java.nio.ByteBuffer;
-
-import febft.ycsb.MessageKind;
-import febft.ycsb.SystemMessage;
 
 public class UnsupportedMessage extends SystemMessage {
     @Override

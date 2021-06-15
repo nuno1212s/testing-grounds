@@ -1,10 +1,11 @@
 package bftsmartest.service;
 
+import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
 import java.io.IOException;
 
-import bftsmartest.service.capnp.Messages.System;
-import bftsmartest.service.capnp.Messages.Reply;
+import static bftsmartest.service.capnp.Messages.System;
+import static bftsmartest.service.capnp.Messages.Reply;
 
 import site.ycsb.Status;
 
@@ -49,7 +50,7 @@ public class ReplyMessage extends SystemMessage {
     public ByteBuffer serialize() {
         MessageBuilder message = new MessageBuilder();
         System.Builder systemMessage = message.initRoot(System.factory);
-        Messages.Reply.Builder reply = systemMessage.initReply();
+        Reply.Builder reply = systemMessage.initReply();
 
         reply.setStatus(status == Status.OK ? 0 : 1);
         reply.setDigest(digest);
