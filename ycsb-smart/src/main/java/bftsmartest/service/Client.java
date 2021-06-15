@@ -11,7 +11,6 @@ import site.ycsb.Status;
 import bftsmart.tom.ServiceProxy;
 
 public class Client {
-    private static final int FIELD_COUNT = 20000;
     private static final int FIELD_LENGTH = 1024;
     private static final int UPDATE_MAX = 128;
 
@@ -29,9 +28,20 @@ public class Client {
         AtomicInteger throughput = new AtomicInteger(0);
         Thread testCase = new Thread(() -> {
             Client client = new Client(1001);
+            byte ch = 0;
+            StringBuilder sb = new StringBuilder();
             for (;;) {
-                //client.update(/* ... */);
-                throughput.getAndAdd(1);
+                sb.append(ch++);
+                String s = sb.toString();
+                byte[] data = new byte[FIELD_LENGTH];
+                Map<String, ByteIterator> row = new HashMap<>();
+                row.put(new String(data), new ByteArrayByteIterator(data));
+                client.update(s, s, row, throughput);
+                if (ch % 128 == 0) {
+                    ch = 0;
+                } else {
+                    sb.setLength(sb.length() - 1);
+                }
             }
         });
         testCase.start();
@@ -42,6 +52,22 @@ public class Client {
             System.exit(1);
         }
         System.out.println("Throughput per sec: " + (throughput.get() / 30));
+    }
+
+    public Status update(String table, String key, Map<String, ByteIterator> values, AtomicInteger throughput) {
+        updates[updateCount++] = new Update(table, key, values);
+
+        if (updateCount % UPDATE_MAX == 0) {
+            updateCount = 0;
+            byte[] request = (new RequestMessage(updates)).serialize().array();
+            byte[] reply = serviceProxy.invokeOrdered(request);
+            ReplyMessage message = (ReplyMessage)
+                SystemMessage.deserializeAs(ReplyMessage.class, ByteBuffer.wrap(reply));
+            throughput.getAndAdd(UPDATE_MAX);
+            return message.getStatus();
+        }
+
+        return Status.OK;
     }
 
     public Status update(String table, String key, Map<String, ByteIterator> values) {
