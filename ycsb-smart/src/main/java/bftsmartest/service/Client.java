@@ -16,12 +16,13 @@ public class Client {
 
     private ServiceProxy serviceProxy;
     private Update[] updates;
-    private int updateCount;
+    private int nodeId, updateCount;
 
     public Client(int nodeId) {
         serviceProxy = new ServiceProxy(nodeId);
         updates = new Update[UPDATE_MAX];
         updateCount = 0;
+        this.nodeId = nodeId;
     }
 
     public static void main(String[] args) {
@@ -30,13 +31,16 @@ public class Client {
             Client client = new Client(1001);
             byte ch = 0;
             StringBuilder sb = new StringBuilder();
+            final int nodeId = client.nodeId;
             for (;;) {
                 sb.append(ch++);
                 String s = sb.toString();
                 byte[] data = new byte[FIELD_LENGTH];
                 Map<String, ByteIterator> row = new HashMap<>();
                 row.put(new String(data), new ByteArrayByteIterator(data));
+                //System.out.printf("%d: performing update (at %d)\n", nodeId, System.nanoTime());
                 client.update(s, s, row, throughput);
+                //System.out.printf("%d: update done (at %d)\n", nodeId, System.nanoTime());
                 if (ch % 128 == 0) {
                     ch = 0;
                 } else {
@@ -51,7 +55,10 @@ public class Client {
         } catch (InterruptedException e) {
             System.exit(1);
         }
-        System.out.println("Throughput per sec: " + (throughput.get() / 30));
+
+        int effectiveThroughput = throughput.get();
+        System.out.println("Throughput: " + effectiveThroughput);
+        System.out.println("Throughput per sec: " + (effectiveThroughput / 30));
     }
 
     public Status update(String table, String key, Map<String, ByteIterator> values, AtomicInteger throughput) {

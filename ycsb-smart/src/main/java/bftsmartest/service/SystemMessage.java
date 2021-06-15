@@ -16,6 +16,7 @@ public abstract class SystemMessage {
         try {
             return kls.newInstance().deserialize(buf);
         } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }

@@ -23,6 +23,10 @@ import org.capnproto.MessageReader;
 public class RequestMessage extends SystemMessage {
     private Update[] updates;
 
+    public RequestMessage() {
+        this.updates = null;
+    }
+
     public RequestMessage(Update... updates) {
         this.updates = updates;
     }

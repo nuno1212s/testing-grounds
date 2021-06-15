@@ -17,6 +17,11 @@ public class ReplyMessage extends SystemMessage {
     private Status status;
     private byte[] digest;
 
+    public ReplyMessage() {
+        status = Status.ERROR;
+        digest = null;
+    }
+
     public ReplyMessage(Status status, byte[] digest) {
         this.status = status;
         this.digest = digest;
