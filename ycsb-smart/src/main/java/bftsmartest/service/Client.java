@@ -1,4 +1,4 @@
-package bftsmartest;
+package bftsmartest.service;
 
 import java.util.*;
 
@@ -9,15 +9,20 @@ import site.ycsb.Status;
 import bftsmart.tom.ServiceProxy;
 
 public class Client {
+    private static final int FIELD_LENGTH = 1024;
+    private static final int UPDATE_MAX = 128;
+
     private ServiceProxy serviceProxy;
+    private Update[] updates;
+    private int updateCount;
 
     public Client(int nodeId) {
         serviceProxy = new ServiceProxy(nodeId);
+        updates = new Update[UPDATE_MAX];
+        updateCount = 0;
     }
 
     public static void main(String[] args) {
-        // use this size for each map value
-        final int fieldLength = 1024;
     }
 
     public Status update(String table, String key, Map<String, ByteIterator> values) {
