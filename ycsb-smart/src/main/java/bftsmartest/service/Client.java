@@ -11,6 +11,7 @@ import site.ycsb.Status;
 import bftsmart.tom.ServiceProxy;
 
 public class Client {
+    private static final int TEST_SECS = 30;
     private static final int FIELD_LENGTH = 1024;
     private static final int UPDATE_MAX = 128;
 
@@ -51,14 +52,14 @@ public class Client {
         testCase.start();
 
         try {
-            Thread.sleep(30 * 1000);
+            Thread.sleep(TEST_SECS * 1000);
         } catch (InterruptedException e) {
             System.exit(1);
         }
 
         int effectiveThroughput = throughput.get();
         System.out.println("Throughput: " + effectiveThroughput);
-        System.out.println("Throughput per sec: " + (effectiveThroughput / 30));
+        System.out.println("Throughput per sec: " + (effectiveThroughput / TEST_SECS));
     }
 
     public Status update(String table, String key, Map<String, ByteIterator> values, AtomicInteger throughput) {
