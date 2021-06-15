@@ -47,7 +47,7 @@ public class Client {
         testCase.start();
 
         try {
-            Thread.sleep(30);
+            Thread.sleep(30 * 1000);
         } catch (InterruptedException e) {
             System.exit(1);
         }
