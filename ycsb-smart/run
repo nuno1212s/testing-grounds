@@ -10,8 +10,15 @@ class Node(object):
     def __init__(self, id):
         print(f'Starting {self.kind()} {id}...')
         self.id = id
-        self.proc = subprocess.Popen( \
-            args=f'java -jar ./build/libs/bft-smart-all.jar {self.kind()} {id}'.split(' '))
+        if self.kind() == 'server':
+            self.proc = subprocess.Popen( \
+                args=f'java -cp ./build/libs/bft-smart-all.jar bftsmartest.YCSBServer {id}'.split(' '))
+        elif self.kind() == 'client':
+            self.proc = subprocess.Popen( \
+                args=f'java -cp ./build/libs/bft-smart-all.jar bftsmartest.service.Client {id}'.split(' '))
+        else:
+            print(f'Invalid node kind: {self.kind()}')
+            os.exit(1)
         sleep(1)
 
     def kind(self):
