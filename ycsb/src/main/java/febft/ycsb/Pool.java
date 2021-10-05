@@ -9,9 +9,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
 
+import febft.ycsb.Config;
+
 public class Pool {
-    private static final int F = 1;
-    private static final int QUORUM = 2*F + 1;
+    private static final int F = (Config.getReplicas().size() - 1) / 3;
+    private static final int QUORUM = F + 1;
 
     private static ExecutorService INSTANCE = Executors.newCachedThreadPool();
     //private static ExecutorService INSTANCE = Executors.newWorkStealingPool();
