@@ -2,7 +2,7 @@ use febft::bft::error::*;
 use febft::bft::collections;
 use febft::bft::executable::Service;
 
-use crate::data::{Update, Request};
+use crate::data::Update;
 use crate::serialize::{
     YcsbData,
     YcsbDataState,
@@ -13,7 +13,7 @@ pub struct YcsbService;
 impl Service for YcsbService {
     type Data = YcsbData;
 
-    fn initial_state(&mut self) -> Result<State<Self>> {
+    fn initial_state(&mut self) -> Result<YcsbDataState> {
         Ok(collections::hash_map())
     }
 
