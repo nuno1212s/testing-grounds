@@ -15,14 +15,15 @@ futures-timer = "3"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "f65e04d4cbc602c3cae3a9cade57b6090dbbacfd"
+rev = "1bdfd6a96bad1ae30d1dbefacf23353f8e97aef1"
 default-features = false
 features = [
     "expose_impl",
     "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_tokio_tcp",
-    "channel_futures_mpsc",
+    "serialize_serde",
+    "channel_async_channel_mpmc",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
     "collections_randomstate_twox_hash"
