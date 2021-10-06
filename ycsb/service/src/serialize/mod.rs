@@ -3,16 +3,13 @@ use std::io::{Read, Write};
 
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
+use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{
     ReplyMessage,
     SystemMessage,
     RequestMessage,
     ConsensusMessage,
     ConsensusMessageKind,
-};
-use febft::bft::communication::serialize::{
-    SharedData,
-    ReplicaData,
 };
 use febft::bft::collections::{
     self,
@@ -23,8 +20,10 @@ use crate::data::{Update, Request};
 
 pub struct YcsbData;
 
-impl ReplicaData for YcsbData {
+impl SharedData for YcsbData {
     type State = HashMap<String, HashMap<String, HashMap<String, Vec<u8>>>>;
+    type Request = Update;
+    type Reply = u32;
 
     fn serialize_state<W>(mut w: W, _s: &Self::State) -> Result<()>
     where
@@ -40,11 +39,6 @@ impl ReplicaData for YcsbData {
     {
         unimplemented!()
     }
-}
-
-impl SharedData for YcsbData {
-    type Request = Update;
-    type Reply = u32;
 
     fn serialize_message<W>(w: W, m: &SystemMessage<Update, u32>) -> Result<()>
     where
