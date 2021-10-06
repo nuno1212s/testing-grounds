@@ -3,6 +3,15 @@
 using Rust = import "rust.capnp";
 $Rust.parentModule("serialize");
 
+struct Header {
+    raw @0 :Data;
+}
+
+struct Message {
+    header  @0 :Header;
+    message @1 :System;
+}
+
 struct System {
     union {
         request   @0 :Update;
@@ -12,10 +21,6 @@ struct System {
 }
 
 struct Update {
-    requests @0 :List(Request);
-}
-
-struct Request {
     table  @0 :Text;
     key    @1 :Text;
     values @2 :List(Value);
@@ -34,8 +39,8 @@ struct Reply {
 struct Consensus {
     seqNo @0 :UInt32;
     union {
-        prePrepare @1 :Data;
-        prepare    @2 :Void;
-        commit     @3 :Void;
+        prePrepare @1 :List(Message);
+        prepare    @2 :Data;
+        commit     @3 :Data;
     }
 }
