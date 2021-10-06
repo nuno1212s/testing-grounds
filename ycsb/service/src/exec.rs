@@ -1,12 +1,12 @@
 use febft::bft::error::*;
-use febft::bft::executable::{
-    State,
-    Service,
-};
 use febft::bft::collections;
+use febft::bft::executable::Service;
 
-use crate::serialize::YcsbData;
 use crate::data::{Update, Request};
+use crate::serialize::{
+    YcsbData,
+    YcsbDataState,
+};
 
 pub struct YcsbService;
 
@@ -17,11 +17,13 @@ impl Service for YcsbService {
         Ok(collections::hash_map())
     }
 
-    fn update(&mut self, tables: &mut State<Self>, update: Update) -> u32 {
-        for Request { table, key, values } in update.requests {
-            let db = tables.entry(table).or_insert_with(collections::hash_map);
-            db.insert(key, values);
-        }
+    fn update(
+        &mut self,
+        tables: &mut YcsbDataState,
+        Update { table, key, values }: Update,
+    ) -> u32 {
+        let db = tables.entry(table).or_insert_with(collections::hash_map);
+        db.insert(key, values);
         0
     }
 }
