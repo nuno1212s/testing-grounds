@@ -136,7 +136,7 @@ public class Node {
         }
     }
 
-    public Status callService(Update... updates) throws IOException {
+    public Status callService(Update update) throws IOException {
         List<Callable<Status>> callables = new ArrayList<>(noReplicas);
         for (int i = 0; i < noReplicas; i++) {
             final int nodeId = i;
@@ -145,7 +145,7 @@ public class Node {
             final Lock readLock = readLocks.get(nodeId);
             final Lock writeLock = writeLocks.get(nodeId);
             callables.add(() -> {
-                ByteBuffer requestBuf = (new RequestMessage(updates)).serialize();
+                ByteBuffer requestBuf = (new RequestMessage(update)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
                 printf("Serialized request (len=%d)\n", requestBuf.position());
 

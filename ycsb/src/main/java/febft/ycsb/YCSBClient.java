@@ -8,19 +8,13 @@ import java.security.Security;
 
 import febft.ycsb.Node;
 import febft.ycsb.Update;
-import febft.ycsb.Config;
 
 import site.ycsb.ByteIterator;
 import site.ycsb.Status;
 import site.ycsb.DB;
 
 public class YCSBClient extends DB {
-    // TODO: change ycsb workload to reflect this new value
-    private static final int UPDATE_MAX = Config.getBatchSize();
-
     private Node node;
-    private int updateCount;
-    private Update[] updates;
 
     public YCSBClient() {
         // empty constructor
@@ -48,27 +42,18 @@ public class YCSBClient extends DB {
             System.err.printf("Failed to bootstrap node %d: %s\n", id, e);
             System.exit(1);
         }
-
-        this.updates = new Update[UPDATE_MAX];
-        this.updateCount = 0;
     }
 
     @Override
     public Status update(String table, String key, Map<String, ByteIterator> values) {
-        updates[updateCount++] = new Update(table, key, values);
-
-        if (updateCount % UPDATE_MAX == 0) {
-            updateCount = 0;
-            try {
-                node.println("Calling service");
-                return node.callService(updates);
-            } catch (IOException e) {
-                node.printf("Exception: %s\n", e);
-                System.exit(1);
-            }
+        try {
+            //node.println("Calling service");
+            final Update update = new Update(table, key, values);
+            return node.callService(update);
+        } catch (IOException e) {
+            node.printf("Exception: %s\n", e);
+            System.exit(1);
         }
-
-        return Status.OK;
     }
 
     @Override
