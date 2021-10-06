@@ -23,6 +23,7 @@ pub fn main() {
         .next()
         .unwrap();
     let conf = InitConfig {
+        pool_threads: num_cpus::get(),
         async_threads: num_cpus::get(),
     };
     let _guard = unsafe { init(conf).unwrap() };

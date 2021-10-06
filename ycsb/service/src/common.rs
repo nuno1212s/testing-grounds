@@ -202,8 +202,8 @@ pub async fn setup_replica(
     let node = node_config(&t, n, id, sk, addrs, pk).await;
     let conf = ReplicaConfig {
         node,
-        next_consensus_seq: SeqNo::from(0),
-        leader: NodeId::from(0u32),
+        view: SeqNo::ZERO,
+        next_consensus_seq: SeqNo::ZERO,
         service: YcsbService,
     };
     Replica::bootstrap(conf).await
