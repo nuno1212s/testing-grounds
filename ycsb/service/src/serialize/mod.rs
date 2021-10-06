@@ -2,6 +2,7 @@ use std::default::Default;
 use std::io::{Read, Write};
 
 use febft::bft::error::*;
+use febft::bft::ordering::Orderable;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{
@@ -20,8 +21,10 @@ use crate::data::{Update, Request};
 
 pub struct YcsbData;
 
+pub type YcsbDataState = HashMap<String, HashMap<String, HashMap<String, Vec<u8>>>>;
+
 impl SharedData for YcsbData {
-    type State = HashMap<String, HashMap<String, HashMap<String, Vec<u8>>>>;
+    type State = YcsbDataState;
     type Request = Update;
     type Reply = u32;
 
@@ -40,7 +43,7 @@ impl SharedData for YcsbData {
         unimplemented!()
     }
 
-    fn serialize_message<W>(w: W, m: &SystemMessage<Update, u32>) -> Result<()>
+    fn serialize_message<W>(w: W, m: &SystemMessage<YcsbDataState, Update, u32>) -> Result<()>
     where
         W: Write
     {
@@ -84,7 +87,7 @@ impl SharedData for YcsbData {
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
-    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Update, u32>>
+    fn deserialize_message<R>(r: R) -> Result<SystemMessage<YcsbDataState, Update, u32>>
     where
         R: Read
     {
