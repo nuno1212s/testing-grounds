@@ -4,12 +4,8 @@ using Java = import "/capnp/java.capnp";
 $Java.package("febft.ycsb.capnp");
 $Java.outerClassname("Messages");
 
-struct Header {
-    raw @0 :Data;
-}
-
 struct Message {
-    header  @0 :Header;
+    header  @0 :Data;
     message @1 :System;
 }
 
