@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::net::SocketAddr;
-use std::io::{BufReader, BufRead};
+use std::io::{BufReader, BufRead, Read};
 
 use regex::Regex;
 use rustls::{
@@ -120,33 +120,6 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
     Some(ConfigEntry { id, hostname, ipaddr, portno })
 }
 
-pub fn debug_rogue(rogue: Vec<Message<YcsbDataState, Update, u32>>) -> String {
-    let mut buf = String::new();
-    buf.push_str("[ ");
-    for m in rogue {
-        let code = debug_msg(m);
-        buf.push_str(code);
-        buf.push_str(" ");
-    }
-    buf.push_str("]");
-    buf
-}
-
-pub fn debug_msg(m: Message<YcsbDataState, Update, u32>) -> &'static str {
-    match m {
-        Message::System(_, m) => match m {
-            SystemMessage::Request(_) => "Req",
-            _ => unreachable!(),
-        },
-        Message::ConnectedTx(_, _) => "CTx",
-        Message::ConnectedRx(_, _) => "CRx",
-        Message::DisconnectedTx(_) => "DTx",
-        Message::DisconnectedRx(_) => "DRx",
-        Message::ExecutionFinished(_, _, _) => "Exe",
-        Message::ExecutionFinishedWithAppstate(_, _, _, _) => "ExA",
-    }
-}
-
 async fn node_config(
     t: &ThreadPool,
     n: usize,
@@ -199,9 +172,14 @@ pub async fn setup_replica(
     addrs: HashMap<NodeId, (SocketAddr, String)>,
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<Replica<YcsbService>> {
-    let node = node_config(&t, n, id, sk, addrs, pk).await;
+    let (node, batch_size) = {
+        let n = node_config(&t, n, id, sk, addrs, pk);
+        let b = get_batch_size(&t);
+        futures::join!(n, b)
+    };
     let conf = ReplicaConfig {
         node,
+        batch_size,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: YcsbService,
@@ -209,16 +187,15 @@ pub async fn setup_replica(
     Replica::bootstrap(conf).await
 }
 
-pub async fn setup_node(
-    t: ThreadPool,
-    n: usize,
-    id: NodeId,
-    sk: KeyPair,
-    addrs: HashMap<NodeId, (SocketAddr, String)>,
-    pk: HashMap<NodeId, PublicKey>,
-) -> Result<(Node<YcsbData>, Vec<Message<YcsbDataState, Update, u32>>)> {
-    let conf = node_config(&t, n, id, sk, addrs, pk).await;
-    Node::bootstrap(conf).await
+async fn get_batch_size(t: &ThreadPool) -> usize {
+    let (tx, rx) = oneshot::channel();
+    t.execute(move || {
+        let mut buf = String::new();
+        let mut f = open_file("../config/batch.config");
+        f.read_to_string(&mut buf).unwrap();
+        tx.send(buf.trim().parse().unwrap()).unwrap();
+    });
+    rx.await.unwrap()
 }
 
 async fn get_server_config(t: &ThreadPool, id: NodeId) -> ServerConfig {
