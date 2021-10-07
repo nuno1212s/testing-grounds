@@ -14,9 +14,9 @@ use rustls::{
 };
 
 use febft::bft::error::*;
+use febft::bft::threadpool;
 use febft::bft::ordering::SeqNo;
 use febft::bft::collections::HashMap;
-use febft::bft::threadpool::ThreadPool;
 use febft::bft::communication::message::{
     Message,
     SystemMessage,
@@ -121,7 +121,6 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
 }
 
 async fn node_config(
-    t: &ThreadPool,
     n: usize,
     id: NodeId,
     sk: KeyPair,
@@ -130,8 +129,8 @@ async fn node_config(
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config) = {
-        let cli = get_client_config(t, id);
-        let srv = get_server_config(t, id);
+        let cli = get_client_config(id);
+        let srv = get_server_config(id);
         futures::join!(cli, srv)
     };
 
@@ -150,14 +149,13 @@ async fn node_config(
 }
 
 pub async fn setup_client(
-    t: ThreadPool,
     n: usize,
     id: NodeId,
     sk: KeyPair,
     addrs: HashMap<NodeId, (SocketAddr, String)>,
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<Client<YcsbData>> {
-    let node = node_config(&t, n, id, sk, addrs, pk).await;
+    let node = node_config(n, id, sk, addrs, pk).await;
     let conf = client::ClientConfig {
         node,
     };
@@ -165,7 +163,6 @@ pub async fn setup_client(
 }
 
 pub async fn setup_replica(
-    t: ThreadPool,
     n: usize,
     id: NodeId,
     sk: KeyPair,
@@ -173,8 +170,8 @@ pub async fn setup_replica(
     pk: HashMap<NodeId, PublicKey>,
 ) -> Result<Replica<YcsbService>> {
     let (node, batch_size) = {
-        let n = node_config(&t, n, id, sk, addrs, pk);
-        let b = get_batch_size(&t);
+        let n = node_config(n, id, sk, addrs, pk);
+        let b = get_batch_size();
         futures::join!(n, b)
     };
     let conf = ReplicaConfig {
@@ -187,9 +184,9 @@ pub async fn setup_replica(
     Replica::bootstrap(conf).await
 }
 
-async fn get_batch_size(t: &ThreadPool) -> usize {
+async fn get_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
-    t.execute(move || {
+    threadpool::execute(move || {
         let mut buf = String::new();
         let mut f = open_file("../config/batch.config");
         f.read_to_string(&mut buf).unwrap();
@@ -198,9 +195,9 @@ async fn get_batch_size(t: &ThreadPool) -> usize {
     rx.await.unwrap()
 }
 
-async fn get_server_config(t: &ThreadPool, id: NodeId) -> ServerConfig {
+async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
-    t.execute(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
 
@@ -242,9 +239,9 @@ async fn get_server_config(t: &ThreadPool, id: NodeId) -> ServerConfig {
     rx.await.unwrap()
 }
 
-async fn get_client_config(t: &ThreadPool, id: NodeId) -> ClientConfig {
+async fn get_client_config(id: NodeId) -> ClientConfig {
     let (tx, rx) = oneshot::channel();
-    t.execute(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut cfg = ClientConfig::new();
 

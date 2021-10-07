@@ -49,10 +49,6 @@ async fn async_main(id: NodeId) {
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
-        let pool = threadpool::Builder::new()
-            .num_threads(num_cpus::get() >> 1)
-            .build();
-
         let addrs = {
             let mut addrs = collections::hash_map();
             for other in &replicas_config {
@@ -69,7 +65,6 @@ async fn async_main(id: NodeId) {
         };
         let sk = secret_keys.remove(&id).unwrap();
         let fut = setup_replica(
-            pool,
             replicas_config.len(),
             id,
             sk,

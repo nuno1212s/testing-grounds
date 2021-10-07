@@ -56,10 +56,6 @@ async fn async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let pool = threadpool::Builder::new()
-        .num_threads(num_cpus::get() >> 1)
-        .build();
-
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
         let addrs = {
@@ -78,7 +74,6 @@ async fn async_main() {
         };
         let sk = secret_keys.remove(&id).unwrap();
         let fut = setup_replica(
-            pool.clone(),
             replicas_config.len(),
             id,
             sk,
@@ -92,7 +87,7 @@ async fn async_main() {
             replica.run().await.unwrap();
         });
     }
-    drop((pool, secret_keys, public_keys, clients_config, replicas_config));
+    drop((secret_keys, public_keys, clients_config, replicas_config));
 
     // run forever
     std::future::pending().await
@@ -116,10 +111,6 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let pool = threadpool::Builder::new()
-        .num_threads(num_cpus::get() >> 1)
-        .build();
-
     let throughput = Arc::new(AtomicI32::new(0));
     let (tx, mut rx) = channel::new_bounded(8);
 
@@ -141,7 +132,6 @@ async fn client_async_main() {
         };
         let sk = secret_keys.remove(&id).unwrap();
         let fut = setup_client(
-            pool.clone(),
             replicas_config.len(),
             id,
             sk,
@@ -156,7 +146,7 @@ async fn client_async_main() {
             tx.send(client).await.unwrap();
         });
     }
-    drop((pool, secret_keys, public_keys, replicas_config));
+    drop((secret_keys, public_keys, replicas_config));
 
     let mut clients = Vec::with_capacity(clients_config.len());
     for _i in 0..clients_config.len() {
