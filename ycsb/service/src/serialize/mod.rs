@@ -7,6 +7,7 @@ use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{
     Header,
     ReplyMessage,
+    StoredMessage,
     SystemMessage,
     RequestMessage,
     ConsensusMessage,
@@ -218,11 +219,69 @@ impl SharedData for YcsbData {
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
 
                 let kind = match message_kind {
-                    messages_capnp::consensus::Which::PrePrepare(Ok(requests)) => {
-                        unimplemented!()
-                        //let digest = Digest::from_bytes(digest_reader)
-                        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                        //ConsensusMessageKind::PrePrepare(digest)
+                    messages_capnp::consensus::Which::PrePrepare(Ok(requests_reader)) => {
+                        let mut requests = Vec::new();
+
+                        for forwarded in requests_reader.iter() {
+                            let header = {
+                                let raw_header = forwarded
+                                    .get_header()
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request header")?;
+
+                                Header::deserialize_from(raw_header).unwrap()
+                            };
+                            let message = {
+                                let request = forwarded
+                                    .get_request()
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request message")?;
+
+                                let session_id: SeqNo = request.get_session_id().into();
+                                let operation_id: SeqNo = request.get_operation_id().into();
+
+                                let update = request
+                                    .get_update()
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update")?;
+
+                                let values_reader = update
+                                    .get_values()
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update values")?;
+
+                                let table = update
+                                    .get_table()
+                                    .map(String::from)
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update table")?;
+                                let key = update
+                                    .get_key()
+                                    .map(String::from)
+                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update key")?;
+                                let mut values = collections::hash_map();
+
+                                for value in values_reader.iter() {
+                                    let key = value
+                                        .get_key()
+                                        .map(String::from)
+                                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get values key")?;
+                                    let value = value
+                                        .get_value()
+                                        .map(Vec::from)
+                                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get values value")?;
+
+                                    values.insert(key, value);
+                                }
+
+                                let decoded_update = Update {
+                                    values,
+                                    table,
+                                    key,
+                                };
+
+                                RequestMessage::new(session_id, operation_id, decoded_update)
+                            };
+
+                            requests.push(StoredMessage::new(header, message));
+                        }
+
+                        ConsensusMessageKind::PrePrepare(requests)
                     },
                     messages_capnp::consensus::Which::Prepare(Ok(digest)) => {
                         let digest = Digest::from_bytes(digest)
