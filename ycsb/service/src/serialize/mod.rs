@@ -2,7 +2,6 @@ use std::default::Default;
 use std::io::{Read, Write};
 
 use febft::bft::error::*;
-use febft::bft::ordering::Orderable;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{
@@ -16,6 +15,10 @@ use febft::bft::communication::message::{
 use febft::bft::collections::{
     self,
     HashMap,
+};
+use febft::bft::ordering::{
+    SeqNo,
+    Orderable,
 };
 
 use crate::data::Update;
@@ -130,103 +133,106 @@ impl SharedData for YcsbData {
     where
         R: Read
     {
-        unimplemented!()
-        //let reader = capnp::serialize::read_message(r, Default::default())
-        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
-        //let sys_msg: messages_capnp::system::Reader = reader
-        //    .get_root()
-        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message root")?;
-        //let sys_msg_which = sys_msg
-        //    .which()
-        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message kind")?;
+        let reader = capnp::serialize::read_message(r, Default::default())
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
+        let sys_msg: messages_capnp::system::Reader = reader
+            .get_root()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message root")?;
+        let sys_msg_which = sys_msg
+            .which()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message kind")?;
 
-        //match sys_msg_which {
-        //    messages_capnp::system::Which::Reply(Ok(reply)) => {
-        //        let status = reply.get_status();
-        //        let digest_reader = reply
-        //            .get_digest()
-        //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
-        //        let digest = Digest::from_bytes(digest_reader)
-        //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+        match sys_msg_which {
+            messages_capnp::system::Which::Reply(Ok(reply)) => {
+                let status = reply.get_status();
+                let digest_reader = reply
+                    .get_digest()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
+                let digest = Digest::from_bytes(digest_reader)
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
 
-        //        Ok(SystemMessage::Reply(ReplyMessage::new(digest, status)))
-        //    },
-        //    messages_capnp::system::Which::Reply(_) => {
-        //        Err("Failed to read reply message")
-        //            .wrapped(ErrorKind::CommunicationSerialize)
-        //    },
-        //    messages_capnp::system::Which::Request(Ok(updates)) => {
-        //        let updates = updates
-        //            .get_requests()
-        //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get requests")?;
-        //        let mut decoded_update = Update { requests: Vec::new() };
+                Ok(SystemMessage::Reply(ReplyMessage::new(digest, status)))
+            },
+            messages_capnp::system::Which::Reply(_) => {
+                Err("Failed to read reply message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
+            },
+            messages_capnp::system::Which::Request(Ok(request)) => {
+                let session_id: SeqNo = request.get_session_id().into();
+                let operation_id: SeqNo = request.get_operation_id().into();
+                let update = request
+                    .get_update()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update")?;
 
-        //        for request in updates.iter() {
-        //            let values_reader = request
-        //                .get_values()
-        //                .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request values")?;
+                let values_reader = update
+                    .get_values()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update values")?;
 
-        //            let table = request
-        //                .get_table()
-        //                .map(String::from)
-        //                .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request table")?;
-        //            let key = request
-        //                .get_key()
-        //                .map(String::from)
-        //                .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request key")?;
-        //            let mut values = collections::hash_map();
+                let table = update
+                    .get_table()
+                    .map(String::from)
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update table")?;
+                let key = update
+                    .get_key()
+                    .map(String::from)
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get update key")?;
+                let mut values = collections::hash_map();
 
-        //            for value in values_reader.iter() {
-        //                let key = value
-        //                    .get_key()
-        //                    .map(String::from)
-        //                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request key")?;
-        //                let value = value
-        //                    .get_value()
-        //                    .map(Vec::from)
-        //                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request value")?;
+                for value in values_reader.iter() {
+                    let key = value
+                        .get_key()
+                        .map(String::from)
+                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get values key")?;
+                    let value = value
+                        .get_value()
+                        .map(Vec::from)
+                        .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get values value")?;
 
-        //                values.insert(key, value);
-        //            }
+                    values.insert(key, value);
+                }
 
-        //            decoded_update.requests.push(Request { table, key, values });
-        //        }
+                let decoded_update = Update {
+                    values,
+                    table,
+                    key,
+                };
 
-        //        Ok(SystemMessage::Request(RequestMessage::new(decoded_update)))
-        //    },
-        //    messages_capnp::system::Which::Request(_) => {
-        //        Err("Failed to read request message")
-        //            .wrapped(ErrorKind::CommunicationSerialize)
-        //    },
-        //    messages_capnp::system::Which::Consensus(Ok(consensus)) => {
-        //        let seq = consensus
-        //            .reborrow()
-        //            .get_seq_no();
-        //        let message_kind = consensus
-        //            .which()
-        //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
+                Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, decoded_update)))
+            },
+            messages_capnp::system::Which::Request(_) => {
+                Err("Failed to read request message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
+            },
+            messages_capnp::system::Which::Consensus(Ok(consensus)) => {
+                unimplemented!()
+                //let seq = consensus
+                //    .reborrow()
+                //    .get_seq_no();
+                //let message_kind = consensus
+                //    .which()
+                //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
 
-        //        let kind = match message_kind {
-        //            messages_capnp::consensus::Which::PrePrepare(Ok(digest_reader)) => {
-        //                let digest = Digest::from_bytes(digest_reader)
-        //                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-        //                ConsensusMessageKind::PrePrepare(digest)
-        //            },
-        //            messages_capnp::consensus::Which::PrePrepare(_) => {
-        //                return Err("Failed to read consensus message kind")
-        //                    .wrapped(ErrorKind::CommunicationSerialize);
-        //            },
-        //            messages_capnp::consensus::Which::Prepare(_) => ConsensusMessageKind::Prepare,
-        //            messages_capnp::consensus::Which::Commit(_) => ConsensusMessageKind::Commit,
-        //        };
+                //let kind = match message_kind {
+                //    messages_capnp::consensus::Which::PrePrepare(Ok(digest_reader)) => {
+                //        let digest = Digest::from_bytes(digest_reader)
+                //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                //        ConsensusMessageKind::PrePrepare(digest)
+                //    },
+                //    messages_capnp::consensus::Which::PrePrepare(_) => {
+                //        return Err("Failed to read consensus message kind")
+                //            .wrapped(ErrorKind::CommunicationSerialize);
+                //    },
+                //    messages_capnp::consensus::Which::Prepare(_) => ConsensusMessageKind::Prepare,
+                //    messages_capnp::consensus::Which::Commit(_) => ConsensusMessageKind::Commit,
+                //};
 
-        //        Ok(SystemMessage::Consensus(ConsensusMessage::new(seq.into(), kind)))
-        //    },
-        //    messages_capnp::system::Which::Consensus(_) => {
-        //        Err("Failed to read consensus message")
-        //            .wrapped(ErrorKind::CommunicationSerialize)
-        //    },
-        //}
+                //Ok(SystemMessage::Consensus(ConsensusMessage::new(seq.into(), kind)))
+            },
+            messages_capnp::system::Which::Consensus(_) => {
+                Err("Failed to read consensus message")
+                    .wrapped(ErrorKind::CommunicationSerialize)
+            },
+        }
     }
 }
 
