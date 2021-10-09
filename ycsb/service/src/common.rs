@@ -17,12 +17,7 @@ use febft::bft::error::*;
 use febft::bft::threadpool;
 use febft::bft::ordering::SeqNo;
 use febft::bft::collections::HashMap;
-use febft::bft::communication::message::{
-    Message,
-    SystemMessage,
-};
 use febft::bft::communication::{
-    Node,
     NodeId,
     NodeConfig,
 };
@@ -39,12 +34,8 @@ use febft::bft::core::server::{
     ReplicaConfig,
 };
 
-use crate::data::Update;
 use crate::exec::YcsbService;
-use crate::serialize::{
-    YcsbData,
-    YcsbDataState,
-};
+use crate::serialize:: YcsbData;
 
 #[macro_export]
 macro_rules! addr {
