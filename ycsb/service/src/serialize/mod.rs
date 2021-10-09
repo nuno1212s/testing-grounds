@@ -52,23 +52,24 @@ impl SharedData for YcsbData {
         let sys_msg: messages_capnp::system::Builder = root.init_root();
         match m {
             SystemMessage::Request(m) => {
-                unimplemented!()
-                //let update = sys_msg.init_request();
-                //let mut requests = update.init_requests(m.operation().requests.len() as u32);
-                //for i in 0..m.operation().requests.len() {
-                //    let r = &m.operation().requests[i];
-                //    let mut request = requests.reborrow().get(i as u32);
-                //    request.set_table(&r.table);
-                //    request.set_key(&r.key);
-                //    let mut values = request.init_values(r.values.len() as u32);
-                //    let mut i = 0;
-                //    for (k, v) in r.values.iter() {
-                //        let mut value = values.reborrow().get(i);
-                //        value.set_key(k);
-                //        value.set_value(v);
-                //        i += 1;
-                //    }
-                //}
+                let mut request = sys_msg.init_request();
+
+                request.set_operation_id(m.sequence_number().into());
+                request.set_session_id(m.session_id().into());
+
+                let u = m.operation();
+                let mut update = request.init_update();
+
+                update.set_table(&u.table);
+                update.set_key(&u.key);
+
+                let mut values = update.init_values(u.values.len() as u32);
+
+                for (i, (k, v)) in u.values.iter().enumerate() {
+                    let mut value = values.reborrow().get(i as u32);
+                    value.set_key(k);
+                    value.set_value(v);
+                }
             },
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
