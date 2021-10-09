@@ -11,10 +11,16 @@ struct Message {
 
 struct System {
     union {
-        request   @0 :Update;
+        request   @0 :Request;
         reply     @1 :Reply;
         consensus @2 :Consensus;
     }
+}
+
+struct Request {
+    sessionId   @0 :UInt32;
+    operationId @1 :UInt32;
+    update      @2 :Update;
 }
 
 struct Update {

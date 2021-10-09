@@ -47,45 +47,46 @@ impl SharedData for YcsbData {
     where
         W: Write
     {
-        unimplemented!()
-        //let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
-        //let sys_msg: messages_capnp::system::Builder = root.init_root();
-        //match m {
-        //    SystemMessage::Request(m) => {
-        //        let update = sys_msg.init_request();
-        //        let mut requests = update.init_requests(m.operation().requests.len() as u32);
-        //        for i in 0..m.operation().requests.len() {
-        //            let r = &m.operation().requests[i];
-        //            let mut request = requests.reborrow().get(i as u32);
-        //            request.set_table(&r.table);
-        //            request.set_key(&r.key);
-        //            let mut values = request.init_values(r.values.len() as u32);
-        //            let mut i = 0;
-        //            for (k, v) in r.values.iter() {
-        //                let mut value = values.reborrow().get(i);
-        //                value.set_key(k);
-        //                value.set_value(v);
-        //                i += 1;
-        //            }
-        //        }
-        //    },
-        //    SystemMessage::Reply(m) => {
-        //        let mut reply = sys_msg.init_reply();
-        //        reply.set_status(*m.payload());
-        //        reply.set_digest(m.digest().as_ref());
-        //    },
-        //    SystemMessage::Consensus(m) => {
-        //        let mut consensus = sys_msg.init_consensus();
-        //        consensus.set_seq_no(m.sequence_number().into());
-        //        match m.kind() {
-        //            ConsensusMessageKind::PrePrepare(digest) => consensus.set_pre_prepare(digest.as_ref()),
-        //            ConsensusMessageKind::Prepare => consensus.set_prepare(()),
-        //            ConsensusMessageKind::Commit => consensus.set_commit(()),
-        //        }
-        //    },
-        //}
-        //capnp::serialize::write_message(w, &root)
-        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
+        let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
+        let sys_msg: messages_capnp::system::Builder = root.init_root();
+        match m {
+            SystemMessage::Request(m) => {
+                unimplemented!()
+                //let update = sys_msg.init_request();
+                //let mut requests = update.init_requests(m.operation().requests.len() as u32);
+                //for i in 0..m.operation().requests.len() {
+                //    let r = &m.operation().requests[i];
+                //    let mut request = requests.reborrow().get(i as u32);
+                //    request.set_table(&r.table);
+                //    request.set_key(&r.key);
+                //    let mut values = request.init_values(r.values.len() as u32);
+                //    let mut i = 0;
+                //    for (k, v) in r.values.iter() {
+                //        let mut value = values.reborrow().get(i);
+                //        value.set_key(k);
+                //        value.set_value(v);
+                //        i += 1;
+                //    }
+                //}
+            },
+            SystemMessage::Reply(m) => {
+                let mut reply = sys_msg.init_reply();
+                reply.set_status(*m.payload());
+                reply.set_digest(m.digest().as_ref());
+            },
+            SystemMessage::Consensus(m) => {
+                //let mut consensus = sys_msg.init_consensus();
+                //consensus.set_seq_no(m.sequence_number().into());
+                //match m.kind() {
+                //    ConsensusMessageKind::PrePrepare(digest) => consensus.set_pre_prepare(digest.as_ref()),
+                //    ConsensusMessageKind::Prepare => consensus.set_prepare(()),
+                //    ConsensusMessageKind::Commit => consensus.set_commit(()),
+                //}
+            },
+            _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
+        }
+        capnp::serialize::write_message(w, &root)
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
     fn deserialize_message<R>(r: R) -> Result<SystemMessage<YcsbDataState, Update, u32>>
