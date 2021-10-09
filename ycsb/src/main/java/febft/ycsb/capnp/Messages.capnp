@@ -36,10 +36,11 @@ struct Reply {
 
 struct Consensus {
     seqNo @0 :UInt32;
+    view  @1 :UInt32;
     union {
-        prePrepare @1 :List(ForwardedRequest);
-        prepare    @2 :Data;
-        commit     @3 :Data;
+        prePrepare @2 :List(ForwardedRequest);
+        prepare    @3 :Data;
+        commit     @4 :Data;
     }
 }
 

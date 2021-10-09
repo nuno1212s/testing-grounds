@@ -489,7 +489,7 @@ public final class Messages {
 
 
   public static class Consensus {
-    public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)1,(short)1);
+    public static final org.capnproto.StructSize STRUCT_SIZE = new org.capnproto.StructSize((short)2,(short)1);
     public static final class Factory extends org.capnproto.StructFactory<Builder, Reader> {
       public Factory() {
       }
@@ -514,7 +514,7 @@ public final class Messages {
         super(segment, data, pointers, dataSize, pointerCount);
       }
       public Which which() {
-        switch(_getShortField(2)) {
+        switch(_getShortField(4)) {
           case 0 : return Which.PRE_PREPARE;
           case 1 : return Which.PREPARE;
           case 2 : return Which.COMMIT;
@@ -531,6 +531,13 @@ public final class Messages {
         _setIntField(0, value);
       }
 
+      public final int getView() {
+        return _getIntField(1);
+      }
+      public final void setView(int value) {
+        _setIntField(1, value);
+      }
+
       public final boolean isPrePrepare() {
         return which() == Consensus.Which.PRE_PREPARE;
       }
@@ -541,11 +548,11 @@ public final class Messages {
         return _getPointerField(febft.ycsb.capnp.Messages.ForwardedRequest.listFactory, 0, null, 0);
       }
       public final void setPrePrepare(org.capnproto.StructList.Reader<febft.ycsb.capnp.Messages.ForwardedRequest.Reader> value) {
-        _setShortField(2, (short)Consensus.Which.PRE_PREPARE.ordinal());
+        _setShortField(4, (short)Consensus.Which.PRE_PREPARE.ordinal());
         _setPointerField(febft.ycsb.capnp.Messages.ForwardedRequest.listFactory, 0, value);
       }
       public final org.capnproto.StructList.Builder<febft.ycsb.capnp.Messages.ForwardedRequest.Builder> initPrePrepare(int size) {
-        _setShortField(2, (short)Consensus.Which.PRE_PREPARE.ordinal());
+        _setShortField(4, (short)Consensus.Which.PRE_PREPARE.ordinal());
         return _initPointerField(febft.ycsb.capnp.Messages.ForwardedRequest.listFactory, 0, size);
       }
       public final boolean isPrepare() {
@@ -559,15 +566,15 @@ public final class Messages {
         return _getPointerField(org.capnproto.Data.factory, 0, null, 0, 0);
       }
       public final void setPrepare(org.capnproto.Data.Reader value) {
-        _setShortField(2, (short)Consensus.Which.PREPARE.ordinal());
+        _setShortField(4, (short)Consensus.Which.PREPARE.ordinal());
         _setPointerField(org.capnproto.Data.factory, 0, value);
       }
       public final void setPrepare(byte [] value) {
-        _setShortField(2, (short)Consensus.Which.PREPARE.ordinal());
+        _setShortField(4, (short)Consensus.Which.PREPARE.ordinal());
         _setPointerField(org.capnproto.Data.factory, 0, new org.capnproto.Data.Reader(value));
       }
       public final org.capnproto.Data.Builder initPrepare(int size) {
-        _setShortField(2, (short)Consensus.Which.PREPARE.ordinal());
+        _setShortField(4, (short)Consensus.Which.PREPARE.ordinal());
         return _initPointerField(org.capnproto.Data.factory, 0, size);
       }
       public final boolean isCommit() {
@@ -581,15 +588,15 @@ public final class Messages {
         return _getPointerField(org.capnproto.Data.factory, 0, null, 0, 0);
       }
       public final void setCommit(org.capnproto.Data.Reader value) {
-        _setShortField(2, (short)Consensus.Which.COMMIT.ordinal());
+        _setShortField(4, (short)Consensus.Which.COMMIT.ordinal());
         _setPointerField(org.capnproto.Data.factory, 0, value);
       }
       public final void setCommit(byte [] value) {
-        _setShortField(2, (short)Consensus.Which.COMMIT.ordinal());
+        _setShortField(4, (short)Consensus.Which.COMMIT.ordinal());
         _setPointerField(org.capnproto.Data.factory, 0, new org.capnproto.Data.Reader(value));
       }
       public final org.capnproto.Data.Builder initCommit(int size) {
-        _setShortField(2, (short)Consensus.Which.COMMIT.ordinal());
+        _setShortField(4, (short)Consensus.Which.COMMIT.ordinal());
         return _initPointerField(org.capnproto.Data.factory, 0, size);
       }
     }
@@ -600,7 +607,7 @@ public final class Messages {
       }
 
       public Which which() {
-        switch(_getShortField(2)) {
+        switch(_getShortField(4)) {
           case 0 : return Which.PRE_PREPARE;
           case 1 : return Which.PREPARE;
           case 2 : return Which.COMMIT;
@@ -609,6 +616,10 @@ public final class Messages {
       }
       public final int getSeqNo() {
         return _getIntField(0);
+      }
+
+      public final int getView() {
+        return _getIntField(1);
       }
 
       public final boolean isPrePrepare() {
@@ -1055,14 +1066,14 @@ public static final org.capnproto.SegmentReader b_d3cdbcd116a9c97d =
    org.capnproto.GeneratedClassSupport.decodeRawBytes(
    "\u0000\u0000\u0000\u0000\u0005\u0000\u0006\u0000" +
    "\u007d\u00c9\u00a9\u0016\u00d1\u00bc\u00cd\u00d3" +
-   "\u002e\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
+   "\u002e\u0000\u0000\u0000\u0001\u0000\u0002\u0000" +
    "\u0005\u00e8\u0059\u00c3\u00f6\u003d\u00a4\u0094" +
    "\u0001\u0000\u0007\u0000\u0000\u0000\u0003\u0000" +
-   "\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0015\u0000\u0000\u0000\u00c2\u0001\u0000\u0000" +
    "\u002d\u0000\u0000\u0000\u0007\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0029\u0000\u0000\u0000\u00e7\u0000\u0000\u0000" +
+   "\u0029\u0000\u0000\u0000\u001f\u0001\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0073\u0072\u0063\u002f\u006d\u0061\u0069\u006e" +
@@ -1073,36 +1084,51 @@ public static final org.capnproto.SegmentReader b_d3cdbcd116a9c97d =
    "\u0063\u0061\u0070\u006e\u0070\u003a\u0043\u006f" +
    "\u006e\u0073\u0065\u006e\u0073\u0075\u0073\u0000" +
    "\u0000\u0000\u0000\u0000\u0001\u0000\u0001\u0000" +
-   "\u0010\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
+   "\u0014\u0000\u0000\u0000\u0003\u0000\u0004\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0061\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\\\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0068\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0001\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0065\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0064\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
-   "\u0080\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0002\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
-   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u007d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u007d\u0000\u0000\u0000\u0032\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0078\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0084\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
-   "\u0003\u0000\u00fd\u00ff\u0000\u0000\u0000\u0000" +
-   "\u0000\u0000\u0001\u0000\u0003\u0000\u0000\u0000" +
+   "\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0001\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
-   "\u0081\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
+   "\u0081\u0000\u0000\u0000\u002a\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u007c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
    "\u0088\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0002\u0000\u00ff\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0002\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0085\u0000\u0000\u0000\u005a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0084\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u00a0\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0003\u0000\u00fe\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0003\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u009d\u0000\u0000\u0000\u0042\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0098\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u00a4\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
+   "\u0004\u0000\u00fd\u00ff\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0001\u0000\u0004\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u00a1\u0000\u0000\u0000\u003a\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u009c\u0000\u0000\u0000\u0003\u0000\u0001\u0000" +
+   "\u00a8\u0000\u0000\u0000\u0002\u0000\u0001\u0000" +
    "\u0073\u0065\u0071\u004e\u006f\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
+   "\u0076\u0069\u0065\u0077\u0000\u0000\u0000\u0000" +
    "\u0008\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
    "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000" +
