@@ -76,36 +76,48 @@ impl SharedData for YcsbData {
                 reply.set_digest(m.digest().as_ref());
             },
             SystemMessage::Consensus(m) => {
-                unimplemented!()
-                //let mut consensus = sys_msg.init_consensus();
-                //consensus.set_seq_no(m.sequence_number().into());
-                //match m.kind() {
-                //    ConsensusMessageKind::PrePrepare(requests) => {
-                //        let mut pre_prepare_requests = consensus.init_pre_prepare(requests.len() as u32);
-                //        let iterator = requests
-                //            .iter()
-                //            .enumerate()
-                //            .map(|(i, m)| (i as u32, m));
+                let mut consensus = sys_msg.init_consensus();
+                consensus.set_seq_no(m.sequence_number().into());
+                match m.kind() {
+                    ConsensusMessageKind::PrePrepare(requests) => {
+                        let mut header = [0; Header::LENGTH];
+                        let mut pre_prepare_requests = consensus.init_pre_prepare(requests.len() as u32);
 
-                //        for (i, stored) in iterator {
-                //            let mut message = pre_prepare_requests.reborrow().get(i);
-                //            
-                //            // set header
-                //            {
-                //                let mut header = [0; Header::LENGTH];
-                //                stored.header().serialize_into(&mut header[..]).unwrap();
-                //                message.set_header(&header[..]);
-                //            }
+                        for (i, stored) in requests.iter().enumerate() {
+                            let mut forwarded = pre_prepare_requests.reborrow().get(i as u32);
 
-                //            // set message
-                //            {
-                //                let mut system = message.init_message();
-                //            }
-                //        }
-                //    },
-                //    ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
-                //    ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
-                //}
+                            // set header
+                            {
+                                stored.header().serialize_into(&mut header[..]).unwrap();
+                                forwarded.set_header(&header[..]);
+                            }
+
+                            // set request
+                            {
+                                let mut request = forwarded.init_request();
+
+                                request.set_operation_id(stored.message().sequence_number().into());
+                                request.set_session_id(stored.message().session_id().into());
+
+                                let u = stored.message().operation();
+                                let mut update = request.init_update();
+
+                                update.set_table(&u.table);
+                                update.set_key(&u.key);
+
+                                let mut values = update.init_values(u.values.len() as u32);
+
+                                for (i, (k, v)) in u.values.iter().enumerate() {
+                                    let mut value = values.reborrow().get(i as u32);
+                                    value.set_key(k);
+                                    value.set_value(v);
+                                }
+                            }
+                        }
+                    },
+                    ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
+                    ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
+                }
             },
             _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
         }
