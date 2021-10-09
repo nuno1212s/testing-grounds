@@ -6,6 +6,7 @@ use febft::bft::ordering::Orderable;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{
+    Header,
     ReplyMessage,
     SystemMessage,
     RequestMessage,
@@ -75,12 +76,35 @@ impl SharedData for YcsbData {
                 reply.set_digest(m.digest().as_ref());
             },
             SystemMessage::Consensus(m) => {
+                unimplemented!()
                 //let mut consensus = sys_msg.init_consensus();
                 //consensus.set_seq_no(m.sequence_number().into());
                 //match m.kind() {
-                //    ConsensusMessageKind::PrePrepare(digest) => consensus.set_pre_prepare(digest.as_ref()),
-                //    ConsensusMessageKind::Prepare => consensus.set_prepare(()),
-                //    ConsensusMessageKind::Commit => consensus.set_commit(()),
+                //    ConsensusMessageKind::PrePrepare(requests) => {
+                //        let mut pre_prepare_requests = consensus.init_pre_prepare(requests.len() as u32);
+                //        let iterator = requests
+                //            .iter()
+                //            .enumerate()
+                //            .map(|(i, m)| (i as u32, m));
+
+                //        for (i, stored) in iterator {
+                //            let mut message = pre_prepare_requests.reborrow().get(i);
+                //            
+                //            // set header
+                //            {
+                //                let mut header = [0; Header::LENGTH];
+                //                stored.header().serialize_into(&mut header[..]).unwrap();
+                //                message.set_header(&header[..]);
+                //            }
+
+                //            // set message
+                //            {
+                //                let mut system = message.init_message();
+                //            }
+                //        }
+                //    },
+                //    ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
+                //    ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
                 //}
             },
             _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
