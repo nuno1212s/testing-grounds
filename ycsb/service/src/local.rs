@@ -8,7 +8,6 @@ use std::sync::atomic::{Ordering, AtomicI32};
 
 use futures_timer::Delay;
 
-use febft::bft::threadpool;
 use febft::bft::communication::channel;
 use febft::bft::core::client::Client;
 use febft::bft::communication::NodeId;

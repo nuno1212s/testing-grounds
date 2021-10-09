@@ -1,6 +1,5 @@
 use crate::common::*;
 
-use febft::bft::threadpool;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
 use febft::bft::{

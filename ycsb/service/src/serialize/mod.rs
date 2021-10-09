@@ -82,6 +82,7 @@ impl SharedData for YcsbData {
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
                 consensus.set_seq_no(m.sequence_number().into());
+                consensus.set_view(m.view().into());
                 match m.kind() {
                     ConsensusMessageKind::PrePrepare(requests) => {
                         let mut header = [0; Header::LENGTH];
@@ -204,29 +205,39 @@ impl SharedData for YcsbData {
                     .wrapped(ErrorKind::CommunicationSerialize)
             },
             messages_capnp::system::Which::Consensus(Ok(consensus)) => {
-                unimplemented!()
-                //let seq = consensus
-                //    .reborrow()
-                //    .get_seq_no();
-                //let message_kind = consensus
-                //    .which()
-                //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
+                let seq: SeqNo = consensus
+                    .reborrow()
+                    .get_seq_no()
+                    .into();
+                let view: SeqNo = consensus
+                    .reborrow()
+                    .get_view()
+                    .into();
+                let message_kind = consensus
+                    .which()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
 
-                //let kind = match message_kind {
-                //    messages_capnp::consensus::Which::PrePrepare(Ok(digest_reader)) => {
-                //        let digest = Digest::from_bytes(digest_reader)
-                //            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                //        ConsensusMessageKind::PrePrepare(digest)
-                //    },
-                //    messages_capnp::consensus::Which::PrePrepare(_) => {
-                //        return Err("Failed to read consensus message kind")
-                //            .wrapped(ErrorKind::CommunicationSerialize);
-                //    },
-                //    messages_capnp::consensus::Which::Prepare(_) => ConsensusMessageKind::Prepare,
-                //    messages_capnp::consensus::Which::Commit(_) => ConsensusMessageKind::Commit,
-                //};
+                let kind = match message_kind {
+                    messages_capnp::consensus::Which::PrePrepare(Ok(requests)) => {
+                        unimplemented!()
+                        //let digest = Digest::from_bytes(digest_reader)
+                        //    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                        //ConsensusMessageKind::PrePrepare(digest)
+                    },
+                    messages_capnp::consensus::Which::Prepare(Ok(digest)) => {
+                        let digest = Digest::from_bytes(digest)
+                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                        ConsensusMessageKind::Prepare(digest)
+                    },
+                    messages_capnp::consensus::Which::Commit(Ok(digest)) => {
+                        let digest = Digest::from_bytes(digest)
+                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                        ConsensusMessageKind::Commit(digest)
+                    },
+                    _ => return Err("Failed to read consensus message kind").wrapped(ErrorKind::CommunicationSerialize),
+                };
 
-                //Ok(SystemMessage::Consensus(ConsensusMessage::new(seq.into(), kind)))
+                Ok(SystemMessage::Consensus(ConsensusMessage::new(seq, view, kind)))
             },
             messages_capnp::system::Which::Consensus(_) => {
                 Err("Failed to read consensus message")
