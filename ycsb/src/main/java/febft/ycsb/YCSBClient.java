@@ -53,6 +53,7 @@ public class YCSBClient extends DB {
         } catch (IOException e) {
             node.printf("Exception: %s\n", e);
             System.exit(1);
+            return Status.ERROR;
         }
     }
 

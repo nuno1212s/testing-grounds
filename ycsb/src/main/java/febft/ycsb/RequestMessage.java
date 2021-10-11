@@ -19,10 +19,14 @@ import org.capnproto.StructList;
 import org.capnproto.MessageBuilder;
 
 public class RequestMessage extends SystemMessage {
-    private Update[] updates;
+    private int sessionId;
+    private int operationId;
+    private Update update;
 
-    public RequestMessage(Update... updates) {
-        this.updates = updates;
+    public RequestMessage(int sessionId, int operationId, Update update) {
+        this.sessionId = sessionId;
+        this.operationId = operationId;
+        this.update = update;
     }
 
     @Override
@@ -34,28 +38,27 @@ public class RequestMessage extends SystemMessage {
     public ByteBuffer serialize() {
         MessageBuilder message = new MessageBuilder();
         System.Builder systemMessage = message.initRoot(System.factory);
-        Messages.Update.Builder updateRequest = systemMessage.initRequest();
-        StructList.Builder<Request.Builder> updateReqs = updateRequest.initRequests(updates.length);
 
-        for (int k = 0; k < updates.length; k++) {
-            Request.Builder request = updateReqs.get(k);
+        Request.Builder request = systemMessage.initRequest();
+        request.setOperationId(operationId);
+        request.setSessionId(sessionId);
 
-            request.setTable(updates[k].getTable());
-            request.setKey(updates[k].getKey());
+        Messages.Update.Builder updateRequest = request.initUpdate();
+        updateRequest.setTable(update.getTable());
+        updateRequest.setKey(update.getKey());
 
-            int i = 0;
-            Map<String, ByteIterator> values = updates[k].getValues();
-            StructList.Builder<Value.Builder> reqVals = request.initValues(values.size());
+        int i = 0;
+        Map<String, ByteIterator> values = update.getValues();
+        StructList.Builder<Value.Builder> updateVals = updateRequest.initValues(values.size());
 
-            for (Map.Entry<String, ByteIterator> pair : values.entrySet()) {
-                Value.Builder entry = reqVals.get(i);
-                long n = pair.getValue().bytesLeft();
+        for (Map.Entry<String, ByteIterator> pair : values.entrySet()) {
+            Value.Builder entry = updateVals.get(i);
+            long n = pair.getValue().bytesLeft();
 
-                entry.setKey(pair.getKey());
-                entry.setValue(new byte[(int)(n < 0 ? -n : n)]);
+            entry.setKey(pair.getKey());
+            entry.setValue(new byte[(int)(n < 0 ? -n : n)]);
 
-                ++i;
-            }
+            ++i;
         }
 
         ByteBuffer output = ByteBuffer.allocate(20 * 1024 * 1024);
@@ -69,7 +72,7 @@ public class RequestMessage extends SystemMessage {
 
         table.putInt(0, segments.length - 1);
 
-        for (int i = 0; i < segments.length; ++i) {
+        for (i = 0; i < segments.length; ++i) {
             table.putInt(4 * (i + 1), segments[i].limit() / 8);
         }
 

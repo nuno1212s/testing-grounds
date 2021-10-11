@@ -54,9 +54,12 @@ public class Node {
     private Map<Integer, Lock> readLocks;
     private Map<Integer, Lock> writeLocks;
 
+    private int operationId;
+
     public Node() {
         config = Config.getClients().get(new Integer(IdCounter.nextId()));
         rng = new Random();
+        operationId = 0;
     }
 
     public void close() {
@@ -145,7 +148,7 @@ public class Node {
             final Lock readLock = readLocks.get(nodeId);
             final Lock writeLock = writeLocks.get(nodeId);
             callables.add(() -> {
-                ByteBuffer requestBuf = (new RequestMessage(update)).serialize();
+                ByteBuffer requestBuf = (new RequestMessage(0, operationId, update)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
                 printf("Serialized request (len=%d)\n", requestBuf.position());
 
@@ -188,6 +191,7 @@ public class Node {
             });
             printf("Added callable to node %d\n", i);
         }
+        operationId += 1;
         return Pool.call(callables);
     }
 
