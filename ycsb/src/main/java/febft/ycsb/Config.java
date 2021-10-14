@@ -9,10 +9,8 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.File;
 
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.SSLServerSocketFactory;
-
-import nl.altindag.ssl.SSLFactory;
+import javax.net.SocketFactory;
+import javax.net.ServerSocketFactory;
 
 public class Config {
     private static final String CLI_PREFIX = "cli";
@@ -27,37 +25,12 @@ public class Config {
     private static final String BATCH_SIZE_PATH = "config/batch.config";
     private static int BATCH_SIZE = 0;
 
-    public static SSLSocketFactory getSslSocketFactory(int id) {
-        SSLFactory sslFactory = initSslFactory(id);
-        return sslFactory.getSslSocketFactory();
+    public static SocketFactory getSslSocketFactory(int id) {
+        return SocketFactory.getDefault();
     }
 
-    public static SSLServerSocketFactory getSslServerSocketFactory(int id) {
-        SSLFactory sslFactory = initSslFactory(id);
-        return sslFactory.getSslServerSocketFactory();
-    }
-
-    private static SSLFactory initSslFactory(int id) {
-        final char[] password = "123456".toCharArray();
-        SSLFactory.Builder sslFactoryBuilder = null;
-
-        try (FileInputStream file = new FileInputStream(CA_ROOT_PATH + "/truststore.jks")) {
-            sslFactoryBuilder = SSLFactory.builder()
-                .withTrustMaterial(file, password, "jks");
-
-            final String path = String.format("%s/%s%d.pfx", CA_ROOT_PATH, CLI_PREFIX, id);
-
-            try (FileInputStream file2 = new FileInputStream(path)) {
-                sslFactoryBuilder = sslFactoryBuilder
-                    .withIdentityMaterial(file2, password);
-            } catch (SecurityException | IOException e) {
-                throw new RuntimeException(e);
-            }
-        } catch (SecurityException | IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        return sslFactoryBuilder.build();
+    public static ServerSocketFactory getSslServerSocketFactory(int id) {
+        return ServerSocketFactory.getDefault();
     }
 
     public synchronized static int getBatchSize() {

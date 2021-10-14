@@ -18,11 +18,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLParameters;
-import javax.net.ssl.SNIServerName;
-import javax.net.ssl.SNIHostName;
+import java.net.Socket;
+import java.net.ServerSocket;
 
 import site.ycsb.Status;
 import site.ycsb.ByteIterator;
@@ -46,7 +43,7 @@ public class Node {
 
     private Entry config;
     private int noReplicas;
-    private SSLServerSocket listener = null;
+    private ServerSocket listener = null;
     private Random rng;
 
     private Map<Integer, OutputStream> tx;
@@ -122,7 +119,7 @@ public class Node {
         // accept conns from replicas
         for (int i = 0; i < noReplicas; i++) {
             printf("Accepting connection no. %d\n", i);
-            SSLSocket socket = (SSLSocket)listener.accept();
+            Socket socket = listener.accept();
             DataInputStream reader = new DataInputStream(socket.getInputStream());
             println("Accepted, reading header");
 
@@ -222,32 +219,12 @@ public class Node {
     
     
     private static OutputStream connect(int id, String sni, String host, int port) throws IOException {
-        SSLSocket socket = (SSLSocket)
-            Config.getSslSocketFactory(id).createSocket(host, port);
-
-        SSLParameters params = socket.getSSLParameters();
-        List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));
-
-        params.setProtocols(PROTOCOLS);
-        params.setCipherSuites(CIPHER_SUITES);
-        params.setServerNames(serverNames);
-
-        socket.setSSLParameters(params);
+        Socket socket = Config.getSslSocketFactory(id).createSocket(host, port);
         return socket.getOutputStream();
     }
     
-    private static SSLServerSocket listen(int id, String sni, int port) throws IOException {
-        SSLServerSocket socket = (SSLServerSocket)
-            Config.getSslServerSocketFactory(id).createServerSocket(port);
-
-        SSLParameters params = socket.getSSLParameters();
-        List<SNIServerName> serverNames = Arrays.asList(new SNIHostName(sni));
-
-        params.setProtocols(PROTOCOLS);
-        params.setCipherSuites(CIPHER_SUITES);
-        params.setServerNames(serverNames);
-
-        socket.setSSLParameters(params);
+    private static ServerSocket listen(int id, String sni, int port) throws IOException {
+        ServerSocket socket = Config.getSslServerSocketFactory(id).createServerSocket(port);
         return socket;
     }
 }
