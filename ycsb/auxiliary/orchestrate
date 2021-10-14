@@ -119,7 +119,7 @@ for no_replicas in $(echo $REPLICAS); do
 
                     log Starting replica id=$i 'in' $cop "($ip)"
                     ssh $cop \
-                        "cd tg/ycsb/service; env ID=$i ./target/release/service" \
+                        "cd tg/ycsb/service; sudo env ID=$i ./run" \
                         >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
                     if [ $? -ne 0 ]; then
                         log Error: "Couldn't start replica $i in $cop"
