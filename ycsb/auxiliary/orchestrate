@@ -58,7 +58,7 @@ done
 for i in `seq 1 4`; do
     cop=cop0${i}
     log Killing all replicas 'in' $cop
-    ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+    ssh tcarvalho@$cop "pkill -f service" >/dev/null 2>/dev/null &
 done
 smallcooldown
 
@@ -66,7 +66,7 @@ smallcooldown
 log Building Rust YCSB service
 for i in `seq 1 4`; do
     cop=cop0${i}
-    ssh $cop '. .cargo/env; cd tg; git pull; cd ycsb/service; env RUSTFLAGS="-C target-cpu=native" cargo build --release'
+    ssh tcarvalho@$cop '. .cargo/env; cd tg; git pull; cd ycsb/service; env RUSTFLAGS="-C target-cpu=native" cargo build --release'
     if [ $? -ne 0 ]; then
         log Error: "Couldn't update service in $cop"
         exit 1
@@ -109,7 +109,7 @@ for no_replicas in $(echo $REPLICAS); do
                 for i in `seq 1 4`; do
                     cop=cop0${i}
                     log Generating configs 'for' $cop
-                    ssh $cop \
+                    ssh tcarvalho@$cop \
                         "cd tg/ycsb; mkdir -p config; cp auxiliary/generate config; cd config; ./generate $no_clients $no_replicas $batch_size"
                     if [ $? -ne 0 ]; then
                         log Error: "Couldn't generatte configs for $cop"
@@ -124,7 +124,7 @@ for no_replicas in $(echo $REPLICAS); do
                     ip=192.168.70.$(expr 16 + $ippart)
 
                     log Starting replica id=$i 'in' $cop "($ip)"
-                    ssh $cop \
+                    ssh tcarvalho@$cop \
                         "cd tg/ycsb/service; sudo env ID=$i ./run" \
                         >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
                     if [ $? -ne 0 ]; then
@@ -151,7 +151,7 @@ for no_replicas in $(echo $REPLICAS); do
                     for i in `seq 1 4`; do
                         cop=cop0${i}
                         log Killing all replicas 'in' $cop
-                        ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+                        ssh tcarvalho@$cop "pkill -f service" >/dev/null 2>/dev/null &
                     done
                     bigcooldown
                     date +%s > $end
@@ -163,7 +163,7 @@ for no_replicas in $(echo $REPLICAS); do
                 for i in `seq 1 4`; do
                     cop=cop0${i}
                     log Killing all replicas 'in' $cop
-                    ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+                    ssh tcarvalho@$cop "pkill -f service" >/dev/null 2>/dev/null &
                 done
                 bigcooldown
 
