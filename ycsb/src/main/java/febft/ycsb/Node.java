@@ -147,7 +147,7 @@ public class Node {
             callables.add(() -> {
                 ByteBuffer requestBuf = (new RequestMessage(0, operationId, update)).serialize();
                 ByteBuffer headerBuf = ByteBuffer.allocate(Header.LENGTH).order(LITTLE_ENDIAN);
-                printf("Serialized request (len=%d)\n", requestBuf.position());
+                //printf("Serialized request (len=%d)\n", requestBuf.position());
 
                 Header header = new Header(
                     config.getId(),
@@ -164,20 +164,20 @@ public class Node {
                 output.write(requestBuf.array(), 0, requestBuf.position());
                 output.flush();
                 writeLock.unlock();
-                printf("Sent header and request pair over the wire: %s\n", header);
+                //printf("Sent header and request pair over the wire: %s\n", header);
 
                 headerBuf.clear();
                 readLock.lock();
                 input.readFully(headerBuf.array(), 0, Header.LENGTH);
                 headerBuf.limit(Header.LENGTH);
                 header = Header.deserializeFrom(headerBuf);
-                printf("Read and deserialized header from the wire: from %d\n", header.getFrom());
+                //printf("Read and deserialized header from the wire: from %d\n", header.getFrom());
 
                 ByteBuffer payloadBuf = ByteBuffer.allocate((int)header.getLength());
                 input.readFully(payloadBuf.array(), 0, (int)header.getLength());
                 readLock.unlock();
                 ReplyMessage reply = (ReplyMessage)SystemMessage.deserializeAs(ReplyMessage.class, payloadBuf);
-                println("Read and deserialized payload from the wire");
+                //println("Read and deserialized payload from the wire");
 
                 if (reply == null) {
                     return Status.ERROR;
@@ -186,7 +186,7 @@ public class Node {
 
                 return reply.getStatus();
             });
-            printf("Added callable to node %d\n", i);
+            //printf("Added callable to node %d\n", i);
         }
         operationId += 1;
         return Pool.call(callables);
