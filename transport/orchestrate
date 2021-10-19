@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# avoid accidentally terminating benchmarks
+trap '' INT
+
+log() {
+    echo $(date): $@ >&2
+}
+
+smallcooldown() {
+    log Waiting 'for' 5 seconds
+    sleep 5
+}
+
+bigcooldown() {
+    log Waiting 'for' 1 minute
+    sleep 60
+}
+
+# config
+DATA_SIZES="8 32 128 512 1024"
+BACKENDS="tcp:sync tcp:tokio tcp:async_std"
+RESULTS=results
+
+################################################################################
+
+# update cwd
+cd "$(dirname $0)"
+
+# ask to continue
+echo "Run tests? This will purge any old results!"
+while true; do
+    read -p "(y/n)?" yn
+    case $yn in
+        [Yy]*)
+            break
+            ;;
+        [Nn]*)
+            exit 0
+            ;;
+        *)
+            echo "Please answer (y)es or (n)o."
+            ;;
+    esac
+done
+
+log Beginning tests
+rm -rf $RESULTS # purge old results
+mkdir -p $RESULTS
+
+for s in `echo $DATA_SIZES`; do
+    log Building executable for $s
+    ./run update $s
+    bigcooldown
+
+    log Testing size $s
+
+    for b in `echo $BACKENDS`; do
+        log Testing backend $b
+
+        for i in `seq 0 2`; do
+            log Init of run no. $i
+
+            targetdir="${RESULTS}/b=${b}/s=${s}/r=${i}"
+            start=${targetdir}/start
+            end=${targetdir}/end
+            throughput=${targetdir}/throughput
+
+            mkdir -p $targetdir
+
+            date +%s > $start
+            ./run 2 $s $b > $throughput
+            date +%s > $end
+
+            bigcooldown
+        done
+
+        log Done testing backend $b
+    done
+
+    log Done testing size $s
+done
+
+log All tests finished

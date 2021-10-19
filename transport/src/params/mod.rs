@@ -1,9 +1,17 @@
 use std::time::Duration;
+use konst::{
+    primitive::parse_usize,
+    unwrap_ctx,
+};
 
-pub const SECS: u64 = 5;
+// 2 minutes per test case
+pub const SECS: u64 = 2 * 60;
 pub const TIME: Duration = Duration::from_secs(SECS);
 
-pub const BUFSIZ: usize = 4096;
+pub const BUFSIZ: usize = {
+    let result = parse_usize(env!("BUFSIZ"));
+    unwrap_ctx!(result)
+};
 pub const LADDR: &str = "0.0.0.0:50001";
 pub const N1: &str = "192.168.70.16:50001";
 pub const N2: &str = "192.168.70.17:50001";

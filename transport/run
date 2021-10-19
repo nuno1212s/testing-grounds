@@ -9,7 +9,8 @@ N3=34018
 N4=34019
 
 TEST_CASE=$1
-BACKEND=$2
+DATA_SIZE=$2
+BACKEND=$3
 
 run() {
     ssh $USER@$HOST $@
@@ -17,10 +18,10 @@ run() {
 
 case $TEST_CASE in
     update)
-        run -t -p $N1 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N2 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N3 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
-        run -t -p $N4 '. .cargo/env && cd ./tg/transport/ && git pull && cargo build --release'
+        run -t -p $N1 ". .cargo/env && cd ./tg/transport/ && git pull && env BUFSIZ=$DATA_SIZE cargo build --release"
+        run -t -p $N2 ". .cargo/env && cd ./tg/transport/ && git pull && env BUFSIZ=$DATA_SIZE cargo build --release"
+        run -t -p $N3 ". .cargo/env && cd ./tg/transport/ && git pull && env BUFSIZ=$DATA_SIZE cargo build --release"
+        run -t -p $N4 ". .cargo/env && cd ./tg/transport/ && git pull && env BUFSIZ=$DATA_SIZE cargo build --release"
         ;;
     1)
         echo Not implemented yet...
@@ -34,7 +35,7 @@ case $TEST_CASE in
         wait
         ;;
     *)
-        echo Usage: $0 '<test id>' '<backend>' >&2
+        echo Usage: $0 '<test id>' '<data size>' '<backend>' >&2
         exit 1
         ;;
 esac
