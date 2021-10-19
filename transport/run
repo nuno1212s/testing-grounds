@@ -27,10 +27,10 @@ case $TEST_CASE in
         echo Not implemented yet...
         ;;
     2)
-        run -p $N1 env THREADS=40 TEST=2 \
+        run -p $N4 env THREADS=40 TEST=2 \
             ./tg/transport/target/release/transport ${BACKEND}:server &
         sleep 1
-        run -p $N2 env THREADS=40 TEST=2 \
+        run -p $N1 env THREADS=40 TEST=2 \
             ./tg/transport/target/release/transport ${BACKEND}:client &
         wait
         ;;
