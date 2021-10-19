@@ -12,9 +12,9 @@ pub const BUFSIZ: usize = {
     let result = parse_usize(env!("BUFSIZ"));
     unwrap_ctx!(result)
 };
-pub const LADDR: &str = "0.0.0.0:50001";
-pub const N1: &str = "192.168.70.16:50001";
-pub const N2: &str = "192.168.70.17:50001";
-pub const N3: &str = "192.168.70.18:50001";
-pub const N4: &str = "192.168.70.19:50001";
+pub const LADDR: &str = "0.0.0.0:50005";
+pub const N1: &str = "192.168.70.16:50005";
+pub const N2: &str = "192.168.70.17:50005";
+pub const N3: &str = "192.168.70.18:50005";
+pub const N4: &str = "192.168.70.19:50005";
 pub const ADDRS: [&str; 4] = [N2, N1, N3, N4];
