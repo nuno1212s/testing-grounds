@@ -61,19 +61,21 @@ where
         }
         // first client connected, proceed with test
         ready.send(()).ok()?;
-        let mut counter = 0;
+        let counter = Arc::new(AtomicU64::new(0));
         while !quit.load(Ordering::Relaxed) {
             match server.accept_client() {
-                Ok(mut c) => thread::spawn(move || {
-                    write_sync(&mut c)
-                        .and_then(|_| read_sync(&mut c))
-                        .map_err(|_| ())
-                }),
+                Ok(mut c) => {
+                    let counter = Arc::clone(&counter);
+                    thread::spawn(move || {
+                        let _ = write_sync(&mut c);
+                        let _ = read_sync(&mut c);
+                        counter.fetch_add(1, Ordering::Relaxed);
+                    });
+                },
                 _ => continue,
             };
-            counter += 1;
         }
-        Some(counter)
+        Some(counter.load(Ordering::Relaxed))
     })
     .map(ops_per_sec)
 }
@@ -111,8 +113,8 @@ where
                 Ok(mut c) => {
                     let counter = Arc::clone(&counter);
                     R::spawn(async move {
-                        write_async(&mut c).await.ok()?;
-                        read_async(&mut c).await.ok()?;
+                        let _ = write_async(&mut c).await;
+                        let _ = read_async(&mut c).await;
                         counter.fetch_add(1, Ordering::Relaxed);
                         Some(0)
                     });
