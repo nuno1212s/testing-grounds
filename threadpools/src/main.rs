@@ -8,6 +8,8 @@ use rayon::ThreadPoolBuilder as RayonBuilder;
 use threadpool_crossbeam_channel::Builder as CrossbeamBuilder;
 
 const TEST_DURATION: Duration = Duration::from_secs(10);
+const REST_DURATION: Duration = TEST_DURATION;
+
 const NUM_THREADS: &[usize] = &[2, 4, 8, 16, 32];
 
 struct State {
@@ -22,51 +24,67 @@ fn main() {
         print!("{},", n);
 
         // rayon
-        {
-            let threadpool = RayonBuilder::new()
-                .num_threads(n)
-                .build()
-                .unwrap();
+        let throughput = {
+            let mut throughput = 0;
 
-            let throughput = testcase(|state| {
-                threadpool.spawn(move || state.update());
-            });
+            for _i in 0..3 {
+                let threadpool = RayonBuilder::new()
+                    .num_threads(n)
+                    .build()
+                    .unwrap();
 
-            threadpool.join();
-            print!("{},", throughput);
-        }
+                throughput += testcase(|state| {
+                    threadpool.spawn(move || state.update());
+                });
+            }
+
+            throughput as f32 / 3.0
+        };
+        print!("{:.3},", throughput);
 
         // cthpool
-        {
-            let threadpool = CThreadPoolBuilder::new()
-                .num_threads(n)
-                .build();
+        let throughput = {
+            let mut throughput = 0;
 
-            let throughput = testcase(|state| {
-                threadpool.execute(move || state.update());
-            });
+            for _i in 0..3 {
+                let threadpool = CThreadPoolBuilder::new()
+                    .num_threads(n)
+                    .build();
 
-            threadpool.join();
-            print!("{},", throughput);
-        }
+                throughput += testcase(|state| {
+                    threadpool.execute(move || state.update());
+                });
+
+                threadpool.join();
+            }
+
+            throughput as f32 / 3.0
+        };
+        print!("{:.3},", throughput);
 
         // crossbeam-threadpool
-        {
-            let threadpool = CrossbeamBuilder::new()
-                .num_threads(n)
-                .build();
+        let throughput = {
+            let mut throughput = 0;
 
-            let throughput = testcase(|state| {
-                threadpool.execute(move || state.update());
-            });
+            for _i in 0..3 {
+                let threadpool = CrossbeamBuilder::new()
+                    .num_threads(n)
+                    .build();
 
-            threadpool.join();
-            println!("{}", throughput);
-        }
+                throughput += testcase(|state| {
+                    threadpool.execute(move || state.update());
+                });
+
+                threadpool.join();
+            }
+
+            throughput as f32 / 3.0
+        };
+        println!("{:.3}", throughput);
     }
 }
 
-fn testcase<F: FnMut(Arc<State>)>(f: F) -> usize {
+fn testcase<F: FnMut(Arc<State>)>(mut f: F) -> usize {
     let state = State::new();
 
     let finalize_state = Arc::clone(&state);
@@ -79,6 +97,7 @@ fn testcase<F: FnMut(Arc<State>)>(f: F) -> usize {
         f(Arc::clone(&state));
     }
 
+    thread::sleep(REST_DURATION);
     state.result()
 }
 
