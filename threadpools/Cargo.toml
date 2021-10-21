@@ -1,0 +1,9 @@
+[package]
+name = "threadpools"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+rayon = "1"
+threadpool-crossbeam-channel = "1"
+cthpool = { git = "https://github.com/sug0/cthpool" }
