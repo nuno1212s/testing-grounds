@@ -5,7 +5,7 @@ use konst::{
 };
 
 // 2 minutes per test case
-pub const SECS: u64 = 5;
+pub const SECS: u64 = 2 * 60;
 pub const TIME: Duration = Duration::from_secs(SECS);
 
 pub const BUFSIZ: usize = {
