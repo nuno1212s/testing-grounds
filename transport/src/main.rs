@@ -60,7 +60,7 @@ fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
     match arg {
         "tcp:sync:client" => {
             handlers::client_test2_sync(|| {
-                let client = tcp_sync::C::connect_server(params::N1)?;
+                let client = tcp_sync::C::connect_server(params::N2)?;
                 Ok(client)
             })
         },
@@ -72,7 +72,7 @@ fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
         }),
         "tcp:tokio:client" => {
             handlers::client_test2_async(TRuntime, || async {
-                let client = tcp_tokio::C::connect_server_async(params::N1).await?;
+                let client = tcp_tokio::C::connect_server_async(params::N2).await?;
                 Ok(client)
             })
         },
@@ -85,7 +85,7 @@ fn kind_2(arg: &str) -> Result<(), Box<dyn std::error::Error>> {
         "tcp:async_std:client" => {
             ASRuntime::init();
             handlers::client_test2_async(ASRuntime, || async {
-                let client = tcp_async_std::C::connect_server_async(params::N1).await?;
+                let client = tcp_async_std::C::connect_server_async(params::N2).await?;
                 Ok(client)
             })
         },
