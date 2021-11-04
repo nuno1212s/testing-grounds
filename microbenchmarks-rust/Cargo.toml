@@ -17,7 +17,7 @@ konst = "0.2"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "d8cb59d0779c8415365c6f2da4b797993ec0b1c2"
+rev = "162da2de59b89aeeb54d23f9860f78625c951a17"
 default-features = false
 features = [
     "expose_impl",
