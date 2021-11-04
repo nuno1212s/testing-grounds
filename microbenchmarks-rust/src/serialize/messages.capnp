@@ -17,13 +17,9 @@ struct Request {
     data        @2 :Data;
 }
 
-struct Value {
-    key   @0 :Text;
-    value @1 :Data;
-}
-
 struct Reply {
     digest @0 :Data;
+    data   @1 :Data;
 }
 
 struct Consensus {

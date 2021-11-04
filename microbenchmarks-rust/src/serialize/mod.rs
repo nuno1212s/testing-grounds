@@ -1,5 +1,11 @@
+use std::sync::Arc;
 use std::default::Default;
 use std::io::{Read, Write};
+
+use konst::{
+    primitive::parse_usize,
+    unwrap_ctx,
+};
 
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
@@ -20,10 +26,32 @@ use febft::bft::ordering::{
 
 pub struct MicrobenchmarkData;
 
+impl MicrobenchmarkData {
+    pub const REQUEST_SIZE: usize = {
+        let result = parse_usize(env!("REQUEST_SIZE"));
+        unwrap_ctx!(result)
+    };
+
+    pub const REPLY_SIZE: usize = {
+        let result = parse_usize(env!("REPLY_SIZE"));
+        unwrap_ctx!(result)
+    };
+
+    pub const STATE_SIZE: usize = {
+        let result = parse_usize(env!("STATE_SIZE"));
+        unwrap_ctx!(result)
+    };
+
+    pub const MEASUREMENT_INTERVAL: usize = {
+        let result = parse_usize(env!("MEASUREMENT_INTERVAL"));
+        unwrap_ctx!(result)
+    };
+}
+
 impl SharedData for MicrobenchmarkData {
-    type State = ();
+    type State = Vec<u8>;
     type Request = Vec<u8>;
-    type Reply = ();
+    type Reply = Arc<Vec<u8>>;
 
     fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
     where
@@ -32,14 +60,18 @@ impl SharedData for MicrobenchmarkData {
         Ok(())
     }
 
-    fn deserialize_state<R>(_r: R) -> Result<()>
+    fn deserialize_state<R>(_r: R) -> Result<Vec<u8>>
     where
         R: Read
     {
-        Ok(())
+        Ok((0..)
+            .into_iter()
+            .take(MicrobenchmarkData::STATE_SIZE)
+            .map(|x| (x & 0xff) as u8)
+            .collect())
     }
 
-    fn serialize_message<W>(w: W, m: &SystemMessage<(), Vec<u8>, ()>) -> Result<()>
+    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Vec<u8>, Arc<Vec<u8>>>) -> Result<()>
     where
         W: Write
     {
@@ -56,6 +88,7 @@ impl SharedData for MicrobenchmarkData {
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
                 reply.set_digest(m.digest().as_ref());
+                reply.set_data(m.payload());
             },
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
@@ -95,7 +128,7 @@ impl SharedData for MicrobenchmarkData {
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
-    fn deserialize_message<R>(r: R) -> Result<SystemMessage<(), Vec<u8>, ()>>
+    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Vec<u8>, Arc<Vec<u8>>>>
     where
         R: Read
     {
@@ -115,8 +148,12 @@ impl SharedData for MicrobenchmarkData {
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
                 let digest = Digest::from_bytes(digest_reader)
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                let data = reply
+                    .get_data()
+                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?
+                    .to_owned();
 
-                Ok(SystemMessage::Reply(ReplyMessage::new(digest, ())))
+                Ok(SystemMessage::Reply(ReplyMessage::new(digest, Arc::new(data))))
             },
             messages_capnp::system::Which::Reply(_) => {
                 Err("Failed to read reply message")

@@ -170,7 +170,7 @@ pub async fn setup_replica(
         batch_size,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
-        service: Microbenchmark,
+        service: Microbenchmark::new(),
     };
     Replica::bootstrap(conf).await
 }
