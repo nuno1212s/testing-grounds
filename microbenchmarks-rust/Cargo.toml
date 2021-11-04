@@ -1,0 +1,31 @@
+[package]
+name = "service"
+version = "0.1.0"
+authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
+edition = "2018"
+
+[dependencies]
+regex = "1"
+rustls = "0.19"
+futures = "0.3"
+oneshot = "0.1"
+num_cpus = "1"
+futures-timer = "3"
+byteorder = "1"
+rand_core = "0.6"
+
+[dependencies.febft]
+git = "https://github.com/febft/febft"
+rev = "38b77b23fc027e89e6eb40610ca8c0aab3ddcf4b"
+default-features = false
+features = [
+    "expose_impl",
+    "async_runtime_tokio",
+    "threadpool_crossbeam",
+    "socket_tokio_tcp",
+    "serialize_serde",
+    "channel_async_channel_mpmc",
+    "crypto_signature_ring_ed25519",
+    "crypto_hash_blake3_blake3",
+    "collections_randomstate_twox_hash"
+]
