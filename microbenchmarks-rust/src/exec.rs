@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use std::time::SystemTime;
 use std::default::Default;
+use std::sync::{Arc, Weak};
 
 use febft::bft::error::*;
 use febft::bft::benchmarks::{
@@ -52,7 +52,7 @@ impl Service for Microbenchmark {
             .collect())
     }
 
-    fn update(&mut self, _s: &mut Vec<u8>, _r: Vec<u8>) -> Arc<Vec<u8>> {
+    fn update(&mut self, _s: &mut Vec<u8>, _r: Vec<u8>) -> Weak<Vec<u8>> {
         unimplemented!()
     }
 
@@ -61,14 +61,14 @@ impl Service for Microbenchmark {
         _state: &mut Vec<u8>,
         batch: UpdateBatch<Vec<u8>>,
         mut meta: BatchMeta,
-    ) -> UpdateBatchReplies<Arc<Vec<u8>>> {
+    ) -> UpdateBatchReplies<Weak<Vec<u8>>> {
         let mut reply_batch = UpdateBatchReplies::with_capacity(batch.len());
 
         meta.execution_time = SystemTime::now();
 
         for update in batch.into_inner() {
             let (peer_id, dig, _req) = update.into_inner();
-            let reply = Arc::clone(&self.reply);
+            let reply = Arc::downgrade(&self.reply);
             reply_batch.add(peer_id, dig, reply);
         }
 

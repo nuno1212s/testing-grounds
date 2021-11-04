@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::Weak;
 use std::default::Default;
 use std::io::{Read, Write};
 
@@ -51,7 +51,7 @@ impl MicrobenchmarkData {
 impl SharedData for MicrobenchmarkData {
     type State = Vec<u8>;
     type Request = Vec<u8>;
-    type Reply = Arc<Vec<u8>>;
+    type Reply = Weak<Vec<u8>>;
 
     fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
     where
@@ -71,7 +71,7 @@ impl SharedData for MicrobenchmarkData {
             .collect())
     }
 
-    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Vec<u8>, Arc<Vec<u8>>>) -> Result<()>
+    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Vec<u8>, Weak<Vec<u8>>>) -> Result<()>
     where
         W: Write
     {
@@ -87,8 +87,12 @@ impl SharedData for MicrobenchmarkData {
             },
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
+                let payload = match m.payload().upgrade() {
+                    Some(p) => p,
+                    _ => return Err("No payload available").wrapped(ErrorKind::CommunicationSerialize),
+                };
                 reply.set_digest(m.digest().as_ref());
-                reply.set_data(m.payload());
+                reply.set_data(&*payload);
             },
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
@@ -128,7 +132,7 @@ impl SharedData for MicrobenchmarkData {
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
-    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Vec<u8>, Arc<Vec<u8>>>>
+    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Vec<u8>, Weak<Vec<u8>>>>
     where
         R: Read
     {
@@ -148,12 +152,12 @@ impl SharedData for MicrobenchmarkData {
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
                 let digest = Digest::from_bytes(digest_reader)
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                let data = reply
+                let _data = reply
                     .get_data()
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?
                     .to_owned();
 
-                Ok(SystemMessage::Reply(ReplyMessage::new(digest, Arc::new(data))))
+                Ok(SystemMessage::Reply(ReplyMessage::new(digest, Weak::new())))
             },
             messages_capnp::system::Which::Reply(_) => {
                 Err("Failed to read reply message")
