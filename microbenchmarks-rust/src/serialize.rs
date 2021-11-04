@@ -67,6 +67,10 @@ impl SharedData for MicrobenchmarkData {
                     ConsensusMessageKind::PrePrepare(requests) => {
                         // message kind
                         w.write_i32::<BigEndian>(0x03).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // seq no
+                        w.write_u32::<BigEndian>(m.sequence_number().into()).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // view
+                        w.write_u32::<BigEndian>(m.view().into()).wrapped(ErrorKind::CommunicationSerialize)?;
                         // number of requests
                         let num_reqs = requests.len();
                         w.write_i32::<BigEndian>(num_reqs as i32).wrapped(ErrorKind::CommunicationSerialize)?;
@@ -88,12 +92,20 @@ impl SharedData for MicrobenchmarkData {
                     ConsensusMessageKind::Prepare(digest) => {
                         // message kind
                         w.write_i32::<BigEndian>(0x04).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // seq no
+                        w.write_u32::<BigEndian>(m.sequence_number().into()).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // view
+                        w.write_u32::<BigEndian>(m.view().into()).wrapped(ErrorKind::CommunicationSerialize)?;
                         // digest
                         w.write_all(digest.as_ref()).wrapped(ErrorKind::CommunicationSerialize)?;
                     },
                     ConsensusMessageKind::Commit(digest) => {
                         // message kind
                         w.write_i32::<BigEndian>(0x05).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // seq no
+                        w.write_u32::<BigEndian>(m.sequence_number().into()).wrapped(ErrorKind::CommunicationSerialize)?;
+                        // view
+                        w.write_u32::<BigEndian>(m.view().into()).wrapped(ErrorKind::CommunicationSerialize)?;
                         // digest
                         w.write_all(digest.as_ref()).wrapped(ErrorKind::CommunicationSerialize)?;
                     },
@@ -110,15 +122,62 @@ impl SharedData for MicrobenchmarkData {
     {
         let kind = r.read_i32::<BigEndian>().wrapped(ErrorKind::CommunicationSerialize)?;
 
-        match kind {
-            0x01 => {},
-            0x02 => {},
-            0x03 => {},
-            0x04 => {},
-            0x05 => {},
-            _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
-        }
+        Ok(match kind {
+            0x01 => {
+                let sess: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
+                let seq_no: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
 
-        unimplemented!()
+                let size = r.read_i32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?;
+
+                let mut buf = vec![0; size as usize];
+                let _ = std::io::copy(&mut r, &mut buf);
+
+                SystemMessage::Request(RequestMessage::new(sess, seq_no, buf))
+            },
+            0x02 => {
+                SystemMessage::Reply(ReplyMessage::new(()))
+            },
+            0x03 => {
+                let seq_no: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
+                let view: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
+
+                unimplemented!()
+            },
+            0x04 | 0x05 => {
+                let seq_no: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
+                let view: SeqNo = r.read_u32::<BigEndian>()
+                    .wrapped(ErrorKind::CommunicationSerialize)?
+                    .into();
+
+                let mut buf = [0; Digest::LENGTH];
+                let _ = std::io::copy(&mut r, &mut buf);
+                let digest = Digest::from_bytes(buf)
+                    .wrapped(ErrorKind::CommunicationSerialize)?;
+
+                let consensus_kind = if kind == 0x04 {
+                    ConsensusMessageKind::Prepare(digest)
+                } else {
+                    ConsensusMessageKind::Commit(digest)
+                };
+
+                SystemMessage::Consensus(ConsensusMessage::new(
+                    seq_no,
+                    view,
+                    consensus_kind,
+                ))
+            },
+            _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
+        })
     }
 }
