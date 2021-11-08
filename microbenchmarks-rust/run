@@ -25,7 +25,7 @@ check_args() {
 check_env() {
     _NEED_ENV="OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE"
     for var in $_NEED_ENV; do
-        if [ -z $var ]; then
+        if [ -z $(eval "echo \$$var") ]; then
             echo Error: Variable is unset: $var >&2
             exit 1
         fi
