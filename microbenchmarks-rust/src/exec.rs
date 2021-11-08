@@ -56,14 +56,14 @@ impl Service for Microbenchmark {
             .collect())
     }
 
-    fn update(&mut self, _s: &mut Vec<u8>, _r: Vec<u8>) -> Weak<Vec<u8>> {
+    fn update(&mut self, _s: &mut Vec<u8>, _r: Weak<Vec<u8>>) -> Weak<Vec<u8>> {
         unimplemented!()
     }
 
     fn update_batch(
         &mut self,
         _state: &mut Vec<u8>,
-        batch: UpdateBatch<Vec<u8>>,
+        batch: UpdateBatch<Weak<Vec<u8>>>,
         mut meta: BatchMeta,
     ) -> UpdateBatchReplies<Weak<Vec<u8>>> {
         let mut reply_batch = UpdateBatchReplies::with_capacity(batch.len());

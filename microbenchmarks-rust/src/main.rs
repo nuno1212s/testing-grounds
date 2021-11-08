@@ -2,7 +2,7 @@ mod exec;
 mod serialize;
 
 mod cop;
-//mod local;
+mod local;
 mod common;
 
 fn main() {
@@ -11,7 +11,7 @@ fn main() {
         .unwrap_or(false);
 
     if is_local {
-        //local::main()
+        local::main()
     } else {
         cop::main()
     }

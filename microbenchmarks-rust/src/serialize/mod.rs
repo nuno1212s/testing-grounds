@@ -1,9 +1,15 @@
 use std::sync::Weak;
+use std::time::Duration;
 use std::default::Default;
 use std::io::{Read, Write};
 
 use konst::{
-    primitive::parse_usize,
+    primitive::{
+        parse_usize,
+        parse_bool,
+        parse_u64,
+    },
+    option::unwrap_or,
     unwrap_ctx,
 };
 
@@ -46,11 +52,26 @@ impl MicrobenchmarkData {
         let result = parse_usize(env!("MEASUREMENT_INTERVAL"));
         unwrap_ctx!(result)
     };
+
+    pub const OPS_NUMBER: usize = {
+        let result = parse_usize(env!("OPS_NUMBER"));
+        unwrap_ctx!(result)
+    };
+
+    pub const REQUEST_SLEEP_MILLIS: Duration = {
+        let result = parse_u64(unwrap_or!(option_env!("REQUEST_SLEEP_MILLIS"), "0"));
+        Duration::from_millis(unwrap_ctx!(result))
+    };
+
+    pub const VERBOSE: bool = {
+        let result = parse_bool(unwrap_or!(option_env!("VERBOSE"), "false"));
+        unwrap_ctx!(result)
+    };
 }
 
 impl SharedData for MicrobenchmarkData {
     type State = Vec<u8>;
-    type Request = Vec<u8>;
+    type Request = Weak<Vec<u8>>;
     type Reply = Weak<Vec<u8>>;
 
     fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
@@ -71,7 +92,7 @@ impl SharedData for MicrobenchmarkData {
             .collect())
     }
 
-    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Vec<u8>, Weak<Vec<u8>>>) -> Result<()>
+    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>) -> Result<()>
     where
         W: Write
     {
@@ -80,10 +101,14 @@ impl SharedData for MicrobenchmarkData {
         match m {
             SystemMessage::Request(m) => {
                 let mut request = sys_msg.init_request();
+                let operation = match m.operation().upgrade() {
+                    Some(p) => p,
+                    _ => return Err("No operation available").wrapped(ErrorKind::CommunicationSerialize),
+                };
 
                 request.set_operation_id(m.sequence_number().into());
                 request.set_session_id(m.session_id().into());
-                request.set_data(m.operation());
+                request.set_data(&*operation);
             },
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
@@ -115,10 +140,14 @@ impl SharedData for MicrobenchmarkData {
                             // set request
                             {
                                 let mut request = forwarded.init_request();
+                                let operation = match stored.message().operation().upgrade() {
+                                    Some(p) => p,
+                                    _ => return Err("No operation available").wrapped(ErrorKind::CommunicationSerialize),
+                                };
 
                                 request.set_operation_id(stored.message().sequence_number().into());
                                 request.set_session_id(stored.message().session_id().into());
-                                request.set_data(stored.message().operation());
+                                request.set_data(&*operation);
                             }
                         }
                     },
@@ -132,7 +161,7 @@ impl SharedData for MicrobenchmarkData {
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
     }
 
-    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Vec<u8>, Weak<Vec<u8>>>>
+    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>>
     where
         R: Read
     {
@@ -166,11 +195,11 @@ impl SharedData for MicrobenchmarkData {
             messages_capnp::system::Which::Request(Ok(request)) => {
                 let session_id: SeqNo = request.get_session_id().into();
                 let operation_id: SeqNo = request.get_operation_id().into();
-                let data = request
+                let _data = request
                     .get_data()
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
 
-                Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, data.to_owned())))
+                Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, Weak::new())))
             },
             messages_capnp::system::Which::Request(_) => {
                 Err("Failed to read request message")
@@ -209,11 +238,11 @@ impl SharedData for MicrobenchmarkData {
                                 let session_id: SeqNo = request.get_session_id().into();
                                 let operation_id: SeqNo = request.get_operation_id().into();
 
-                                let data = request
+                                let _data = request
                                     .get_data()
                                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
 
-                                RequestMessage::new(session_id, operation_id, data.to_owned())
+                                RequestMessage::new(session_id, operation_id, Weak::new())
                             };
 
                             requests.push(StoredMessage::new(header, message));
