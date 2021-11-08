@@ -1,5 +1,12 @@
 #!/bin/sh
 
+check_root() {
+    if [ $(id -u) -ne 0 ]; then
+        echo Error: This script needs to be run as root. >&2
+        exit 1
+    fi
+}
+
 update_max_fds() {
     ulimit -n 65535 2>/dev/null
     if [ $? -ne 0 ]; then
@@ -15,54 +22,42 @@ check_args() {
     fi
 }
 
-load_conf() {
-    if [ -f config/generate ]; then
-        cd config
-        ./generate $@ || exit 1
-
-        stat clients.config 2>/dev/null
-        if [ $? -ne 0 ]; then
-            echo Error: Missing config/clients.config! >&2
+check_env() {
+    _NEED_ENV="OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE"
+    for var in $_NEED_ENV; do
+        if [ -z $var ]; then
+            echo Error: Variable is unset: $var >&2
             exit 1
         fi
+    done
+}
 
-        stat replicas.config 2>/dev/null
-        if [ $? -ne 0 ]; then
-            echo Error: Missing config/replicas.config! >&2
-            exit 1
-        fi
+generate_conf() {
+    ./generate_conf $@ || exit 1
 
-        stat batch.config 2>/dev/null
-        if [ $? -ne 0 ]; then
-            echo Error: Missing config/batch.config! >&2
-            exit 1
-        fi
-
-        . ./run.config
-        cd ..
-    else
-        echo Error: Config generating script is absent! >&2
+    if [ ! -f config/clients.config ]; then
+        echo Error: Missing config/clients.config! >&2
         exit 1
     fi
 
-    DB=febft.ycsb.YCSBClient
-    JAR=build/libs/febft-ycsb-all.jar
-    WORKLOAD=config/workload.config
-}
+    if [ ! -f config/replicas.config ]; then
+        echo Error: Missing config/replicas.config! >&2
+        exit 1
+    fi
 
-build_jar() {
-    stat $JAR 2>/dev/null
-    if [ $? -ne 0 ]; then
-        ./gradlew shadowJar
+    if [ ! -f config/batch.config ]; then
+        echo Error: Missing config/batch.config! >&2
+        exit 1
     fi
 }
 
-ycsb_main() {
-    ${YCSB_HOME}/bin/ycsb run $DB -cp $JAR -P $WORKLOAD -threads ${CLIENTS:-1}
+exec_microbenchmarks() {
+    exec env RUSTFLAGS="-C target-cpu=native" cargo run --release
 }
 
+check_root
 update_max_fds
+check_env
 check_args $@
-load_conf $@
-build_jar
-ycsb_main
+generate_conf $@
+exec_microbenchmarks
