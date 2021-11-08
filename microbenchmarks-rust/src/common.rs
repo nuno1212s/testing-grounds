@@ -179,7 +179,7 @@ async fn get_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
         let mut buf = String::new();
-        let mut f = open_file("../config/batch.config");
+        let mut f = open_file("./config/batch.config");
         f.read_to_string(&mut buf).unwrap();
         tx.send(buf.trim().parse().unwrap()).unwrap();
     });

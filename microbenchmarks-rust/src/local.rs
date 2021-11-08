@@ -46,8 +46,8 @@ pub fn main() {
 }
 
 async fn async_main() {
-    let clients_config = parse_config("../config/clients.config").unwrap();
-    let replicas_config = parse_config("../config/replicas.config").unwrap();
+    let clients_config = parse_config("./config/clients.config").unwrap();
+    let replicas_config = parse_config("./config/replicas.config").unwrap();
 
     let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
         .take(replicas_config.len())
@@ -97,8 +97,8 @@ async fn async_main() {
 }
 
 async fn client_async_main() {
-    let clients_config = parse_config("../config/clients.config").unwrap();
-    let replicas_config = parse_config("../config/replicas.config").unwrap();
+    let clients_config = parse_config("./config/clients.config").unwrap();
+    let replicas_config = parse_config("./config/replicas.config").unwrap();
 
     let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
         .take(clients_config.len())
