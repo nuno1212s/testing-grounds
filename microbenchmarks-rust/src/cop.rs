@@ -1,5 +1,17 @@
 use crate::common::*;
+use crate::serialize::MicrobenchmarkData;
 
+use std::fs::File;
+use std::io::Write;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use futures_timer::Delay;
+use rand_core::{OsRng, RngCore};
+use lockfree::queue::Queue;
+
+use febft::bft::communication::channel;
+use febft::bft::core::client::Client;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
 use febft::bft::{
@@ -14,6 +26,10 @@ use febft::bft::collections::{
     self,
     HashMap,
 };
+use febft::bft::benchmarks::{
+    BenchmarkHelper,
+    BenchmarkHelperStore,
+};
 
 pub fn main() {
     let replica_id: u32 = std::env::var("ID")
@@ -21,12 +37,19 @@ pub fn main() {
         .flat_map(|id| id.parse())
         .next()
         .unwrap();
+    let is_client = std::env::var("CLIENT")
+        .map(|x| x == "1")
+        .unwrap_or(false);
     let conf = InitConfig {
         pool_threads: num_cpus::get(),
         async_threads: num_cpus::get(),
     };
     let _guard = unsafe { init(conf).unwrap() };
-    rt::block_on(async_main(NodeId::from(replica_id)));
+    if !is_client {
+        rt::block_on(async_main(NodeId::from(replica_id)));
+    } else {
+        rt::block_on(client_async_main());
+    }
 }
 
 async fn async_main(id: NodeId) {
@@ -81,10 +104,226 @@ async fn async_main(id: NodeId) {
     replica.run().await.unwrap();
 }
 
+async fn client_async_main() {
+    let clients_config = parse_config("./config/clients.config").unwrap();
+    let replicas_config = parse_config("./config/replicas.config").unwrap();
+
+    let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
+        .take(clients_config.len())
+        .enumerate()
+        .map(|(id, sk)| (NodeId::from(1000 + id), sk))
+        .chain(sk_stream()
+            .take(replicas_config.len())
+            .enumerate()
+            .map(|(id, sk)| (NodeId::from(id), sk)))
+        .collect();
+    let public_keys: HashMap<NodeId, PublicKey> = secret_keys
+        .iter()
+        .map(|(id, sk)| (*id, sk.public_key().into()))
+        .collect();
+
+    let (tx, mut rx) = channel::new_bounded(8);
+
+    for client in &clients_config {
+        let id = NodeId::from(client.id);
+        let addrs = {
+            let mut addrs = collections::hash_map();
+            for replica in &replicas_config {
+                let id = NodeId::from(replica.id);
+                let addr = format!("{}:{}", replica.ipaddr, replica.portno);
+                addrs.insert(id, crate::addr!(&replica.hostname => addr));
+            }
+            for other in &clients_config {
+                let id = NodeId::from(other.id);
+                let addr = format!("{}:{}", other.ipaddr, other.portno);
+                addrs.insert(id, crate::addr!(&other.hostname => addr));
+            }
+            addrs
+        };
+        let sk = secret_keys.remove(&id).unwrap();
+        let fut = setup_client(
+            replicas_config.len(),
+            id,
+            sk,
+            addrs,
+            public_keys.clone(),
+        );
+        let mut tx = tx.clone();
+        rt::spawn(async move {
+            println!("Bootstrapping client #{}", u32::from(id));
+            let client = fut.await.unwrap();
+            println!("Done bootstrapping client #{}", u32::from(id));
+            tx.send(client).await.unwrap();
+        });
+    }
+    drop((secret_keys, public_keys, replicas_config));
+
+    let queue = Arc::new(Queue::new());
+
+    let mut clients = Vec::with_capacity(clients_config.len());
+    for _i in 0..clients_config.len() {
+        clients.push(rx.recv().await.unwrap());
+    }
+    let mut handles = Vec::with_capacity(clients_config.len());
+    for client in clients {
+        let queue = Arc::clone(&queue);
+        let h = rt::spawn(run_client(client, queue));
+        handles.push(h);
+    }
+    drop(clients_config);
+
+    for h in handles {
+        let _ = h.await;
+    }
+
+    let mut file = File::open("./latencies.out").unwrap();
+
+    while let Some(line) = queue.pop() {
+        file.write_all(line.as_ref()).unwrap();
+    }
+
+    file.flush().unwrap();
+}
+
 fn sk_stream() -> impl Iterator<Item = KeyPair> {
     std::iter::repeat_with(|| {
         // only valid for ed25519!
         let buf = [0; 32];
         KeyPair::from_bytes(&buf[..]).unwrap()
     })
+}
+
+async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<Queue<String>>) {
+    let mut ramp_up: i32 = 1000;
+
+    let request = Arc::new({
+        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        OsRng.fill_bytes(&mut r);
+        r
+    });
+
+    let iterator = 0..MicrobenchmarkData::OPS_NUMBER/2;
+
+    println!("Warm up...");
+
+    let id = u32::from(client.id());
+
+    for req in iterator {
+        if MicrobenchmarkData::VERBOSE {
+            print!("Sending req {}...", req);
+        }
+
+        let last_send_instant = SystemTime::now();
+        client.update(Arc::downgrade(&request)).await;
+        let latency = last_send_instant
+            .elapsed()
+            .expect("Non monotonic time!")
+            .as_nanos();
+
+        let time_ms = UNIX_EPOCH
+            .elapsed()
+            .expect("Non monotonic time!")
+            .as_millis();
+
+        q.push(
+            format!(
+                "{}\t{}\t{}\n",
+                id,
+                time_ms,
+                latency,
+            ),
+        );
+
+        if MicrobenchmarkData::VERBOSE {
+            println!(" sent!");
+        }
+        if MicrobenchmarkData::VERBOSE && (req % 1000 == 0) {
+            println!("{} // {} operations sent!", id, req);
+        }
+
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+        } else if ramp_up > 0 {
+            Delay::new(Duration::from_millis(ramp_up as u64)).await;
+        }
+        ramp_up -= 100;
+    }
+
+    let mut st = BenchmarkHelper::new(MicrobenchmarkData::OPS_NUMBER/2);
+
+    println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER/2);
+
+    let iterator = MicrobenchmarkData::OPS_NUMBER/2..MicrobenchmarkData::OPS_NUMBER;
+
+    for req in iterator {
+        if MicrobenchmarkData::VERBOSE {
+            print!("{} // Sending req {}...", id, req);
+        }
+
+        let last_send_instant = SystemTime::now();
+        client.update(Arc::downgrade(&request)).await;
+        let now = SystemTime::now();
+        let latency = now
+            .duration_since(last_send_instant)
+            .expect("Non monotonic time!")
+            .as_nanos();
+
+        let time_ms = UNIX_EPOCH
+            .elapsed()
+            .expect("Non monotonic time!")
+            .as_millis();
+
+        q.push(
+            format!(
+                "{}\t{}\t{}\n",
+                id,
+                time_ms,
+                latency,
+            ),
+        );
+
+        if MicrobenchmarkData::VERBOSE {
+            println!(" sent!");
+        }
+
+        (now, last_send_instant).store(&mut st);
+
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+        } else if ramp_up > 0 {
+            Delay::new(Duration::from_millis(ramp_up as u64)).await;
+        }
+        ramp_up -= 100;
+
+        if MicrobenchmarkData::VERBOSE && (req % 1000 == 0) {
+            println!("{} // {} operations sent!", id, req);
+        }
+    }
+
+    if id == 1000 {
+        println!("{} // Average time for {} executions (-10%) = {} us",
+            id,
+            MicrobenchmarkData::OPS_NUMBER / 2,
+            st.average(true) / 1000.0);
+
+        println!("{} // Standard deviation for {} executions (-10%) = {} us",
+            id,
+            MicrobenchmarkData::OPS_NUMBER / 2,
+            st.standard_deviation(true) / 1000.0);
+
+        println!("{} // Average time for {} executions (all samples) = {} us",
+            id,
+            MicrobenchmarkData::OPS_NUMBER / 2,
+            st.average(false) / 1000.0);
+
+        println!("{} // Standard deviation for {} executions (all samples) = {} us",
+            id,
+            MicrobenchmarkData::OPS_NUMBER / 2,
+            st.standard_deviation(false) / 1000.0);
+
+        println!("{} // Maximum time for {} executions (all samples) = {} us",
+            id,
+            MicrobenchmarkData::OPS_NUMBER / 2,
+            st.max(false) / 1000);
+    }
 }
