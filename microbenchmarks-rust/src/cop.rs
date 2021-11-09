@@ -8,7 +8,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
-use lockfree::queue::Queue;
+use nolock::queues::mpsc::jiffy::{
+    async_queue,
+    AsyncSender,
+};
 
 use febft::bft::communication::channel;
 use febft::bft::core::client::Client;
@@ -158,7 +161,8 @@ async fn client_async_main() {
     }
     drop((secret_keys, public_keys, replicas_config));
 
-    let queue = Arc::new(Queue::new());
+    let (mut queue, tx) = async_queue();
+    let tx = Arc::new(tx);
 
     let mut clients = Vec::with_capacity(clients_config.len());
     for _i in 0..clients_config.len() {
@@ -166,8 +170,8 @@ async fn client_async_main() {
     }
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
-        let queue = Arc::clone(&queue);
-        let h = rt::spawn(run_client(client, queue));
+        let tx = Arc::clone(&tx);
+        let h = rt::spawn(run_client(client, tx));
         handles.push(h);
     }
     drop(clients_config);
@@ -176,9 +180,9 @@ async fn client_async_main() {
         let _ = h.await;
     }
 
-    let mut file = File::open("./latencies.out").unwrap();
+    let mut file = File::create("./latencies.out").unwrap();
 
-    while let Some(line) = queue.pop() {
+    while let Ok(line) = queue.try_dequeue() {
         file.write_all(line.as_ref()).unwrap();
     }
 
@@ -193,7 +197,7 @@ fn sk_stream() -> impl Iterator<Item = KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<Queue<String>>) {
+async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
@@ -225,7 +229,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<Queue<String>
             .expect("Non monotonic time!")
             .as_millis();
 
-        q.push(
+        let _ = q.enqueue(
             format!(
                 "{}\t{}\t{}\n",
                 id,
@@ -273,7 +277,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<Queue<String>
             .expect("Non monotonic time!")
             .as_millis();
 
-        q.push(
+        let _ = q.enqueue(
             format!(
                 "{}\t{}\t{}\n",
                 id,

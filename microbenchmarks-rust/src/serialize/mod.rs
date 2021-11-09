@@ -67,6 +67,8 @@ impl MicrobenchmarkData {
         let result = parse_bool(unwrap_or!(option_env!("VERBOSE"), "false"));
         unwrap_ctx!(result)
     };
+
+    const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
 
 impl SharedData for MicrobenchmarkData {
@@ -140,14 +142,10 @@ impl SharedData for MicrobenchmarkData {
                             // set request
                             {
                                 let mut request = forwarded.init_request();
-                                let operation = match stored.message().operation().upgrade() {
-                                    Some(p) => p,
-                                    _ => return Err("No operation available").wrapped(ErrorKind::CommunicationSerialize),
-                                };
 
                                 request.set_operation_id(stored.message().sequence_number().into());
                                 request.set_session_id(stored.message().session_id().into());
-                                request.set_data(&*operation);
+                                request.set_data(&Self::REQUEST);
                             }
                         }
                     },
