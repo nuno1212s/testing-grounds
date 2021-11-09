@@ -1,0 +1,5 @@
+/config/currentView
+/latencies_*.txt
+/.gradle
+/build
+/log
