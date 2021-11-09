@@ -1,6 +1,8 @@
 use crate::common::*;
 use crate::serialize::MicrobenchmarkData;
 
+use std::fs::File;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -167,6 +169,14 @@ async fn client_async_main() {
     for h in handles {
         let _ = h.await;
     }
+
+    let mut file = File::open("./latencies.out").unwrap();
+
+    while let Some(line) = queue.pop() {
+        file.write_all(line.as_ref()).unwrap();
+    }
+
+    file.flush().unwrap();
 }
 
 fn sk_stream() -> impl Iterator<Item = KeyPair> {
