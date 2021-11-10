@@ -1,9 +1,41 @@
 #!/bin/sh
 
-#Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]
+#ThroughputLatencyClient <initial client id> <number of clients> <number of operations> <request size> <interval (ms)> <read only?> <verbose?> <nosig | default | ecdsa>
 
-for id in `seq 0 3`; do
-    java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
-done
+#ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]
 
-wait
+main() {
+    [ $CLIENT -eq 1 ] && clients_main || servers_main
+}
+
+servers_main() {
+    [ $LOCAL -eq 1 ] && servers_local_main || servers_cop_main
+}
+
+servers_local_main() {
+    ./generate_conf_local
+
+    for id in `seq 0 3`; do
+        java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
+    done
+
+    wait
+}
+
+servers_cop_main() {
+    ./generate_conf_cop
+
+    exec java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
+}
+
+clients_main() {
+    [ $LOCAL -eq 1 ] && clients_local_main || clients_cop_main
+}
+
+clients_local_main() {
+    true
+}
+
+clients_cop_main() {
+    true
+}
