@@ -20,7 +20,8 @@ public class App {
             usage();
         }
 
-        BasicConfigurator.configure(new FileAppender(new SimpleLayout(), "log/" + UUID.randomUUID(), false));
+        final String logPath = "log/" + UUID.randomUUID() + ".log";
+        BasicConfigurator.configure(new FileAppender(new SimpleLayout(), logPath, false));
         Security.addProvider(new BouncyCastleProvider());
 
         String[] newArgs = null;
