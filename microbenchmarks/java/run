@@ -1,11 +1,13 @@
 #!/bin/sh
 
-#ThroughputLatencyClient <initial client id> <number of clients> <number of operations> <request size> <interval (ms)> <read only?> <verbose?> <nosig | default | ecdsa>
-
-#ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]
-
 main() {
+    compile
     [ $CLIENT -eq 1 ] && clients_main || servers_main
+}
+
+compile() {
+    ./gradlew shadowJar
+    ./gradlew --stop
 }
 
 servers_main() {
@@ -14,11 +16,9 @@ servers_main() {
 
 servers_local_main() {
     ./generate_conf_local
-
     for ID in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
         start_replica $ID &
     done
-
     wait
 }
 
@@ -28,15 +28,12 @@ servers_cop_main() {
 }
 
 clients_main() {
-    [ $LOCAL -eq 1 ] && clients_local_main || clients_cop_main
-}
-
-clients_local_main() {
-    true
-}
-
-clients_cop_main() {
-    true
+    if [ $LOCAL -eq 1 ]; then
+        ./generate_conf_local
+    else
+        ./generate_conf_cop
+    fi
+    exec start_clients
 }
 
 start_replica() {
