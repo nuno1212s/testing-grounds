@@ -46,3 +46,5 @@ start_clients() {
         1000 $NUM_CLIENTS $OPS_NUMBER $REQUEST_SIZE $REQUEST_SLEEP_MILLIS \
         false $VERBOSE nosig
 }
+
+main
