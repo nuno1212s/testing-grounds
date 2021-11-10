@@ -2,10 +2,8 @@
 
 main() {
     # setup
-    check_root
-    update_max_fds
     import_env $@
-    check_env
+    update_max_fds
 
     # exec
     select_backend
@@ -14,19 +12,6 @@ main() {
 die() {
     echo $@ >&2
     exit 1
-}
-
-check_root() {
-    if [ $(id -u) -ne 0 ]; then
-        die Error: This script needs to be run as root.
-    fi
-}
-
-update_max_fds() {
-    ulimit -n 65535 2>/dev/null
-    if [ $? -ne 0 ]; then
-        die Error: Failed to update max open file descriptors!
-    fi
 }
 
 import_env() {
@@ -41,17 +26,32 @@ import_env() {
             die Usage: $0 '<clients|server>s'
     esac
     . ./env 2>/dev/null || die Error: No environment file found: env
+    check_env
 }
 
 check_env() {
     _NEED_ENV="NUM_CLIENTS NUM_REPLICAS BATCH_SIZE ID LOCAL BACKEND VERBOSE \
-        OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE"
+        OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE \
+        UPDATE_MAX_FDS"
 
     for var in $_NEED_ENV; do
         if [ -z $(eval "echo \$$var") ]; then
             die Error: Variable is unset in environment file: $var
         fi
     done
+}
+
+update_max_fds() {
+    if [ $UPDATE_MAX_FDS -eq 1 ]; then
+        if [ $(id -u) -ne 0 ]; then
+            die Error: This script needs to be run as root.
+        fi
+
+        ulimit -n 65535 2>/dev/null
+        if [ $? -ne 0 ]; then
+            die Error: Failed to update max open file descriptors!
+        fi
+    fi
 }
 
 select_backend() {
