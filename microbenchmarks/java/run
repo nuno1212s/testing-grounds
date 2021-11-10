@@ -15,8 +15,8 @@ servers_main() {
 servers_local_main() {
     ./generate_conf_local
 
-    for id in `seq 0 3`; do
-        java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
+    for ID in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
+        start_replica $ID &
     done
 
     wait
@@ -25,7 +25,7 @@ servers_local_main() {
 servers_cop_main() {
     ./generate_conf_cop
 
-    exec java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
+    exec java -jar build/libs/bft-smart-all.jar server $ID $MEASUREMENT_INTERVAL $REPLY_SIZE $STATE_SIZE $VERBOSE nosig ''
 }
 
 clients_main() {
@@ -38,4 +38,8 @@ clients_local_main() {
 
 clients_cop_main() {
     true
+}
+
+start_replica() {
+    java -jar build/libs/bft-smart-all.jar server $ID $MEASUREMENT_INTERVAL $REPLY_SIZE $STATE_SIZE $VERBOSE nosig '' &
 }

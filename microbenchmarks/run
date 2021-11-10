@@ -15,7 +15,22 @@ die() {
 }
 
 import_env() {
+    . ./env 2>/dev/null || die Error: No environment file found: env
     case $1 in
+        stop)
+            # stop running replicas
+            case $BACKEND in
+                java)
+                    die Unimplemented
+                    ;;
+                rust)
+                    die Unimplemented
+                    ;;
+                *)
+                    die Error: Invalid backend: $BACKEND
+            esac
+            exit 0
+            ;;
         clients)
             export CLIENT=1
             ;;
@@ -23,9 +38,8 @@ import_env() {
             export CLIENT=0
             ;;
         *)
-            die Usage: $0 '<clients|server>s'
+            die Usage: $0 '<clients|servers|stop>'
     esac
-    . ./env 2>/dev/null || die Error: No environment file found: env
     check_env
 }
 
