@@ -1,39 +1,11 @@
 #!/bin/sh
 
-check_root() {
-    if [ $(id -u) -ne 0 ]; then
-        echo Error: This script needs to be run as root. >&2
-        exit 1
-    fi
-}
-
-update_max_fds() {
-    ulimit -n 65535 2>/dev/null
-    if [ $? -ne 0 ]; then
-        echo Error: Failed to update max open file descriptors! >&2
-        exit 1
-    fi
-}
-
-check_args() {
-    if [ $# -lt 3 ]; then
-        echo Usage: $0 '<num-clients>' '<num-replicas>' '<batch-size>' >&2
-        exit 1
-    fi
-}
-
-check_env() {
-    _NEED_ENV="OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE"
-    for var in $_NEED_ENV; do
-        if [ -z $(eval "echo \$$var") ]; then
-            echo Error: Variable is unset: $var >&2
-            exit 1
-        fi
-    done
-}
-
 generate_conf() {
-    ./generate_conf $@ || exit 1
+    if [ $LOCAL -eq 1 ]; then
+        ./generate_conf_local $@ || exit 1
+    else
+        ./generate_conf $@ || exit 1
+    fi
 
     if [ ! -f config/clients.config ]; then
         echo Error: Missing config/clients.config! >&2
@@ -55,9 +27,5 @@ exec_microbenchmarks() {
     exec env RUSTFLAGS="-C target-cpu=native" cargo run --release
 }
 
-check_root
-update_max_fds
-check_env
-check_args $@
-generate_conf $@
+generate_conf $NUM_CLIENTS $NUM_REPLICAS $BATCH_SIZE
 exec_microbenchmarks
