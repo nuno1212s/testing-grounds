@@ -31,20 +31,20 @@ update_max_fds() {
 
 import_env() {
     case $1 in
-        client)
+        clients)
             export CLIENT=1
             ;;
-        server)
+        servers)
             export CLIENT=0
             ;;
         *)
-            die Usage: $0 '<client|server>'
+            die Usage: $0 '<clients|server>s'
     esac
     . ./env 2>/dev/null || die Error: No environment file found: env
 }
 
 check_env() {
-    _NEED_ENV="NUM_CLIENTS NUM_REPLICAS BATCH_SIZE ID LOCAL BACKEND \
+    _NEED_ENV="NUM_CLIENTS NUM_REPLICAS BATCH_SIZE ID LOCAL BACKEND VERBOSE \
         OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE"
 
     for var in $_NEED_ENV; do
