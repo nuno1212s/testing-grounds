@@ -1,0 +1,9 @@
+#!/bin/sh
+
+#Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]
+
+for id in `seq 0 3`; do
+    java -jar build/libs/bft-smart-all.jar server $id 10 128 128 false nosig '' &
+done
+
+wait
