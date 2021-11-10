@@ -1,10 +1,15 @@
 #!/bin/sh
 
+main() {
+    generate_conf
+    exec_microbenchmarks
+}
+
 generate_conf() {
     if [ $LOCAL -eq 1 ]; then
-        ./generate_conf_local $@ || exit 1
+        ./generate_conf_local || exit 1
     else
-        ./generate_conf_cop $@ || exit 1
+        ./generate_conf_cop || exit 1
     fi
 
     if [ ! -f config/clients.config ]; then
@@ -27,5 +32,4 @@ exec_microbenchmarks() {
     exec env RUSTFLAGS="-C target-cpu=native" cargo run --release
 }
 
-generate_conf $NUM_CLIENTS $NUM_REPLICAS $BATCH_SIZE
-exec_microbenchmarks
+main
