@@ -1,4 +1,4 @@
-/config/currentView
+/config
 /latencies_*.txt
 /.gradle
 /build
