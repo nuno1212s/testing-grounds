@@ -1,6 +1,7 @@
 #!/bin/sh
 
 main() {
+    unset _JAVA_OPTIONS
     regen_config_folder
     regen_hosts_file
     regen_system_file
