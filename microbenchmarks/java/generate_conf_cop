@@ -15,11 +15,9 @@ regen_config_folder() {
 regen_hosts_file() {
     rm -f hosts.config
     for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
-        port1=$(expr 11000 + $id)
-        port2=$(expr 12000 + $id)
         host=$(expr $id % 4)
         host=$(expr 16 + $host)
-        echo $id 192.168.70.$host $port1 $port2 >> hosts.config
+        echo $id 192.168.70.$host 11000 11001 >> hosts.config
     done
 }
 

@@ -29,11 +29,7 @@ servers_cop_main() {
 }
 
 clients_main() {
-    if [ $LOCAL -eq 1 ]; then
-        ./generate_conf_local
-    else
-        ./generate_conf_cop
-    fi
+    [ $LOCAL -eq 1 ] && ./generate_conf_local || ./generate_conf_cop
     exec start_clients
 }
 
