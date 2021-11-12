@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Example client that updates a BFT replicated service (a counter).
@@ -51,6 +52,7 @@ public class ThroughputLatencyClient {
     public static int initId = 0;
     static LinkedBlockingQueue<String> latencies;
     static Thread writerThread;
+    static AtomicBoolean writerThreadFlag;
     
     /*public static String privKey =  "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXa3mln4anewXtqrM" +
                                     "hMw6mfZhslkRa/j9P790ToKjlsihRANCAARnxLhXvU4EmnIwhVl3Bh0VcByQi2um" +
@@ -82,6 +84,7 @@ public class ThroughputLatencyClient {
 
         initId = Integer.parseInt(args[0]);
         latencies = new LinkedBlockingQueue<>();
+        writerThreadFlag = new AtomicBoolean(false);
         writerThread = new Thread() {
             
             public void run() {
@@ -89,10 +92,12 @@ public class ThroughputLatencyClient {
                 FileWriter f = null;
                 try {
                     f = new FileWriter("./latencies_" + initId + ".txt");
-                    while (true) {
+                    while (!writerThreadFlag.get()) {
                         
                         f.write(latencies.take());
+                        Thread.sleep(1000);
                     }   
+                    f.write(latencies.take());
                     
                 } catch (IOException | InterruptedException ex) {
                     ex.printStackTrace();
@@ -159,6 +164,13 @@ public class ThroughputLatencyClient {
         }
     
         exec.shutdown();
+
+        try {
+            writerThreadFlag.set(true);
+            writerThread.join();
+        } catch (InterruptedException e) {
+            // ignore
+        }
 
         System.out.println("All clients done.");
     }
