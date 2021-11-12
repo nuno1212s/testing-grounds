@@ -4,8 +4,10 @@ use crate::serialize::MicrobenchmarkData;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
+use chrono::DateTime;
+use chrono::offset::Utc;
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
@@ -217,17 +219,14 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             print!("Sending req {}...", req);
         }
 
-        let last_send_instant = SystemTime::now();
+        let last_send_instant = Utc::now();
         client.update(Arc::downgrade(&request)).await;
-        let latency = last_send_instant
-            .elapsed()
-            .expect("Non monotonic time!")
-            .as_nanos();
+        let latency = Utc::now()
+            .signed_duration_since(last_send_instant)
+            .num_nanoseconds()
+            .unwrap_or(i64::MAX);
 
-        let time_ms = UNIX_EPOCH
-            .elapsed()
-            .expect("Non monotonic time!")
-            .as_millis();
+        let time_ms = Utc::now().timestamp_millis();
 
         let _ = q.enqueue(
             format!(
@@ -264,18 +263,15 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             print!("{} // Sending req {}...", id, req);
         }
 
-        let last_send_instant = SystemTime::now();
+        let last_send_instant = Utc::now();
         client.update(Arc::downgrade(&request)).await;
-        let now = SystemTime::now();
-        let latency = now
-            .duration_since(last_send_instant)
-            .expect("Non monotonic time!")
-            .as_nanos();
+        let exec_time = Utc::now();
+        let latency = exec_time
+            .signed_duration_since(last_send_instant)
+            .num_nanoseconds()
+            .unwrap_or(i64::MAX);
 
-        let time_ms = UNIX_EPOCH
-            .elapsed()
-            .expect("Non monotonic time!")
-            .as_millis();
+        let time_ms = Utc::now().timestamp_millis();
 
         let _ = q.enqueue(
             format!(
@@ -290,7 +286,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             println!(" sent!");
         }
 
-        (now, last_send_instant).store(&mut st);
+        (exec_time, last_send_instant).store(&mut st);
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;

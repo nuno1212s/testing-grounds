@@ -4,7 +4,7 @@ use crate::serialize::MicrobenchmarkData;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
@@ -211,16 +211,15 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             print!("Sending req {}...", req);
         }
 
-        let last_send_instant = SystemTime::now();
+        let last_send_instant = Instant::now();
         client.update(Arc::downgrade(&request)).await;
         let latency = last_send_instant
             .elapsed()
-            .expect("Non monotonic time!")
             .as_nanos();
 
         let time_ms = UNIX_EPOCH
             .elapsed()
-            .expect("Non monotonic time!")
+            .unwrap()
             .as_millis();
 
         let _ = q.enqueue(
@@ -258,17 +257,16 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             print!("{} // Sending req {}...", id, req);
         }
 
-        let last_send_instant = SystemTime::now();
+        let last_send_instant = Instant::now();
         client.update(Arc::downgrade(&request)).await;
-        let now = SystemTime::now();
+        let now = Instant::now();
         let latency = now
             .duration_since(last_send_instant)
-            .expect("Non monotonic time!")
             .as_nanos();
 
         let time_ms = UNIX_EPOCH
             .elapsed()
-            .expect("Non monotonic time!")
+            .unwrap()
             .as_millis();
 
         let _ = q.enqueue(
