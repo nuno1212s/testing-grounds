@@ -1,2 +1,2 @@
 #!/bin/sh
-exec true
+exec pkill microbenchmarks
