@@ -101,6 +101,8 @@ impl Service for Microbenchmark {
                 self.max_tp = tp;
             }
 
+            println!("Throughput = {} operations/sec (Maximum observed: {} ops/sec)", tp, self.max_tp);
+
             self.measurements.total_latency.log_latency("Total");
             self.measurements.consensus_latency.log_latency("Consensus");
             self.measurements.pre_cons_latency.log_latency("Pre-consensus");
