@@ -19,6 +19,7 @@ servers_local_main() {
     ./generate_conf_local
     for ID in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
         start_replica $ID &
+        sleep 0.5
     done
     wait
 }
