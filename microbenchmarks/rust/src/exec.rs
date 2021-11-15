@@ -1,4 +1,3 @@
-use std::time::Instant;
 use std::default::Default;
 use std::sync::{Arc, Weak};
 
@@ -14,11 +13,14 @@ use febft::bft::executable::{
     UpdateBatchReplies,
 };
 
+use chrono::DateTime;
+use chrono::offset::Utc;
+
 use crate::serialize::MicrobenchmarkData;
 
 pub struct Microbenchmark {
     max_tp: f32,
-    max_tp_time: Instant,
+    max_tp_time: DateTime<Utc>,
     iterations: usize,
     reply: Arc<Vec<u8>>,
     measurements: Measurements,
@@ -35,7 +37,7 @@ impl Microbenchmark {
         Self {
             reply,
             max_tp: -1.0,
-            max_tp_time: Instant::now(),
+            max_tp_time: Utc::now(),
             iterations: 0,
             measurements: Measurements::default(),
         }
@@ -77,7 +79,7 @@ impl Service for Microbenchmark {
         // increase iter count
         self.iterations += 1;
 
-        meta.execution_time = Instant::now();
+        meta.execution_time = Utc::now();
 
         // take measurements
         meta.batch_size.store(&mut self.measurements.batch_size);
@@ -91,9 +93,9 @@ impl Service for Microbenchmark {
         if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
             println!("--- Measurements after {} ops ({} samples) ---", self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
 
-            let diff = Instant::now()
-                .duration_since(self.max_tp_time)
-                .as_millis();
+            let diff = Utc::now()
+                .signed_duration_since(self.max_tp_time)
+                .num_milliseconds();
             let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0) / (diff as f32);
 
             if tp > self.max_tp {
@@ -111,7 +113,7 @@ impl Service for Microbenchmark {
             self.measurements.commit_latency.log_latency("Accept");
             self.measurements.batch_size.log_batch();
 
-            self.max_tp_time = Instant::now();
+            self.max_tp_time = Utc::now();
         }
 
         reply_batch

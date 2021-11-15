@@ -6,7 +6,6 @@ use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::DateTime;
 use chrono::offset::Utc;
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
