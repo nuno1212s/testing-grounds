@@ -19,12 +19,12 @@ chrono = "0.4"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "e10812fe0008d653fc4ad2e8799e7ee9f14acb07"
+rev = "3b18c1896686e46fc30606bf1d5c60363656c770"
 default-features = false
 features = [
     "expose_impl",
     "async_runtime_tokio",
-    "threadpool_crossbeam",
+    "threadpool_rayon",
     "socket_tokio_tcp",
     "channel_flume_mpmc",
     "crypto_signature_ring_ed25519",
