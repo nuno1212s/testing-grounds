@@ -1,0 +1,217 @@
+#!/bin/sh
+
+# avoid accidentally terminating benchmarks
+trap '' INT
+
+# helper funs
+log() {
+    echo $(date): $@ >&2
+}
+
+smallcooldown() {
+    log Waiting 'for' 5 seconds
+    sleep 5
+}
+
+bigcooldown() {
+    log Waiting 'for' 1 minute
+    sleep 60
+}
+
+################################################################################
+
+# config params
+OPS_NUMBER=5000
+MEASUREMENT_INTERVAL=100
+
+STATE_SIZE=0
+REQUEST_SIZE=1
+REPLY_SIZE=$REQUEST_SIZE
+REQUEST_SLEEP_MILLIS=0
+
+REPLICAS="4 7 10 13"
+BATCHES="8 16 32 128 512 1024"
+CLIENTS="1 10 30 60 100 1000"
+RESULTS=results
+
+# generate_env <backend> <id> <num clients> <num replicas> <batch size>
+generate_env() {
+    cat << EOF
+export ID=$2
+export LOCAL=0
+
+export BACKEND=$1
+export VERBOSE=false
+export UPDATE_MAX_FDS=1
+
+export NUM_CLIENTS=$3
+export NUM_REPLICAS=$4
+export BATCH_SIZE=$5
+
+export OPS_NUMBER=$OPS_NUMBER
+export MEASUREMENT_INTERVAL=$MEASUREMENT_INTERVAL
+
+export STATE_SIZE=$STATE_SIZE
+export REPLY_SIZE=$REPLY_SIZE
+export REQUEST_SIZE=$REQUEST_SIZE
+export REQUEST_SLEEP_MILLIS=$REQUEST_SLEEP_MILLIS
+EOF
+}
+
+################################################################################
+
+# run as root!
+if [ $(id -u) -ne 0 ]; then
+    echo Run this script as root!
+    exit 1
+fi
+
+# update cwd
+cd "$(dirname $0)"
+cd ..
+
+# ask to continue
+echo "Run tests? This will purge any old results!"
+while true; do
+    read -p "(y/n)?" yn
+    case $yn in
+        [Yy]*)
+            break
+            ;;
+        [Nn]*)
+            exit 0
+            ;;
+        *)
+            echo "Please answer (y)es or (n)o."
+            ;;
+    esac
+done
+
+# kill old replica processes, if
+# an error occurred before
+for i in `seq 1 4`; do
+    cop=cop0${i}
+    log Killing all replicas 'in' $cop
+    sudo -u tcarvalho ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+done
+smallcooldown
+
+# rebuild software
+log Building Rust YCSB service
+for i in `seq 1 4`; do
+    cop=cop0${i}
+    sudo -u tcarvalho ssh $cop '. .cargo/env; cd tg; git pull; cd ycsb/service; env RUSTFLAGS="-C target-cpu=native" cargo build --release'
+    if [ $? -ne 0 ]; then
+        log Error: "Couldn't update service in $cop"
+        exit 1
+    fi
+done
+log Building Java YCSB client
+./gradlew shadowJar
+pkill -f java
+
+# wait for systems to recover
+bigcooldown
+
+# execute benchmarks
+log Beginning tests
+rm -rf $RESULTS # purge old results
+mkdir -p $RESULTS
+for no_replicas in $(echo $REPLICAS); do
+    log Init of benchmarking $no_replicas replicas
+
+    for batch_size in $(echo $BATCHES); do
+        log Init of testing a batch size of $batch_size
+
+        for no_clients in $(echo $CLIENTS); do
+            log Init of benchmarking $no_clients clients
+
+            # run each test 3 times, each test runs for 5min
+            for run_no in `seq 0 2`; do
+                log Init of run no. $run_no
+
+                targetdir="${RESULTS}/r=${no_replicas}/b=${batch_size}/c=${no_clients}/run=${run_no}"
+                start=${targetdir}/start
+                end=${targetdir}/end
+
+                mkdir -p $targetdir
+                date +%s > $start
+
+                log Run no. $run_no: Benchmarking with params: r=$no_replicas b=$batch_size c=$no_clients
+
+                # generate remote configs
+                for i in `seq 1 4`; do
+                    cop=cop0${i}
+                    log Generating configs 'for' $cop
+                    sudo -u tcarvalho ssh $cop \
+                        "cd tg/ycsb; mkdir -p config; cp auxiliary/generate config; cd config; ./generate $no_clients $no_replicas $batch_size"
+                    if [ $? -ne 0 ]; then
+                        log Error: "Couldn't generatte configs for $cop"
+                        exit 1
+                    fi
+                done
+
+                # start replicas in cop0?
+                for i in `seq 0 $(expr $no_replicas - 1)`; do
+                    ippart=$(expr $i % 4)
+                    cop=cop0$(expr $ippart + 1)
+                    ip=192.168.70.$(expr 16 + $ippart)
+
+                    log Starting replica id=$i 'in' $cop "($ip)"
+                    sudo -u tcarvalho ssh $cop \
+                        "cd tg/ycsb/service; sudo env ID=$i ./run" \
+                        >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
+                    if [ $? -ne 0 ]; then
+                        log Error: "Couldn't start replica $i in $cop"
+                        exit 1
+                    fi
+
+                    smallcooldown
+                done
+
+                # copy config generator
+                log Generating local configs
+                mkdir -p config
+                cp auxiliary/generate config
+
+                # run ycsb client
+                log Starting YCSB client
+                ./run $no_clients $no_replicas $batch_size \
+                    >${targetdir}/client_stdout 2>${targetdir}/client_stderr
+                if [ $? -ne 0 ]; then
+                    log Error: "YCSB client exited with an error, check its stderr; skipping to next test case"
+
+                    # kill replicas
+                    for i in `seq 1 4`; do
+                        cop=cop0${i}
+                        log Killing all replicas 'in' $cop
+                        sudo -u tcarvalho ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+                    done
+                    bigcooldown
+                    date +%s > $end
+
+                    continue
+                fi
+
+                # kill replicas
+                for i in `seq 1 4`; do
+                    cop=cop0${i}
+                    log Killing all replicas 'in' $cop
+                    sudo -u tcarvalho ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+                done
+                bigcooldown
+
+                log Finished run $run_no successfully
+                date +%s > $end
+            done
+
+            log Finished benchmarking $no_clients clients
+        done
+
+        log Finished benchmarking a batch size of $batch_size
+    done
+
+    log Finished benchmarking $no_replicas replicas
+done
+
+log All tests finished successfully
