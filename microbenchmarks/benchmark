@@ -22,7 +22,7 @@ bigcooldown() {
 
 # config params
 OPS_NUMBER=5000
-MEASUREMENT_INTERVAL=100
+MEASUREMENT_INTERVAL=1000
 
 STATE_SIZE=0
 REQUEST_SIZE=1
@@ -40,6 +40,7 @@ generate_env() {
 export ID=$2
 export LOCAL=0
 
+export COMPILE=0
 export BACKEND=$1
 export VERBOSE=false
 export UPDATE_MAX_FDS=1
@@ -68,7 +69,9 @@ fi
 
 # update cwd
 cd "$(dirname $0)"
-cd ..
+
+# update git repo
+git pull
 
 # ask to continue
 echo "Run tests? This will purge any old results!"
@@ -92,7 +95,8 @@ done
 for i in `seq 1 4`; do
     cop=cop0${i}
     log Killing all replicas 'in' $cop
-    sudo -u tcarvalho ssh $cop "pkill -f service" >/dev/null 2>/dev/null &
+    sudo ssh $cop "pkill -f microbenchmarks" >/dev/null 2>/dev/null &
+    sudo ssh $cop "pkill -f bft-smart" >/dev/null 2>/dev/null &
 done
 smallcooldown
 
