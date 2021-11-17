@@ -15,12 +15,13 @@ die() {
 }
 
 import_env() {
+    unset _JAVA_OPTIONS
     . ./env 2>/dev/null || die Error: No environment file found: env
     case $1 in
-        stop)
-            # stop running replicas
-            if [ -f $BACKEND/stop ]; then
-                $BACKEND/stop
+        stop|compile)
+            if [ -f $BACKEND/$1 ]; then
+                cd $BACKEND
+                ./$1
                 exit 0
             else
                 die Error: Invalid backend: $BACKEND
@@ -33,7 +34,7 @@ import_env() {
             export CLIENT=0
             ;;
         *)
-            die Usage: $0 '<clients|servers|stop>'
+            die Usage: $0 '<clients|servers|stop|compile>'
     esac
     check_env
 }

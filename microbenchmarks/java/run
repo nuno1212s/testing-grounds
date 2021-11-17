@@ -1,14 +1,12 @@
 #!/bin/sh
 
 main() {
-    unset _JAVA_OPTIONS
     compile
     [ $CLIENT -eq 1 ] && clients_main || servers_main
 }
 
 compile() {
-    ./gradlew shadowJar
-    ./gradlew --stop
+    [ $COMPILE -eq 1 ] && ./compile
 }
 
 servers_main() {

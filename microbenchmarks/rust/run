@@ -2,6 +2,7 @@
 
 main() {
     generate_conf
+    compile
     exec_microbenchmarks
 }
 
@@ -28,8 +29,12 @@ generate_conf() {
     fi
 }
 
+compile() {
+    [ $COMPILE -eq 1 ] && ./compile
+}
+
 exec_microbenchmarks() {
-    exec env RUSTFLAGS="-C target-cpu=native" cargo run --release
+    exec ./target/release/microbenchmarks
 }
 
 main
