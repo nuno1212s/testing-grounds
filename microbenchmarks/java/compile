@@ -1,3 +1,5 @@
 #!/bin/sh
 ./gradlew shadowJar
+retcode=$?
 ./gradlew --stop
+exit $retcode

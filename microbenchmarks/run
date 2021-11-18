@@ -40,13 +40,17 @@ import_env() {
 }
 
 check_env() {
-    _NEED_ENV="NUM_CLIENTS NUM_REPLICAS BATCH_SIZE ID LOCAL BACKEND VERBOSE \
+    _NEED_ENV="NUM_CLIENTS NUM_REPLICAS BATCH_SIZE LOCAL ID BACKEND VERBOSE \
         OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE \
         REQUEST_SLEEP_MILLIS UPDATE_MAX_FDS"
 
     for var in $_NEED_ENV; do
         if [ -z $(eval "echo \$$var") ]; then
-            die Error: Variable is unset in environment file: $var
+            if [ $LOCAL -eq 1 ] && [ $var = "ID" ]; then
+                # ignore ID variable if we are running replicas locally
+                continue
+            fi
+            die Error: Variable is unset in environment: $var
         fi
     done
 }

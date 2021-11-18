@@ -36,11 +36,6 @@ use febft::bft::benchmarks::{
 };
 
 pub fn main() {
-    let replica_id: u32 = std::env::var("ID")
-        .iter()
-        .flat_map(|id| id.parse())
-        .next()
-        .unwrap();
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
         .unwrap_or(false);
@@ -50,6 +45,11 @@ pub fn main() {
     };
     let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
+        let replica_id: u32 = std::env::var("ID")
+            .iter()
+            .flat_map(|id| id.parse())
+            .next()
+            .unwrap();
         rt::block_on(async_main(NodeId::from(replica_id)));
     } else {
         rt::block_on(client_async_main());
