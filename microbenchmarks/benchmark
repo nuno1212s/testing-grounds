@@ -69,7 +69,7 @@ EOF
 # abort execution if we are not orchestrating this benchmark
 # from the cop-gpu node, which will launch all replicas and
 # execute its clients
-if [ ${HOSTNAME%%\.*} != "cop-gpu" ]; then
+if [ "${HOSTNAME%%\.*}" != "cop-gpu" ]; then
     echo Invalid host detected. Please run this script from cop-gpu.
     exit 1
 fi
