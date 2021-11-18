@@ -74,7 +74,12 @@ if [ "${HOSTNAME%%\.*}" != "cop-gpu" ]; then
     exit 1
 fi
 
-# update cwd
+if [ "$USER" != "tcarvalho" ]; then
+    echo Invalid user detected. Please run this script as tcarvalho.
+    exit 1
+fi
+
+# cd to <testing grounds repo>/microbenchmarks
 cd "$(dirname $0)"
 
 # update git repo
