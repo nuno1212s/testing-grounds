@@ -183,7 +183,7 @@ for backend in java rust; do
                     done
 
                     # start clients in cop-gpu
-                    log Starting clients
+                    log "Executing clients; check ${targetdir} for more details"
                     ./run clients >${targetdir}/client_stdout 2>${targetdir}/client_stderr
 
                     if [ $? -eq 0 ]; then
