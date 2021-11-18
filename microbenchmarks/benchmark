@@ -184,12 +184,18 @@ for backend in java rust; do
 
                     # start clients in cop-gpu
                     log "Executing clients; check ${targetdir} for more details"
-                    ./run clients >${targetdir}/client_stdout 2>${targetdir}/client_stderr
+                    ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
 
                     if [ $? -eq 0 ]; then
+                        # move clients' latency file to target directory
+                        mv ${backend}/latencies* ${targetdir}/
+
                         log Finished run $run_no
                     else
-                        log Error: "Client exited with an error, check its stderr; skipping to next test case"
+                        # signal this run was unsuccessful
+                        touch ${targetdir}/error
+
+                        log Error: "Clients exited with an error, check their stderr; skipping to next test case"
                     fi
                     date +%s > $end
 
