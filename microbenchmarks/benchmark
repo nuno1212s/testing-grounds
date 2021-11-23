@@ -36,8 +36,8 @@ REPLY_SIZE=$REQUEST_SIZE
 REQUEST_SLEEP_MILLIS=0
 
 REPLICAS="4 7 10 13"
-BATCHES="8 16 32 128 512 1024"
-CLIENTS="1 10 30 60 100 500"
+BATCHES="8 16 32 128 512 1024 2048"
+CLIENTS="1 10 30 60 100"
 RESULTS=results
 
 # generate_env <backend> <num clients> <num replicas> <batch size>
