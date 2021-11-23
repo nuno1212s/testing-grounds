@@ -1,5 +1,14 @@
 #!/bin/sh
-./gradlew shadowJar
+
+gradle_wrapper() {
+    if [ -n "$JAVA_HOME" ]; then
+        ./gradlew -Dorg.gradle.java.home=$JAVA_HOME $@
+    else
+        ./gradlew $@
+    fi
+}
+
+gradle_wrapper shadowJar
 retcode=$?
-./gradlew --stop
+gradle_wrapper --stop
 exit $retcode
