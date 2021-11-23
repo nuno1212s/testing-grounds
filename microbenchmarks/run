@@ -50,6 +50,10 @@ check_env() {
                 # ignore ID variable if we are running replicas locally
                 continue
             fi
+            if [ $var = "ID" ] && [ $CLIENT -eq 1 ]; then
+                # ignore ID variable if we are running client nodes
+                continue
+            fi
             die Error: Variable is unset in environment: $var
         fi
     done

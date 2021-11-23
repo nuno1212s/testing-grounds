@@ -45,7 +45,7 @@ generate_env() {
     cat << EOF
 export LOCAL=0
 export COMPILE=0
-export JAVA_HOME=\$HOME/jdk-11
+export JAVA_HOME=/home/tcarvalho/jdk-11
 
 export BACKEND=$1
 export VERBOSE=false
@@ -190,7 +190,7 @@ for backend in java rust; do
 
                     # start clients in cop-gpu
                     log "Executing clients; check ${targetdir} for more details"
-                    ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
+                    sudo ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
 
                     if [ $? -eq 0 ]; then
                         # move clients' latency file to target directory
