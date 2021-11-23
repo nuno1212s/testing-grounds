@@ -24,7 +24,7 @@ servers_local_main() {
 
 servers_cop_main() {
     ./generate_conf_cop
-    exec start_replica $ID
+    start_replica $ID
 }
 
 clients_main() {
