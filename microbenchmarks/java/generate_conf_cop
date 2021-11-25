@@ -17,7 +17,9 @@ regen_hosts_file() {
     for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
         host=$(expr $id % 4)
         host=$(expr 16 + $host)
-        echo $id 192.168.70.$host 11000 11001 >> hosts.config
+        port_1=$(expr 11000 + $(expr $id \* 10))
+        port_2=$(expr $(expr 11000 + $(expr $id \* 10)) + 1)
+        echo $id 192.168.70.$host $port_1 $port_2 >> hosts.config
     done
 }
 
