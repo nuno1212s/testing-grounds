@@ -42,7 +42,7 @@ REQUEST_SLEEP_MILLIS=0
 
 REPLICAS="4 7 10 13"
 BATCHES="8 16 32 128 512 1024 2048"
-CLIENTS="1 10 30 60 100"
+CLIENTS="10 30 60 100"
 RESULTS=results
 
 # generate_env <backend> <num clients> <num replicas> <batch size>
@@ -208,11 +208,12 @@ for backend in rust; do
                                 cmd $cop "cd tg/microbenchmarks; sudo ./run stop" >/dev/null 2>/dev/null &
                             done
 
-                            log Error: "Clients exited with an error; retrying"
+                            log Error: "Clients exited with an error; shutting down"
+                            exit 1
 
-                            bigcooldown
-                            rm -f ${targetdir}/*
-                            continue
+                            #bigcooldown
+                            #rm -f ${targetdir}/*
+                            #continue
                         fi
 
                         # move clients' latency file to target directory
