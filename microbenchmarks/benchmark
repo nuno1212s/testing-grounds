@@ -13,6 +13,11 @@ smallcooldown() {
     sleep 5
 }
 
+mediumcooldown() {
+    log Waiting 'for' 30 seconds
+    sleep 30
+}
+
 bigcooldown() {
     log Waiting 'for' 1 minute
     sleep 60
@@ -123,7 +128,7 @@ rm -rf $RESULTS # purge old results
 mkdir -p $RESULTS
 
 log Beginning tests
-for backend in java rust; do
+for backend in rust; do
     log Init of benchmarking backend $backend
 
     for no_replicas in $(echo $REPLICAS); do
@@ -167,52 +172,65 @@ for backend in java rust; do
                     end=${targetdir}/end
 
                     mkdir -p $targetdir
-                    date +%s > $start
 
-                    log Run no. $run_no: Benchmarking with params: backend=$backend r=$no_replicas b=$batch_size c=$no_clients
+                    while true; do
+                        date +%s > $start
 
-                    # start replicas in cop0?
-                    for i in `seq 0 $(expr $no_replicas - 1)`; do
-                        ippart=$(expr $i % 4)
-                        cop=cop0$(expr $ippart + 1)
-                        ip=192.168.70.$(expr 16 + $ippart)
+                        log Run no. $run_no: Benchmarking with params: backend=$backend r=$no_replicas b=$batch_size c=$no_clients
 
-                        log Starting replica id=$i 'in' $cop "($ip)"
-                        cmd $cop "cd tg/microbenchmarks; sudo env ID=$i ./run servers" \
-                            >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
+                        # start replicas in cop0?
+                        for i in `seq 0 $(expr $no_replicas - 1)`; do
+                            ippart=$(expr $i % 4)
+                            cop=cop0$(expr $ippart + 1)
+                            ip=192.168.70.$(expr 16 + $ippart)
+
+                            log Starting replica id=$i 'in' $cop "($ip)"
+                            cmd $cop "cd tg/microbenchmarks; sudo env ID=$i ./run servers" \
+                                >${targetdir}/replica_${i}_stdout 2>${targetdir}/replica_${i}_stderr &
+                            if [ $? -ne 0 ]; then
+                                log Error: "Couldn't start replica $i in $cop"
+                                exit 1
+                            fi
+
+                            smallcooldown
+                        done
+                        mediumcooldown
+
+                        # start clients in cop-gpu
+                        log "Executing clients; check ${targetdir} for more details"
+                        sudo timeout 10m ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
+
                         if [ $? -ne 0 ]; then
-                            log Error: "Couldn't start replica $i in $cop"
-                            exit 1
+                            # kill replicas
+                            for i in `seq 1 4`; do
+                                cop=cop0${i}
+                                log Killing all replicas 'in' $cop
+                                cmd $cop "cd tg/microbenchmarks; sudo ./run stop" >/dev/null 2>/dev/null &
+                            done
+
+                            log Error: "Clients exited with an error; retrying"
+
+                            bigcooldown
+                            rm -f ${targetdir}/*
+                            continue
                         fi
 
-                        smallcooldown
-                    done
-
-                    # start clients in cop-gpu
-                    log "Executing clients; check ${targetdir} for more details"
-                    sudo ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
-
-                    if [ $? -eq 0 ]; then
                         # move clients' latency file to target directory
                         mv ${backend}/latencies* ${targetdir}/
 
                         log Finished run $run_no
-                    else
-                        # signal this run was unsuccessful
-                        touch ${targetdir}/error
+                        date +%s > $end
 
-                        log Error: "Clients exited with an error, check their stderr; skipping to next test case"
-                    fi
-                    date +%s > $end
+                        # kill replicas
+                        for i in `seq 1 4`; do
+                            cop=cop0${i}
+                            log Killing all replicas 'in' $cop
+                            cmd $cop "cd tg/microbenchmarks; sudo ./run stop" >/dev/null 2>/dev/null &
+                        done
 
-                    # kill replicas
-                    for i in `seq 1 4`; do
-                        cop=cop0${i}
-                        log Killing all replicas 'in' $cop
-                        cmd $cop "cd tg/microbenchmarks; sudo ./run stop" >/dev/null 2>/dev/null &
+                        bigcooldown
+                        break
                     done
-
-                    bigcooldown
                 done
 
                 log Finished benchmarking $no_clients clients
