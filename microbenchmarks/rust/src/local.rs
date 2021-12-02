@@ -106,7 +106,6 @@ pub fn main() {
 }
 
 #[tracing::instrument(skip_all)] async fn client_async_main() {
-    std::env::set_var("TOKIO_CONSOLE_BIND", "0.0.0.0:30000");
     console_subscriber::init();
 
     let clients_config = parse_config("./config/clients.config").unwrap();
