@@ -93,9 +93,9 @@ async fn async_main() {
             public_keys.clone(),
         );
         rt::spawn(async move {
-            println!("Bootstrapping replica #{}", u32::from(id));
+            eprintln!("Bootstrapping replica #{}", u32::from(id));
             let mut replica = fut.await.unwrap();
-            println!("Running replica #{}", u32::from(id));
+            eprintln!("Running replica #{}", u32::from(id));
             replica.run().await.unwrap();
         });
     }
@@ -154,9 +154,9 @@ async fn client_async_main() {
         );
         let mut tx = tx.clone();
         rt::spawn(async move {
-            println!("Bootstrapping client #{}", u32::from(id));
+            eprintln!("Bootstrapping client #{}", u32::from(id));
             let client = fut.await.unwrap();
-            println!("Done bootstrapping client #{}", u32::from(id));
+            eprintln!("Done bootstrapping client #{}", u32::from(id));
             tx.send(client).await.unwrap();
         });
     }
