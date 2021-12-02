@@ -52,6 +52,9 @@ pub fn main() {
 }
 
 async fn async_main() {
+    std::env::set_var("TOKIO_CONSOLE_BIND", "0.0.0.0:20000");
+    console_subscriber::init();
+
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -103,6 +106,9 @@ async fn async_main() {
 }
 
 async fn client_async_main() {
+    std::env::set_var("TOKIO_CONSOLE_BIND", "0.0.0.0:30000");
+    console_subscriber::init();
+
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
