@@ -151,6 +151,7 @@ for backend in rust; do
                 done
 
                 # rebuild software
+                ./run compile
                 for i in `seq 1 4`; do
                     cop=cop0${i}
                     cmd $cop '. .cargo/env; cd tg; git pull; cd microbenchmarks; ./run compile'
