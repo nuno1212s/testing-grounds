@@ -56,7 +56,7 @@ pub fn main() {
     }
 }
 
-async fn async_main(id: NodeId) {
+#[tracing::instrument(skip_all)] async fn async_main(id: NodeId) {
     std::env::set_var("TOKIO_CONSOLE_BIND", &format!("0.0.0.0:{}", 20000 + u32::from(id)));
     console_subscriber::init();
 
@@ -111,7 +111,7 @@ async fn async_main(id: NodeId) {
     replica.run().await.unwrap();
 }
 
-async fn client_async_main() {
+#[tracing::instrument(skip_all)] async fn client_async_main() {
     std::env::set_var("TOKIO_CONSOLE_BIND", "0.0.0.0:30000");
     console_subscriber::init();
 
@@ -204,7 +204,7 @@ fn sk_stream() -> impl Iterator<Item = KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+#[tracing::instrument(skip_all)] async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({

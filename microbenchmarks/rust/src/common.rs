@@ -111,7 +111,7 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
     Some(ConfigEntry { id, hostname, ipaddr, portno })
 }
 
-async fn node_config(
+#[tracing::instrument(skip_all)] async fn node_config(
     n: usize,
     id: NodeId,
     sk: KeyPair,
@@ -139,7 +139,7 @@ async fn node_config(
     }
 }
 
-pub async fn setup_client(
+#[tracing::instrument(skip_all)] pub async fn setup_client(
     n: usize,
     id: NodeId,
     sk: KeyPair,
@@ -153,7 +153,7 @@ pub async fn setup_client(
     Client::bootstrap(conf).await
 }
 
-pub async fn setup_replica(
+#[tracing::instrument(skip_all)] pub async fn setup_replica(
     n: usize,
     id: NodeId,
     sk: KeyPair,
@@ -175,7 +175,7 @@ pub async fn setup_replica(
     Replica::bootstrap(conf).await
 }
 
-async fn get_batch_size() -> usize {
+#[tracing::instrument(skip_all)] async fn get_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
         let mut buf = String::new();
@@ -186,7 +186,7 @@ async fn get_batch_size() -> usize {
     rx.await.unwrap()
 }
 
-async fn get_server_config(id: NodeId) -> ServerConfig {
+#[tracing::instrument(skip_all)] async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
         let id = usize::from(id);
@@ -230,7 +230,7 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
     rx.await.unwrap()
 }
 
-async fn get_client_config(id: NodeId) -> ClientConfig {
+#[tracing::instrument(skip_all)] async fn get_client_config(id: NodeId) -> ClientConfig {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
         let id = usize::from(id);
