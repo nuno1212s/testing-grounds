@@ -160,9 +160,6 @@ for backend in rust; do
                     fi
                 done
 
-                # wait for systems to recover
-                bigcooldown
-
                 # run each test 3 times
                 for run_no in `seq 0 2`; do
                     log Init of run no. $run_no
@@ -198,7 +195,7 @@ for backend in rust; do
 
                         # start clients in cop-gpu
                         log "Executing clients; check ${targetdir} for more details"
-                        sudo timeout 10m ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
+                        sudo timeout 60m ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
 
                         if [ $? -ne 0 ]; then
                             # kill replicas
@@ -229,7 +226,6 @@ for backend in rust; do
                             cmd $cop "cd tg/microbenchmarks; sudo ./run stop" >/dev/null 2>/dev/null &
                         done
 
-                        bigcooldown
                         break
                     done
                 done
