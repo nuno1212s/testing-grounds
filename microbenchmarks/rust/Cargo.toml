@@ -38,3 +38,6 @@ rev = "042c1f78447839bed54538ed89b9277e437ed6b4"
 
 [build-dependencies.capnpc]
 version = "0.14"
+
+[profile.release]
+debug = 2
