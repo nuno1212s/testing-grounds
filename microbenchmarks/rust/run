@@ -34,7 +34,7 @@ compile() {
 }
 
 exec_microbenchmarks() {
-    exec ./target/release/microbenchmarks
+    exec ./target/debug/microbenchmarks
 }
 
 main
