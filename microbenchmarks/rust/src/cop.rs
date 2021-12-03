@@ -220,6 +220,8 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
     let id = u32::from(client.id());
 
     for req in iterator {
+        eprintln!("{}: Sending req {}", id, req);
+
         if MicrobenchmarkData::VERBOSE {
             print!("Sending req {}...", req);
         }
@@ -264,9 +266,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
     let iterator = (MicrobenchmarkData::OPS_NUMBER/2)..MicrobenchmarkData::OPS_NUMBER;
 
     for req in iterator {
-        if id == 1000 {
-            eprintln!("Sending req {}", req);
-        }
+        eprintln!("{}: Sending req {}", id, req);
 
         if MicrobenchmarkData::VERBOSE {
             print!("{} // Sending req {}...", id, req);
