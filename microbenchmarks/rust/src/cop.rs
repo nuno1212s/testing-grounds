@@ -177,17 +177,23 @@ async fn client_async_main() {
     }
     drop(clients_config);
 
-    for h in handles {
+    for (i, h) in handles.into_iter().enumerate() {
+        eprintln!("Waiting on client {}", 1000 + i);
         let _ = h.await;
+        eprintln!("Client {} returned", 1000 + i);
     }
 
     let mut file = File::create("./latencies.out").unwrap();
 
+    eprintln!("Writing latencies");
     while let Ok(line) = queue.try_dequeue() {
         file.write_all(line.as_ref()).unwrap();
     }
+    eprintln!("Done writing latencies");
 
+    eprintln!("Flushing latencies");
     file.flush().unwrap();
+    eprintln!("Done flushing latencies");
 }
 
 fn sk_stream() -> impl Iterator<Item = KeyPair> {
@@ -255,9 +261,13 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER/2);
 
-    let iterator = MicrobenchmarkData::OPS_NUMBER/2..MicrobenchmarkData::OPS_NUMBER;
+    let iterator = (MicrobenchmarkData::OPS_NUMBER/2)..MicrobenchmarkData::OPS_NUMBER;
 
     for req in iterator {
+        if id == 1000 {
+            eprintln!("Sending req {}", req);
+        }
+
         if MicrobenchmarkData::VERBOSE {
             print!("{} // Sending req {}...", id, req);
         }
