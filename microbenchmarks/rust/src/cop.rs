@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chrono::offset::Utc;
 use futures_timer::Delay;
+use futures::future::join_all;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -177,11 +178,9 @@ async fn client_async_main() {
     }
     drop(clients_config);
 
-    for (i, h) in handles.into_iter().enumerate() {
-        eprintln!("Waiting on client {}", 1000 + i);
-        let _ = h.await;
-        eprintln!("Client {} returned", 1000 + i);
-    }
+    eprintln!("Waiting on clients");
+    let _output = join_all(handles).await;
+    eprintln!("Done waiting on clients");
 
     let mut file = File::create("./latencies.out").unwrap();
 
