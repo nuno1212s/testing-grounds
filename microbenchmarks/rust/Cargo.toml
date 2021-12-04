@@ -19,17 +19,17 @@ chrono = "0.4"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "ed5eef75ec4b158ea248cc0dab8a760d58192362"
+rev = "c99877a83897fbc737ab8edb6e34a8c48c57b86c"
 default-features = false
 features = [
     "expose_impl",
-    "async_runtime_async_std",
-    "threadpool_crossbeam",
-    "socket_async_std_tcp",
-    "channel_futures_mpsc",
+    "async_runtime_tokio",
+    "threadpool_rayon",
+    "socket_tokio_tcp",
+    "channel_flume_mpmc",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
-    "collections_randomstate_std"
+    "collections_randomstate_twox_hash"
 ]
 
 [build-dependencies.capnpc]
