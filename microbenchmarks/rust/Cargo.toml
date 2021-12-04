@@ -23,9 +23,9 @@ rev = "ed5eef75ec4b158ea248cc0dab8a760d58192362"
 default-features = false
 features = [
     "expose_impl",
-    "async_runtime_tokio",
+    "async_runtime_async_std",
     "threadpool_rayon",
-    "socket_tokio_tcp",
+    "socket_async_std_tcp",
     "channel_flume_mpmc",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
