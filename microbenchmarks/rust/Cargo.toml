@@ -28,7 +28,8 @@ features = [
     "socket_async_std_tcp",
     "channel_futures_mpsc",
     "crypto_signature_ring_ed25519",
-    "crypto_hash_blake3_blake3"
+    "crypto_hash_blake3_blake3",
+    "collections_randomstate_std"
 ]
 
 [build-dependencies.capnpc]
