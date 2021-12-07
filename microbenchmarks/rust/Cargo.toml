@@ -20,7 +20,7 @@ tracing = "0.1"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "8c16250e7a6acd9e1551028e00e1f316f10d35ad"
+rev = "4198e25912d18fb72eb368e646874c83dc0e0deb"
 default-features = false
 features = [
     "expose_impl",
