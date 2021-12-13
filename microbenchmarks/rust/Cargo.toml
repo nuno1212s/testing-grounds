@@ -18,8 +18,9 @@ nolock = "0.3"
 chrono = "0.4"
 
 [dependencies.febft]
-git = "https://github.com/febft/febft"
-rev = "6bcf2e9568bb8bb80a1f9489b6097fd11c36fb76"
+#git = "https://github.com/febft/febft"
+#rev = "b0bc620b51ba1f639cf613d64d7a5d7347c391f7"
+path = "../../../febft/"
 default-features = false
 features = [
     "expose_impl",
