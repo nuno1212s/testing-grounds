@@ -43,7 +43,6 @@ fn bench_plain_mutex(b: &mut test::Bencher) {
 ////////////////////////////////////////////////////////////////////////////////
 
 fn work(pool: &ThreadPool) {
-    asd
 }
 
 fn spawn_sender(tx: mpsc::SyncSender<Message>) {
@@ -51,9 +50,8 @@ fn spawn_sender(tx: mpsc::SyncSender<Message>) {
         let mut rng = thread_rng();
         loop {
             let to: Id = rng.gen_range(0..NUM_CLIENTS);
-            let data = ();
 
-            if tx.send(Message { to, data }).is_err() {
+            if tx.send(Message { to }).is_err() {
                 return;
             }
             thread::sleep(SLEEP);
@@ -62,32 +60,23 @@ fn spawn_sender(tx: mpsc::SyncSender<Message>) {
 }
 
 fn receiver_thread<S>(live: Weak<S>, rx: mpsc::Receiver<Message>) {
-    thread::spawn(move || {
-        let mut rng = thread_rng();
-        loop {
-            let to: Id = rng.gen_range(0..NUM_CLIENTS);
-            let data = ();
-
-            if tx.send(Message { to, data }).is_err() {
-                return;
-            }
-            thread::sleep(SLEEP);
-        }
-    });
 }
 
 /* TRAITS AND COSNTS USED BY TESTS                                            */
 ////////////////////////////////////////////////////////////////////////////////
 
 const NUM_CLIENTS: Id = 16;
+const CHAN_CAP: usize = 1024;
 const SLEEP: Duration = Duration::from_millis(1);
 
 type Id = usize;
-type Data = ();
+
+struct Data {
+    wakeup_notification: Option<oneshot::Receiver<()>>,
+}
 
 struct Message {
     to: Id,
-    data: Data,
 }
 
 trait HandleData {
@@ -96,18 +85,30 @@ trait HandleData {
         F: FnMut(Option<&mut Data>) -> T;
 }
 
-trait SharedState {
+trait SharedStateHandle {
     type HandleData: HandleData;
 
     fn acquire(&self, who: Id) -> Self::HandleData;
 }
 
+trait SharedState {
+    type Shared;
+    type Handle: SharedStateHandle;
+
+    fn new() -> Self;
+    fn handle(&self, shared: Self::Shared) -> Self::Handle;
+}
+
 /* PLAIN MUTEX                                                                */
 ////////////////////////////////////////////////////////////////////////////////
 
+struct OwnedPlainMutex(Mutex<IntMap<Data>>);
+
+//impl
+
 struct PlainMutex<'a>(&'a Mutex<IntMap<Data>>);
 
-impl<'a> SharedState for PlainMutex<'a> {
+impl<'a> SharedStateHandle for PlainMutex<'a> {
     type HandleData = PlainMutexHandle<'a>;
 
     fn acquire(&self, who: Id) -> Self::HandleData {
