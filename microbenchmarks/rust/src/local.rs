@@ -156,8 +156,8 @@ async fn client_async_main() {
     }
     drop((secret_keys, public_keys, replicas_config));
 
-    let (mut queue, tx) = async_queue();
-    let tx = Arc::new(tx);
+    let (mut queue, queue_tx) = async_queue();
+    let queue_tx = Arc::new(queue_tx);
 
     let mut clients = Vec::with_capacity(clients_config.len());
     for _i in 0..clients_config.len() {
@@ -165,8 +165,8 @@ async fn client_async_main() {
     }
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
-        let tx = Arc::clone(&tx);
-        let h = rt::spawn(run_client(client, tx));
+        let queue_tx = Arc::clone(&queue_tx);
+        let h = rt::spawn(run_client(client, queue_tx));
         handles.push(h);
     }
     drop(clients_config);
