@@ -71,9 +71,9 @@ impl Service for Microbenchmark {
         let mut reply_batch = UpdateBatchReplies::with_capacity(batch.len());
 
         for update in batch.into_inner() {
-            let (peer_id, dig, _req) = update.into_inner();
+            let (peer_id, sess, opid, _req) = update.into_inner();
             let reply = Arc::downgrade(&self.reply);
-            reply_batch.add(peer_id, dig, reply);
+            reply_batch.add(peer_id, sess, opid, reply);
         }
 
         // increase iter count

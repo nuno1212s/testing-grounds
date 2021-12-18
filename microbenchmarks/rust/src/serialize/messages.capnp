@@ -18,8 +18,9 @@ struct Request {
 }
 
 struct Reply {
-    digest @0 :Data;
-    data   @1 :Data;
+    sessionId   @0 :UInt32;
+    operationId @1 :UInt32;
+    data        @2 :Data;
 }
 
 struct Consensus {

@@ -118,7 +118,8 @@ impl SharedData for MicrobenchmarkData {
                     Some(p) => p,
                     _ => return Err("No payload available").wrapped(ErrorKind::CommunicationSerialize),
                 };
-                reply.set_digest(m.digest().as_ref());
+                reply.set_operation_id(m.sequence_number().into());
+                reply.set_session_id(m.session_id().into());
                 reply.set_data(&*payload);
             },
             SystemMessage::Consensus(m) => {
@@ -174,17 +175,14 @@ impl SharedData for MicrobenchmarkData {
 
         match sys_msg_which {
             messages_capnp::system::Which::Reply(Ok(reply)) => {
-                let digest_reader = reply
-                    .get_digest()
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
-                let digest = Digest::from_bytes(digest_reader)
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
+                let session_id: SeqNo = reply.get_session_id().into();
+                let operation_id: SeqNo = reply.get_operation_id().into();
                 let _data = reply
                     .get_data()
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?
                     .to_owned();
 
-                Ok(SystemMessage::Reply(ReplyMessage::new(digest, Weak::new())))
+                Ok(SystemMessage::Reply(ReplyMessage::new(session_id, operation_id, Weak::new())))
             },
             messages_capnp::system::Which::Reply(_) => {
                 Err("Failed to read reply message")
