@@ -1,0 +1,20 @@
+[package]
+name = "shared_state"
+version = "0.1.0"
+authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
+edition = "2021"
+
+[features]
+alloc_jemalloc = ["jemallocator"]
+alloc_mimalloc = ["mimalloc"]
+
+[dependencies]
+jemallocator = { version = "0.3", optional = true }
+mimalloc = { version = "0.1", default-features = false, optional = true }
+parking_lot = "0.11"
+lock_api = "0.4"
+threadpool = "1"
+oneshot = "0.1"
+num_cpus = "1"
+intmap = "0.7"
+rand = "0.8"
