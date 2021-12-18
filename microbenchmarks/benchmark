@@ -13,6 +13,11 @@ smallcooldown() {
     sleep 5
 }
 
+mediumcooldown() {
+    log Waiting 'for' 15 seconds
+    sleep 15
+}
+
 bigcooldown() {
     log Waiting 'for' 1 minute
     sleep 60
@@ -146,6 +151,7 @@ for backend in java rust; do
                 done
 
                 # rebuild software
+                ./run compile
                 for i in `seq 1 4`; do
                     cop=cop0${i}
                     cmd $cop '. .cargo/env; cd tg; git pull; cd microbenchmarks; ./run compile'
@@ -187,10 +193,11 @@ for backend in java rust; do
 
                         smallcooldown
                     done
+                    mediumcooldown
 
                     # start clients in cop-gpu
                     log "Executing clients; check ${targetdir} for more details"
-                    sudo ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
+                    sudo timeout 90m ./run clients >${targetdir}/clients_stdout 2>${targetdir}/clients_stderr
 
                     if [ $? -eq 0 ]; then
                         # move clients' latency file to target directory
