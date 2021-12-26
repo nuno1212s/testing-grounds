@@ -128,7 +128,7 @@ rm -rf $RESULTS # purge old results
 mkdir -p $RESULTS
 
 log Beginning tests
-for backend in java rust; do
+for backend in rust; do
     log Init of benchmarking backend $backend
 
     for no_replicas in $(echo $REPLICAS); do
