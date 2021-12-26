@@ -19,7 +19,7 @@ chrono = "0.4"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "84134a8e3e447c678fbbb602634a65052a949b97"
+rev = "4ba3bd3b3f5b5534cb71a4c1c2b833357a3c3c71"
 default-features = false
 features = [
     "expose_impl",
