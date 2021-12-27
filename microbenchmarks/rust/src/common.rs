@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::io::{BufReader, BufRead, Read};
 
 use regex::Regex;
+use intmap::IntMap;
 use rustls::{
     internal::pemfile,
     ServerConfig,
@@ -16,7 +17,6 @@ use rustls::{
 use febft::bft::error::*;
 use febft::bft::threadpool;
 use febft::bft::ordering::SeqNo;
-use febft::bft::collections::HashMap;
 use febft::bft::communication::{
     NodeId,
     NodeConfig,
@@ -43,17 +43,6 @@ macro_rules! addr {
         let addr: ::std::net::SocketAddr = $a.parse().unwrap();
         (addr, String::from($h))
     }}
-}
-
-#[macro_export]
-macro_rules! map {
-    ( $($key:expr => $value:expr),+ ) => {{
-        let mut m = ::febft::bft::collections::hash_map();
-        $(
-            m.insert($key, $value);
-        )+
-        m
-     }};
 }
 
 pub struct ConfigEntry {
@@ -115,8 +104,8 @@ async fn node_config(
     n: usize,
     id: NodeId,
     sk: KeyPair,
-    addrs: HashMap<NodeId, (SocketAddr, String)>,
-    pk: HashMap<NodeId, PublicKey>,
+    addrs: IntMap<(SocketAddr, String)>,
+    pk: IntMap<PublicKey>,
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config) = {
@@ -143,8 +132,8 @@ pub async fn setup_client(
     n: usize,
     id: NodeId,
     sk: KeyPair,
-    addrs: HashMap<NodeId, (SocketAddr, String)>,
-    pk: HashMap<NodeId, PublicKey>,
+    addrs: IntMap<(SocketAddr, String)>,
+    pk: IntMap<PublicKey>,
 ) -> Result<Client<MicrobenchmarkData>> {
     let node = node_config(n, id, sk, addrs, pk).await;
     let conf = client::ClientConfig {
@@ -157,8 +146,8 @@ pub async fn setup_replica(
     n: usize,
     id: NodeId,
     sk: KeyPair,
-    addrs: HashMap<NodeId, (SocketAddr, String)>,
-    pk: HashMap<NodeId, PublicKey>,
+    addrs: IntMap<(SocketAddr, String)>,
+    pk: IntMap<PublicKey>,
 ) -> Result<Replica<Microbenchmark>> {
     let (node, batch_size) = {
         let n = node_config(n, id, sk, addrs, pk);

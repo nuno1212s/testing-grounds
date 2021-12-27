@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 regex = "1"
+intmap = "0.7"
 rustls = "0.19"
 futures = "0.3"
 oneshot = "0.1"
@@ -19,7 +20,7 @@ chrono = "0.4"
 
 [dependencies.febft]
 git = "https://github.com/febft/febft"
-rev = "4ba3bd3b3f5b5534cb71a4c1c2b833357a3c3c71"
+rev = "aa22daf1c54a2c3f16da8b0bd4d3717c1e9324ab"
 default-features = false
 features = [
     "expose_impl",

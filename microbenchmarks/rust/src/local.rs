@@ -6,6 +6,7 @@ use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
+use intmap::IntMap;
 use chrono::offset::Utc;
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
@@ -25,10 +26,6 @@ use febft::bft::{
 use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
-};
-use febft::bft::collections::{
-    self,
-    HashMap,
 };
 use febft::bft::benchmarks::{
     BenchmarkHelper,
@@ -55,12 +52,12 @@ async fn async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
-    let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
+    let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(replicas_config.len())
         .enumerate()
-        .map(|(id, sk)| (NodeId::from(id), sk))
+        .map(|(id, sk)| (id as u64, sk))
         .collect();
-    let public_keys: HashMap<NodeId, PublicKey> = secret_keys
+    let public_keys: IntMap<PublicKey> = secret_keys
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
@@ -68,20 +65,20 @@ async fn async_main() {
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
         let addrs = {
-            let mut addrs = collections::hash_map();
+            let mut addrs = IntMap::new();
             for other in &replicas_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id, crate::addr!(&other.hostname => addr));
+                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
             }
             for client in &clients_config {
                 let id = NodeId::from(client.id);
                 let addr = format!("{}:{}", client.ipaddr, client.portno);
-                addrs.insert(id, crate::addr!(&client.hostname => addr));
+                addrs.insert(id.into(), crate::addr!(&client.hostname => addr));
             }
             addrs
         };
-        let sk = secret_keys.remove(&id).unwrap();
+        let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_replica(
             replicas_config.len(),
             id,
@@ -106,16 +103,16 @@ async fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
-    let mut secret_keys: HashMap<NodeId, KeyPair> = sk_stream()
+    let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
         .enumerate()
-        .map(|(id, sk)| (NodeId::from(1000 + id), sk))
+        .map(|(id, sk)| (1000 + id as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
-            .map(|(id, sk)| (NodeId::from(id), sk)))
+            .map(|(id, sk)| (id as u64, sk)))
         .collect();
-    let public_keys: HashMap<NodeId, PublicKey> = secret_keys
+    let public_keys: IntMap<PublicKey> = secret_keys
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
@@ -125,20 +122,20 @@ async fn client_async_main() {
     for client in &clients_config {
         let id = NodeId::from(client.id);
         let addrs = {
-            let mut addrs = collections::hash_map();
+            let mut addrs = IntMap::new();
             for replica in &replicas_config {
                 let id = NodeId::from(replica.id);
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
-                addrs.insert(id, crate::addr!(&replica.hostname => addr));
+                addrs.insert(id.into(), crate::addr!(&replica.hostname => addr));
             }
             for other in &clients_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id, crate::addr!(&other.hostname => addr));
+                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
             }
             addrs
         };
-        let sk = secret_keys.remove(&id).unwrap();
+        let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
             replicas_config.len(),
             id,
