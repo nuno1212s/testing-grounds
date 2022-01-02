@@ -20,9 +20,9 @@ chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 
 [dependencies.febft]
-path = "../../../febft"
-#git = "https://github.com/febft/febft"
-#rev = "aa22daf1c54a2c3f16da8b0bd4d3717c1e9324ab"
+#path = "../../../febft"
+git = "https://github.com/febft/febft"
+rev = "e05cf16e2e3937bfd6ff4ccd1a3a12b14625d8ff"
 default-features = false
 features = [
     "expose_impl",
