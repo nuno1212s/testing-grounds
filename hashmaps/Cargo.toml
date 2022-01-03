@@ -1,0 +1,26 @@
+[package]
+name = "hashmaps"
+version = "0.1.0"
+authors = ["Tiago Carvalho <up201605259@fc.up.pt>"]
+edition = "2018"
+
+[features]
+
+[dependencies]
+mimalloc = { version = "*", default-features = false }
+num_cpus = "1"
+
+[dependencies.seahash]
+version = "4"
+
+[dependencies.twox-hash]
+version = "1"
+
+[dependencies.fxhash]
+version = "0.2"
+
+[dependencies.metrohash]
+version = "1"
+
+[dependencies.highway]
+version = "0.7"
