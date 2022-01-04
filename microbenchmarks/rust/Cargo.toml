@@ -22,7 +22,7 @@ mimalloc = { version = "*", default-features = false }
 [dependencies.febft]
 #path = "../../../febft"
 git = "https://github.com/febft/febft"
-rev = "e05cf16e2e3937bfd6ff4ccd1a3a12b14625d8ff"
+rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
 default-features = false
 features = [
     "expose_impl",
@@ -32,7 +32,7 @@ features = [
     "channel_futures_mpsc",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
-    "collections_randomstate_twox_hash"
+    "collections_randomstate_fxhash"
 ]
 
 [build-dependencies.capnpc]
