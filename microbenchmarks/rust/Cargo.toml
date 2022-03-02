@@ -20,16 +20,16 @@ chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 
 [dependencies.febft]
-#path = "../../../febft"
-git = "https://github.com/febft/febft"
-rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
+path = "../../../febft"
+#git = "https://github.com/febft/febft"
+#rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
 default-features = false
 features = [
     "expose_impl",
     "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_tokio_tcp",
-    "channel_futures_mpsc",
+    "channel_custom_dump",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
     "collections_randomstate_fxhash"

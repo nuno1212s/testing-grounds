@@ -47,13 +47,14 @@ pub fn main() {
             .flat_map(|id| id.parse())
             .next()
             .unwrap();
-        rt::block_on(async_main(NodeId::from(replica_id)));
+
+            main_(NodeId::from(replica_id));
     } else {
         rt::block_on(client_async_main());
     }
 }
 
-async fn async_main(id: NodeId) {
+fn main_(id: NodeId) {
     let mut replica = {
         let clients_config = parse_config("./config/clients.config").unwrap();
         let replicas_config = parse_config("./config/replicas.config").unwrap();
@@ -87,6 +88,7 @@ async fn async_main(id: NodeId) {
             addrs
         };
         let sk = secret_keys.remove(id.into()).unwrap();
+
         let fut = setup_replica(
             replicas_config.len(),
             id,
@@ -96,13 +98,13 @@ async fn async_main(id: NodeId) {
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
-        let replica = fut.await.unwrap();
+        let replica = rt::block_on(fut).unwrap();
         println!("Running replica #{}", u32::from(id));
         replica
     };
 
     // run forever
-    replica.run().await.unwrap();
+    replica.run().unwrap();
 }
 
 async fn client_async_main() {

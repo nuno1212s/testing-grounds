@@ -42,13 +42,13 @@ pub fn main() {
     };
     let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
-        rt::block_on(async_main());
+        main_();
     } else {
         rt::block_on(client_async_main());
     }
 }
 
-async fn async_main() {
+fn main_() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -61,6 +61,8 @@ async fn async_main() {
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
+
+    let mut pending_threads = Vec::with_capacity(4);
 
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
@@ -86,17 +88,24 @@ async fn async_main() {
             addrs,
             public_keys.clone(),
         );
-        rt::spawn(async move {
-            println!("Bootstrapping replica #{}", u32::from(id));
-            let mut replica = fut.await.unwrap();
-            println!("Running replica #{}", u32::from(id));
-            replica.run().await.unwrap();
-        });
+
+        pending_threads.push(std::thread::spawn(move || {
+            let mut replica = rt::block_on(async move {
+                println!("Bootstrapping replica #{}", u32::from(id));
+                let mut replica = fut.await.unwrap();
+                println!("Running replica #{}", u32::from(id));
+                replica
+            });
+
+            replica.run().unwrap();
+        }));
     }
     drop((secret_keys, public_keys, clients_config, replicas_config));
 
     // run forever
-    std::future::pending().await
+    for x in pending_threads {
+        x.join();
+    }
 }
 
 async fn client_async_main() {

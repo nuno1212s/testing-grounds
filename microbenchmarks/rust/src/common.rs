@@ -108,10 +108,11 @@ async fn node_config(
     pk: IntMap<PublicKey>,
 ) -> NodeConfig {
     // read TLS configs concurrently
-    let (client_config, server_config) = {
+    let (client_config, server_config, batch_size) = {
         let cli = get_client_config(id);
         let srv = get_server_config(id);
-        futures::join!(cli, srv)
+        let batch_size = get_batch_size();
+        futures::join!(cli, srv, batch_size)
     };
 
     // build the node conf
@@ -125,6 +126,7 @@ async fn node_config(
         client_config,
         server_config,
         first_cli: NodeId::from(1000u32),
+        batch_size
     }
 }
 
