@@ -32,7 +32,7 @@ cmd() {
 ################################################################################
 
 # config params
-OPS_NUMBER=5000
+OPS_NUMBER=10000
 MEASUREMENT_INTERVAL=1000
 
 STATE_SIZE=0
@@ -41,7 +41,7 @@ REPLY_SIZE=$REQUEST_SIZE
 REQUEST_SLEEP_MILLIS=0
 
 REPLICAS="4 7 10 13"
-BATCHES="8 16 32 128 512 1024 2048"
+BATCHES="8 16 32 128 512 1024"
 CLIENTS="1 10 30 60 100"
 RESULTS=results
 
