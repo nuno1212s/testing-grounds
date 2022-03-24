@@ -38,9 +38,10 @@ start_replica() {
 }
 
 start_clients() {
-    exec $JAVA_HOME/bin/java -jar build/libs/bft-smart-all.jar client \
+    $JAVA_HOME/bin/java -jar build/libs/bft-smart-all.jar client \
         1000 $NUM_CLIENTS $OPS_NUMBER $REQUEST_SIZE $REQUEST_SLEEP_MILLIS \
         false $VERBOSE nosig
+    rm -f log/*
 }
 
 main
