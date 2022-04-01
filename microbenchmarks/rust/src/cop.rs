@@ -15,7 +15,7 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 
-use febft::bft::communication::channel;
+use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::core::client::Client;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
@@ -56,8 +56,12 @@ pub fn main() {
 
 fn main_(id: NodeId) {
     let mut replica = {
+        println!("Started working on the replica");
+
         let clients_config = parse_config("./config/clients.config").unwrap();
         let replicas_config = parse_config("./config/replicas.config").unwrap();
+
+        println!("Finished reading replica config.");
 
         let mut secret_keys: IntMap<KeyPair> = sk_stream()
             .take(clients_config.len())
@@ -68,25 +72,41 @@ fn main_(id: NodeId) {
                 .enumerate()
                 .map(|(id, sk)| (id as u64, sk)))
             .collect();
+
         let public_keys: IntMap<PublicKey> = secret_keys
             .iter()
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
+
+        println!("Finished reading keys.");
+
+
         let addrs = {
             let mut addrs = IntMap::new();
-            for other in &replicas_config {
+            for replica in &replicas_config {
+                let id = NodeId::from(replica.id);
+                let addr = format!("{}:{}", replica.ipaddr, replica.portno);
+                let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
+
+                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&replica.hostname => addr),
+                                                           crate::addr!(&replica.hostname => replica_addr));
+
+                addrs.insert(id.into(), replica_p_addr);
+            }
+
+            for other in &clients_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
+
+                let client_addr = PeerAddr::new(crate::addr!(&other.hostname => addr));
+
+                addrs.insert(id.into(), client_addr);
             }
-            for client in &clients_config {
-                let id = NodeId::from(client.id);
-                let addr = format!("{}:{}", client.ipaddr, client.portno);
-                addrs.insert(id.into(), crate::addr!(&client.hostname => addr));
-            }
+
             addrs
         };
+
         let sk = secret_keys.remove(id.into()).unwrap();
 
         let fut = setup_replica(
@@ -134,13 +154,23 @@ async fn client_async_main() {
             for replica in &replicas_config {
                 let id = NodeId::from(replica.id);
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
-                addrs.insert(id.into(), crate::addr!(&replica.hostname => addr));
+                let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
+
+                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&replica.hostname => addr),
+                                                           crate::addr!(&replica.hostname => replica_addr));
+
+                addrs.insert(id.into(), replica_p_addr);
             }
+
             for other in &clients_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
+
+                let client_addr = PeerAddr::new(crate::addr!(&other.hostname => addr));
+
+                addrs.insert(id.into(), client_addr);
             }
+
             addrs
         };
         let sk = secret_keys.remove(id.into()).unwrap();

@@ -36,11 +36,16 @@ pub fn main() {
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
         .unwrap_or(false);
+
     let conf = InitConfig {
-        pool_threads: num_cpus::get(),
-        async_threads: num_cpus::get(),
+        pool_threads: num_cpus::get() / 4,
+        async_threads: num_cpus::get() / 4,
     };
+
     let _guard = unsafe { init(conf).unwrap() };
+
+    println!("Starting...");
+
     if !is_client {
         main_();
     } else {
@@ -52,6 +57,8 @@ fn main_() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
+    println!("Read configurations.");
+
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(replicas_config.len())
         .enumerate()
@@ -62,10 +69,14 @@ fn main_() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
+    println!("Read keys.");
+
     let mut pending_threads = Vec::with_capacity(4);
 
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
+
+        println!("Starting replica {:?}", id);
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -76,7 +87,7 @@ fn main_() {
                 let replica_addr = format!("{}:{}", other.ipaddr, other.rep_portno.unwrap());
 
                 let client_addr = PeerAddr::new_replica(crate::addr!(&other.hostname => addr),
-                crate::addr!(&other.hostname => replica_addr));
+                                                        crate::addr!(&other.hostname => replica_addr));
 
                 addrs.insert(id.into(), client_addr);
             }
@@ -92,7 +103,10 @@ fn main_() {
 
             addrs
         };
+
         let sk = secret_keys.remove(id.into()).unwrap();
+
+        println!("Setting up replica...");
         let fut = setup_replica(
             replicas_config.len(),
             id,
@@ -149,10 +163,10 @@ async fn client_async_main() {
             for replica in &replicas_config {
                 let id = NodeId::from(replica.id);
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
-                let replica_addr = format!("{}:{}", other.ipaddr, other.rep_portno.unwrap());
+                let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
 
-                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&other.hostname => addr),
-                                                           crate::addr!(&other.hostname => replica_addr));
+                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&replica.hostname => addr),
+                                                           crate::addr!(&replica.hostname => replica_addr));
 
                 addrs.insert(id.into(), replica_p_addr);
             }

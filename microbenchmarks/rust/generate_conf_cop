@@ -17,7 +17,7 @@ rm -f replicas.config
 for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
     sni=srv${id}
     port=$(expr 10000 + $id)
-    rep_port=$(expr 12000 + $i)
+    rep_port=$(expr 12000 + $id)
     host=$(expr $id % 4)
     host=$(expr 16 + $host)
     echo $id $sni 192.168.70.$host $port $rep_port >> replicas.config

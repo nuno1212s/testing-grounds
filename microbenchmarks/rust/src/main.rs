@@ -13,6 +13,8 @@ fn main() {
         .map(|x| x == "1")
         .unwrap_or(false);
 
+    println!("Starting local? {}", is_local);
+
     if is_local {
         local::main()
     } else {

@@ -86,7 +86,7 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
         .find_iter(line)
         .collect();
 
-    if matches.len() != 4 || matches.len() != 5 {
+    if matches.len() < 4 {
         return None;
     }
 
@@ -97,7 +97,7 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
 
     let rep_portno: Option<u16> =
         if matches.len() >= 5 {
-            Some(matches[4].as_str().trim_end().parse().ok?)
+            Some(matches[4].as_str().trim_end().parse().ok()?)
         } else { None };
 
     Some(ConfigEntry { id, rep_portno, hostname, ipaddr, portno })
