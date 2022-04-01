@@ -37,8 +37,8 @@ pub fn main() {
         .map(|x| x == "1")
         .unwrap_or(false);
     let conf = InitConfig {
-        pool_threads: num_cpus::get(),
-        async_threads: num_cpus::get(),
+        pool_threads: num_cpus::get() / 4,
+        async_threads: num_cpus::get() / 4,
     };
     let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
@@ -250,7 +250,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         ramp_up -= 100;
     }
 
-    let mut st = BenchmarkHelper::new(MicrobenchmarkData::OPS_NUMBER/2);
+    let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER/2);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER/2);
 

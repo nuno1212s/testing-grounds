@@ -21,7 +21,7 @@ use febft::bft::benchmarks::{
     BenchmarkHelper,
     BenchmarkHelperStore,
 };
-use febft::bft::communication::channel;
+use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::communication::NodeId;
 use febft::bft::core::client::Client;
 use febft::bft::crypto::signature::{
@@ -66,18 +66,30 @@ fn main_() {
 
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
+
         let addrs = {
             let mut addrs = IntMap::new();
+
             for other in &replicas_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
+                let replica_addr = format!("{}:{}", other.ipaddr, other.rep_portno.unwrap());
+
+                let client_addr = PeerAddr::new_replica(crate::addr!(&other.hostname => addr),
+                crate::addr!(&other.hostname => replica_addr));
+
+                addrs.insert(id.into(), client_addr);
             }
+
             for client in &clients_config {
                 let id = NodeId::from(client.id);
                 let addr = format!("{}:{}", client.ipaddr, client.portno);
-                addrs.insert(id.into(), crate::addr!(&client.hostname => addr));
+
+                let replica = PeerAddr::new(crate::addr!(&client.hostname => addr));
+
+                addrs.insert(id.into(), replica);
             }
+
             addrs
         };
         let sk = secret_keys.remove(id.into()).unwrap();
@@ -100,6 +112,7 @@ fn main_() {
             replica.run().unwrap();
         }));
     }
+
     drop((secret_keys, public_keys, clients_config, replicas_config));
 
     // run forever
@@ -132,18 +145,29 @@ async fn client_async_main() {
         let id = NodeId::from(client.id);
         let addrs = {
             let mut addrs = IntMap::new();
+
             for replica in &replicas_config {
                 let id = NodeId::from(replica.id);
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
-                addrs.insert(id.into(), crate::addr!(&replica.hostname => addr));
+                let replica_addr = format!("{}:{}", other.ipaddr, other.rep_portno.unwrap());
+
+                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&other.hostname => addr),
+                                                           crate::addr!(&other.hostname => replica_addr));
+
+                addrs.insert(id.into(), replica_p_addr);
             }
+
             for other in &clients_config {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
-                addrs.insert(id.into(), crate::addr!(&other.hostname => addr));
+
+                let client_addr = PeerAddr::new(crate::addr!(&other.hostname => addr));
+
+                addrs.insert(id.into(), client_addr);
             }
             addrs
         };
+
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
             replicas_config.len(),
@@ -152,6 +176,7 @@ async fn client_async_main() {
             addrs,
             public_keys.clone(),
         );
+
         let mut tx = tx.clone();
         rt::spawn(async move {
             println!("Bootstrapping client #{}", u32::from(id));
@@ -160,6 +185,7 @@ async fn client_async_main() {
             tx.send(client).await.unwrap();
         });
     }
+
     drop((secret_keys, public_keys, replicas_config));
 
     let (mut queue, queue_tx) = async_queue();
@@ -175,14 +201,18 @@ async fn client_async_main() {
 
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
-        let h = rt::spawn(run_client(client, queue_tx));
+
+        let h = std::thread::spawn(move || {
+            run_client(client, queue_tx)
+        });
+
         handles.push(h);
     }
 
     drop(clients_config);
 
     for h in handles {
-        let _ = h.await;
+        let _ = h.join();
     }
 
     let mut file = File::create("./latencies.out").unwrap();
@@ -202,7 +232,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
@@ -223,7 +253,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
-        client.update(Arc::downgrade(&request)).await;
+        rt::block_on(client.update(Arc::downgrade(&request)));
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
             .num_nanoseconds()
@@ -249,15 +279,15 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
         } else if ramp_up > 0 {
-            Delay::new(Duration::from_millis(ramp_up as u64)).await;
+            std::thread::sleep(Duration::from_millis(ramp_up as u64));
         }
 
         ramp_up -= 100;
     }
 
-    let mut st = BenchmarkHelper::new(MicrobenchmarkData::OPS_NUMBER / 2);
+    let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
@@ -269,7 +299,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
-        client.update(Arc::downgrade(&request)).await;
+        rt::block_on(client.update(Arc::downgrade(&request)));
         let exec_time = Utc::now();
         let latency = exec_time
             .signed_duration_since(last_send_instant)
@@ -294,10 +324,11 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         (exec_time, last_send_instant).store(&mut st);
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
         } else if ramp_up > 0 {
-            Delay::new(Duration::from_millis(ramp_up as u64)).await;
+            std::thread::sleep(Duration::from_millis(ramp_up as u64));
         }
+
         ramp_up -= 100;
 
         if MicrobenchmarkData::VERBOSE && (req % 1000 == 0) {

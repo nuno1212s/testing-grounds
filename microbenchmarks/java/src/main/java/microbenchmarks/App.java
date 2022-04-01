@@ -27,16 +27,16 @@ public class App {
         String[] newArgs = null;
 
         switch (args[0]) {
-        case "client":
-            newArgs = Arrays.copyOfRange(args, 1, args.length);
-            ThroughputLatencyClient.main(newArgs);
-            break;
-        case "server":
-            newArgs = Arrays.copyOfRange(args, 1, args.length);
-            ThroughputLatencyServer.main(newArgs);
-            break;
-        default:
-            usage();
+            case "client":
+                newArgs = Arrays.copyOfRange(args, 1, args.length);
+                ThroughputLatencyClient.main(newArgs);
+                break;
+            case "server":
+                newArgs = Arrays.copyOfRange(args, 1, args.length);
+                ThroughputLatencyServer.main(newArgs);
+                break;
+            default:
+                usage();
         }
     }
 

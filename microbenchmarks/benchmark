@@ -32,15 +32,15 @@ cmd() {
 ################################################################################
 
 # config params
-OPS_NUMBER=5000
-MEASUREMENT_INTERVAL=1000
+OPS_NUMBER=10000
+MEASUREMENT_INTERVAL=2000
 
 STATE_SIZE=0
 REQUEST_SIZE=1
 REPLY_SIZE=$REQUEST_SIZE
 REQUEST_SLEEP_MILLIS=0
 
-REPLICAS="4 7 10 13"
+REPLICAS="4"
 BATCHES="8 16 32 128 512 1024 2048"
 CLIENTS="1 10 30 60 100"
 RESULTS=results
@@ -50,7 +50,7 @@ generate_env() {
     cat << EOF
 export LOCAL=0
 export COMPILE=0
-export JAVA_HOME=/home/tcarvalho/jdk-11
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/bin/java
 
 export BACKEND=$1
 export VERBOSE=false
