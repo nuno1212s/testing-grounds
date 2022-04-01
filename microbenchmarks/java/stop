@@ -1,2 +1,3 @@
 #!/bin/sh
-exec pkill java
+pkill java
+exec rm -f log/*
