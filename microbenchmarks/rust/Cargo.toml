@@ -22,7 +22,7 @@ mimalloc = { version = "*", default-features = false }
 [dependencies.febft]
 #path = "../../../febft"
 git = "https://github.com/febft/febft"
-rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
+rev = "cb85fc06bfe81767d69e0e55409530aa4fcb7719"
 default-features = false
 features = [
     "expose_impl",
