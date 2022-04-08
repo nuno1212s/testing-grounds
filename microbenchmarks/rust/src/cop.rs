@@ -36,10 +36,12 @@ pub fn main() {
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
         .unwrap_or(false);
+
     let conf = InitConfig {
         pool_threads: num_cpus::get() / 4,
-        async_threads: num_cpus::get() / 4,
+        async_threads: if is_client { num_cpus::get() } else { (num_cpus::get() / 4) },
     };
+
     let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
         let replica_id: u32 = std::env::var("ID")
@@ -48,7 +50,7 @@ pub fn main() {
             .next()
             .unwrap();
 
-            main_(NodeId::from(replica_id));
+        main_(NodeId::from(replica_id));
     } else {
         rt::block_on(client_async_main());
     }
@@ -219,7 +221,7 @@ async fn client_async_main() {
     file.flush().unwrap();
 }
 
-fn sk_stream() -> impl Iterator<Item = KeyPair> {
+fn sk_stream() -> impl Iterator<Item=KeyPair> {
     std::iter::repeat_with(|| {
         // only valid for ed25519!
         let buf = [0; 32];
@@ -236,7 +238,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         r
     });
 
-    let iterator = 0..MicrobenchmarkData::OPS_NUMBER/2;
+    let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
 
     println!("Warm up...");
 
@@ -280,11 +282,11 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         ramp_up -= 100;
     }
 
-    let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER/2);
+    let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
-    println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER/2);
+    println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
-    let iterator = MicrobenchmarkData::OPS_NUMBER/2..MicrobenchmarkData::OPS_NUMBER;
+    let iterator = MicrobenchmarkData::OPS_NUMBER / 2..MicrobenchmarkData::OPS_NUMBER;
 
     for req in iterator {
         if MicrobenchmarkData::VERBOSE {
@@ -330,28 +332,28 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
     if id == 1000 {
         println!("{} // Average time for {} executions (-10%) = {} us",
-            id,
-            MicrobenchmarkData::OPS_NUMBER / 2,
-            st.average(true) / 1000.0);
+                 id,
+                 MicrobenchmarkData::OPS_NUMBER / 2,
+                 st.average(true) / 1000.0);
 
         println!("{} // Standard deviation for {} executions (-10%) = {} us",
-            id,
-            MicrobenchmarkData::OPS_NUMBER / 2,
-            st.standard_deviation(true) / 1000.0);
+                 id,
+                 MicrobenchmarkData::OPS_NUMBER / 2,
+                 st.standard_deviation(true) / 1000.0);
 
         println!("{} // Average time for {} executions (all samples) = {} us",
-            id,
-            MicrobenchmarkData::OPS_NUMBER / 2,
-            st.average(false) / 1000.0);
+                 id,
+                 MicrobenchmarkData::OPS_NUMBER / 2,
+                 st.average(false) / 1000.0);
 
         println!("{} // Standard deviation for {} executions (all samples) = {} us",
-            id,
-            MicrobenchmarkData::OPS_NUMBER / 2,
-            st.standard_deviation(false) / 1000.0);
+                 id,
+                 MicrobenchmarkData::OPS_NUMBER / 2,
+                 st.standard_deviation(false) / 1000.0);
 
         println!("{} // Maximum time for {} executions (all samples) = {} us",
-            id,
-            MicrobenchmarkData::OPS_NUMBER / 2,
-            st.max(false) / 1000);
+                 id,
+                 MicrobenchmarkData::OPS_NUMBER / 2,
+                 st.max(false) / 1000);
     }
 }
