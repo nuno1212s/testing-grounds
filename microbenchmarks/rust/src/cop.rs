@@ -39,7 +39,7 @@ pub fn main() {
 
     let conf = InitConfig {
         pool_threads: num_cpus::get() / 4,
-        async_threads: if is_client { num_cpus::get() } else { (num_cpus::get() / 4) },
+        async_threads: if is_client { num_cpus::get() } else { num_cpus::get() / 4 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
