@@ -10,7 +10,7 @@ for i in `seq 0 $(expr $NUM_CLIENTS - 1)`; do
     id=$(expr 1000 + $i)
     sni=cli${id}
     port=$(expr 11000 + $i)
-    echo $id $sni 192.168.85.28 $port >> clients.config
+    echo $id $sni 192.168.85.30 $port >> clients.config
 done
 
 rm -f replicas.config
