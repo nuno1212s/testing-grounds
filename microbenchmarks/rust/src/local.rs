@@ -39,7 +39,7 @@ pub fn main() {
 
     let conf = InitConfig {
         pool_threads: num_cpus::get() / 4,
-        async_threads: num_cpus::get() / 4,
+        async_threads: num_cpus::get() / 1,
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -179,10 +179,12 @@ async fn client_async_main() {
 
                 addrs.insert(id.into(), client_addr);
             }
+
             addrs
         };
 
         let sk = secret_keys.remove(id.into()).unwrap();
+
         let fut = setup_client(
             replicas_config.len(),
             id,
