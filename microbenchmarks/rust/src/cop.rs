@@ -38,8 +38,11 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
+        //Divide the logical cores into the thread pool and the async threadpool.
+        //This should leave enough room for the threads that each replica requires to constantly
+        //Have (which we want to avoid context switching on)
         pool_threads: num_cpus::get() / 4,
-        async_threads: if is_client { num_cpus::get() } else { num_cpus::get() / 4 },
+        async_threads: if is_client { num_cpus::get() } else { num_cpus::get() / 2 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
