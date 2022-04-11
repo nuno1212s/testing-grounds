@@ -36,7 +36,8 @@ fn take_cpu_measurement(node_id: NodeId) {
     let mut tx_speed = 0.0;
     let mut rx_speed = 0.0;
 
-    for (network, speed) in network_speed {
+    for (_network, speed) in network_speed {
+        //Only capture the most used one.
         if speed.receive > rx_speed || speed.transmit > tx_speed {
             rx_speed = speed.receive;
             tx_speed = speed.transmit;

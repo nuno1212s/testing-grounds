@@ -111,8 +111,9 @@ impl Service for Microbenchmark {
 
                 let diff = Utc::now()
                     .signed_duration_since(self.max_tp_time)
-                    .num_milliseconds();
-                let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0) / (diff as f32);
+                    .num_microseconds().expect("Need micro seconds");
+
+                let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0 * 1000.0) / (diff as f32);
 
                 if tp > self.max_tp {
                     self.max_tp = tp;
