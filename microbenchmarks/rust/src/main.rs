@@ -4,6 +4,7 @@ mod serialize;
 mod cop;
 mod local;
 mod common;
+mod os_statistics;
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;

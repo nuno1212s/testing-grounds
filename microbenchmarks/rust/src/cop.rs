@@ -125,6 +125,10 @@ fn main_(id: NodeId) {
         println!("Bootstrapping replica #{}", u32::from(id));
         let replica = rt::block_on(fut).unwrap();
         println!("Running replica #{}", u32::from(id));
+
+        //Here we want to launch a statistics thread for each replica since they are on different machines
+        crate::os_statistics::start_statistics_thread(id);
+
         replica
     };
 
@@ -152,8 +156,15 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded(8);
 
+    let mut first_cli = u32::MAX;
+
     for client in &clients_config {
         let id = NodeId::from(client.id);
+
+        if client.id < first_cli {
+            first_cli = client.id;
+        }
+
         let addrs = {
             let mut addrs = IntMap::new();
             for replica in &replicas_config {
@@ -203,6 +214,10 @@ async fn client_async_main() {
     for _i in 0..clients_config.len() {
         clients.push(rx.recv().await.unwrap());
     }
+
+    //Start the OS resource monitoring thread
+    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
+
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
@@ -337,22 +352,22 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         println!("{} // Average time for {} executions (-10%) = {} us",
                  id,
                  MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.average(true) / 1000.0);
+                 st.average(true, false) / 1000.0);
 
         println!("{} // Standard deviation for {} executions (-10%) = {} us",
                  id,
                  MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.standard_deviation(true) / 1000.0);
+                 st.standard_deviation(true, true) / 1000.0);
 
         println!("{} // Average time for {} executions (all samples) = {} us",
                  id,
                  MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.average(false) / 1000.0);
+                 st.average(false, true) / 1000.0);
 
         println!("{} // Standard deviation for {} executions (all samples) = {} us",
                  id,
                  MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.standard_deviation(false) / 1000.0);
+                 st.standard_deviation(false, true) / 1000.0);
 
         println!("{} // Maximum time for {} executions (all samples) = {} us",
                  id,
