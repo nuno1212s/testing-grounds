@@ -21,6 +21,8 @@ import bftsmart.tom.server.defaultservices.CommandsInfo;
 import bftsmart.tom.server.defaultservices.DefaultRecoverable;
 import bftsmart.tom.util.Storage;
 import bftsmart.tom.util.TOMUtil;
+import microbenchmarks.benchmarks.OSStatistics;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -98,22 +100,16 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         acceptLatency = new Storage(interval);
         
         batchSize = new Storage(interval);
-        
+
+
         if (write > 0) {
-            
+
             try {
-                final File f = File.createTempFile("bft-"+id+"-", Long.toString(System.nanoTime()));
+                final File f = File.createTempFile("bft-" + id + "-", Long.toString(System.nanoTime()));
                 randomAccessFile = new RandomAccessFile(f, (write > 1 ? "rwd" : "rw"));
                 channel = randomAccessFile.getChannel();
-                
-                Runtime.getRuntime().addShutdownHook(new Thread() {
-                    
-                    @Override
-                    public void run() {
-                        
-                        f.delete();
-                    }
-                });
+
+                Runtime.getRuntime().addShutdownHook(new Thread(f::delete));
             } catch (IOException ex) {
                 ex.printStackTrace();
                 System.exit(0);
@@ -332,13 +328,19 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
             System.out.println("Option 'ecdsa' requires SunEC provider to be available.");
             System.exit(0);
         }
-        
+
         int w = 0;
         
         if (!write.equalsIgnoreCase("")) w++;
         if (write.equalsIgnoreCase("rwd")) w++;
 
-        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);        
+        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);
+
+        OSStatistics statistics = new OSStatistics(processId);
+
+        statistics.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
     }
 
     @Override

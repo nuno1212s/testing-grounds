@@ -20,6 +20,8 @@ import java.io.IOException;
 import bftsmart.tom.ServiceProxy;
 import bftsmart.tom.util.Storage;
 import bftsmart.tom.util.TOMUtil;
+import microbenchmarks.benchmarks.OSStatistics;
+
 import java.io.FileWriter;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
@@ -151,6 +153,10 @@ public class ThroughputLatencyClient {
         for (Client c : clients) {
             tasks.add(exec.submit(c));
         }
+
+        OSStatistics os_stats = new OSStatistics(initId);
+
+        os_stats.start();
         
         // wait for tasks completion
         for (Future<?> currTask : tasks) {
@@ -162,6 +168,8 @@ public class ThroughputLatencyClient {
             }
 
         }
+
+        os_stats.cancel();
     
         exec.shutdown();
 
