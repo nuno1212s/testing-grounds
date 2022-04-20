@@ -347,6 +347,8 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
             statistics.start();
 
             Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
         }
     }
 
