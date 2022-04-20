@@ -2,6 +2,7 @@ package microbenchmarks.benchmarks;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class OSStatistics extends Thread {
@@ -37,8 +38,8 @@ public class OSStatistics extends Thread {
                 if (proc.exitValue() != 0) {
                     System.out.println("Failed to execute OS statistics script. " + proc.exitValue() + " ");
 
-                    BufferedReader error_reader = proc.errorReader(),
-                    input_reader = proc.inputReader();
+                    BufferedReader error_reader = new BufferedReader(new InputStreamReader(proc.getErrorStream())),
+                            input_reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
 
                     String read;
 
@@ -53,7 +54,7 @@ public class OSStatistics extends Thread {
                     break;
                 }
 
-                final BufferedReader reader = proc.inputReader();
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
 
                 String s;
 
