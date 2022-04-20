@@ -33,7 +33,8 @@ servers_local_main() {
         start_replica "$ID" &
         sleep 0.5
     done
-    wait
+
+    wait $!
 }
 
 servers_cop_main() {
@@ -54,13 +55,13 @@ clients_main() {
 
 start_replica() {
     exec "$JAVA_HOME"/bin/java -jar build/libs/bft-smart-all.jar server \
-        "$1" "$MEASUREMENT_INTERVAL" "$REPLY_SIZE" "$STATE_SIZE" "$VERBOSE" nosig ''
+        "$1" "$MEASUREMENT_INTERVAL" "$REPLY_SIZE" "$STATE_SIZE" "$VERBOSE" nosig "$PATH_TO_OS_STATS" ''
 }
 
 start_clients() {
     exec "$JAVA_HOME"/bin/java -jar build/libs/bft-smart-all.jar client \
         1000 "$NUM_CLIENTS" "$OPS_NUMBER" "$REQUEST_SIZE" "$REQUEST_SLEEP_MILLIS" \
-        false "$VERBOSE" nosig
+        false "$VERBOSE" nosig "$PATH_TO_OS_STATS"
 }
 
 main

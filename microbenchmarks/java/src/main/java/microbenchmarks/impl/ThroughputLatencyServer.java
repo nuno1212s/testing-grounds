@@ -306,7 +306,7 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
 
     public static void main(String[] args){
         if(args.length < 6) {
-            System.out.println("Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]");
+            System.out.println("Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> <path_to_os (or \"null\" for no os stats)> [rwd | rw]");
             System.exit(-1);
         }
 
@@ -316,8 +316,13 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         int stateSize = Integer.parseInt(args[3]);
         boolean context = Boolean.parseBoolean(args[4]);
         String signed = args[5];
-        String write = args.length > 6 ? args[6] : "";
-        
+        String path = args[6];
+        String write = args.length > 7 ? args[7] : "";
+
+        if (path.equalsIgnoreCase("null")) {
+            path = null;
+        }
+
         int s = 0;
         
         if (!signed.equalsIgnoreCase("nosig")) s++;
@@ -336,11 +341,13 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
 
         new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);
 
-        OSStatistics statistics = new OSStatistics(processId);
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(processId, path);
 
-        statistics.start();
+            statistics.start();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        }
     }
 
     @Override

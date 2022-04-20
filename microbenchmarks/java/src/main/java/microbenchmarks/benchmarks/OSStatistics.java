@@ -10,8 +10,11 @@ public class OSStatistics extends Thread {
 
     private final AtomicBoolean cancelled;
 
-    public OSStatistics(int node_id) {
+    private final String command;
+
+    public OSStatistics(int node_id, String command) {
         this.node_id = node_id;
+        this.command = command;
         this.cancelled = new AtomicBoolean(false);
     }
 
@@ -27,10 +30,26 @@ public class OSStatistics extends Thread {
         while (!cancelled.get()) {
             try {
 
-                Process proc = Runtime.getRuntime().exec("os_stat " + node_id);
+                Process proc = Runtime.getRuntime().exec(String.format(command, node_id));
+
+                proc.waitFor();
 
                 if (proc.exitValue() != 0) {
-                    System.out.println("Failed to execute OS statistics script");
+                    System.out.println("Failed to execute OS statistics script. " + proc.exitValue() + " ");
+
+                    BufferedReader error_reader = proc.errorReader(),
+                    input_reader = proc.inputReader();
+
+                    String read;
+
+                    while ((read = error_reader.readLine()) != null) {
+                        System.out.println(read);
+                    }
+
+                    while ((read = input_reader.readLine()) != null) {
+                        System.out.println(read);
+                    }
+
                     break;
                 }
 
@@ -42,7 +61,7 @@ public class OSStatistics extends Thread {
                     System.out.println(s);
                 }
 
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
 
