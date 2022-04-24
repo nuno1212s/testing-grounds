@@ -323,6 +323,8 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
             path = null;
         }
 
+        System.out.println("Starting server " + processId);
+
         int s = 0;
         
         if (!signed.equalsIgnoreCase("nosig")) s++;
@@ -338,6 +340,8 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         
         if (!write.equalsIgnoreCase("")) w++;
         if (write.equalsIgnoreCase("rwd")) w++;
+
+        System.out.println("Init");
 
         new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);
 

@@ -84,6 +84,8 @@ public class ThroughputLatencyClient {
             System.exit(-1);
         }
 
+        System.out.println("Starting clients...");
+
         initId = Integer.parseInt(args[0]);
         latencies = new LinkedBlockingQueue<>();
         writerThreadFlag = new AtomicBoolean(false);
