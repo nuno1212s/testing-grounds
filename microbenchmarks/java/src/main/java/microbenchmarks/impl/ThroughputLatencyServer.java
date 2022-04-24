@@ -115,7 +115,10 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
                 System.exit(0);
             }
         }
+
+        System.out.println("Starting replica...");
         replica = new ServiceReplica(id, this, this);
+        System.out.println("Started replica.");
     }
     
     @Override
