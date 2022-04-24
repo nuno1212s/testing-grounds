@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.nuno1212s:bft-smart-lib:ec422c0687'
+    implementation 'com.github.nuno1212s:bft-smart-lib:5ab4b286a1'
     implementation 'commons-codec:commons-codec:1.15'
     implementation 'io.netty:netty-all:4.1.72.Final'
     implementation 'org.bouncycastle:bcprov-jdk15on:1.69'
