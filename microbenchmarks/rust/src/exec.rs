@@ -139,10 +139,10 @@ impl Service for Microbenchmark {
                 self.measurements.message_send_to_create.log_latency("Create send to objects");
                 self.measurements.batch_size.log_batch();
 
+                self.max_tp_time = Utc::now();
             }
         }
 
-        self.max_tp_time = Utc::now();
 
         reply_batch
     }
