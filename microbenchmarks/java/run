@@ -54,12 +54,12 @@ clients_main() {
 }
 
 start_replica() {
-    exec "$JAVA_HOME"/bin/java -jar build/libs/bft-smart-all.jar server \
+    exec "$JAVA_HOME"/bin/java -Dlogback.configurationFile=config/logback.xml -jar build/libs/bft-smart-all.jar server \
         "$1" "$MEASUREMENT_INTERVAL" "$REPLY_SIZE" "$STATE_SIZE" "$VERBOSE" nosig "$PATH_TO_OS_STATS" ''
 }
 
 start_clients() {
-    exec "$JAVA_HOME"/bin/java -jar build/libs/bft-smart-all.jar client \
+    exec "$JAVA_HOME"/bin/java -Dlogback.configurationFile=config/logback.xml -jar build/libs/bft-smart-all.jar client \
         1000 "$NUM_CLIENTS" "$OPS_NUMBER" "$REQUEST_SIZE" "$REQUEST_SLEEP_MILLIS" \
         false "$VERBOSE" nosig "$PATH_TO_OS_STATS"
 }
