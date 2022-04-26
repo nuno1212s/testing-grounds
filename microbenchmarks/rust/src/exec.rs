@@ -119,8 +119,6 @@ impl Service for Microbenchmark {
                     self.max_tp = tp;
                 }
 
-                self.max_tp_time = Utc::now();
-
                 println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
                          self.id, tp, self.max_tp);
 
@@ -143,6 +141,8 @@ impl Service for Microbenchmark {
 
             }
         }
+
+        self.max_tp_time = Utc::now();
 
         reply_batch
     }
