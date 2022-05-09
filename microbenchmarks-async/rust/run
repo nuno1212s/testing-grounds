@@ -1,0 +1,40 @@
+#!/bin/sh
+
+main() {
+    generate_conf
+    compile
+    exec_microbenchmarks
+}
+
+generate_conf() {
+    if [ $LOCAL -eq 1 ]; then
+        ./generate_conf_local || exit 1
+    else
+        ./generate_conf_cop || exit 1
+    fi
+
+    if [ ! -f config/clients.config ]; then
+        echo Error: Missing config/clients.config! >&2
+        exit 1
+    fi
+
+    if [ ! -f config/replicas.config ]; then
+        echo Error: Missing config/replicas.config! >&2
+        exit 1
+    fi
+
+    if [ ! -f config/batch.config ]; then
+        echo Error: Missing config/batch.config! >&2
+        exit 1
+    fi
+}
+
+compile() {
+    [ $COMPILE -eq 1 ] && ./compile
+}
+
+exec_microbenchmarks() {
+    exec ./target/release/microbenchmarks
+}
+
+main
