@@ -1,18 +1,12 @@
 #![allow(dead_code)]
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Seek};
 use std::net::SocketAddr;
 
 use intmap::IntMap;
 use regex::Regex;
-use rustls::{
-    AllowAnyAuthenticatedClient,
-    ClientConfig,
-    internal::pemfile,
-    RootCertStore,
-    ServerConfig,
-};
+use rustls::{AllowAnyAuthenticatedClient, ClientConfig, internal::pemfile, PrivateKey, RootCertStore, ServerConfig};
 
 use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
 use febft::bft::core::client::{
@@ -109,7 +103,7 @@ async fn node_config(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
-    fill_batch: bool
+    fill_batch: bool,
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size) = {
@@ -135,7 +129,7 @@ async fn node_config(
         replica_server_config: server_config_replica,
         first_cli: NodeId::from(1000u32),
         batch_size,
-        fill_batch
+        fill_batch,
     }
 }
 
@@ -160,7 +154,7 @@ pub async fn setup_replica(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
-    fill_batch: bool
+    fill_batch: bool,
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
@@ -192,6 +186,20 @@ async fn get_batch_size() -> usize {
     rx.await.unwrap()
 }
 
+#[inline]
+fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
+    let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
+
+    if sk.is_empty() {
+        file.rewind();
+        let mut sk = pemfile::pkcs8_private_keys(&mut file).expect("secret key");
+
+        sk.remove(0)
+    } else {
+        sk.remove(0)
+    }
+}
+
 async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
@@ -216,8 +224,8 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
         let chain = {
             let mut file = if id < 1000 {
@@ -260,8 +268,8 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
         let chain = {
             let mut file = if id < 1000 {
@@ -291,6 +299,7 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
             let mut file = open_file("./ca-root/crt");
             pemfile::certs(&mut file).expect("root cert")
         };
+
         cfg.root_store.add(&certs[0]).unwrap();
 
         // configure our cert chain and secret key
@@ -300,9 +309,10 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
+
         let chain = {
             let mut file = if id < 1000 {
                 open_file(&format!("./ca-root/srv{}/crt", id))
@@ -342,8 +352,8 @@ async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
         let chain = {
             let mut file = if id < 1000 {

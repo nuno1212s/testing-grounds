@@ -70,9 +70,7 @@ fn main_() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = std::env::var("FILL_BATCH")
-        .expect("Failed to read fill batch")
-        .parse().expect("FILL_BATCH is not a boolean");
+    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
 
     println!("Read keys.");
 
@@ -121,7 +119,7 @@ fn main_() {
             fill_batch
         );
 
-        pending_threads.push(std::thread::spawn(move || {
+        let thread = std::thread::Builder::new().name(format!("Node {:?}", id)).spawn(move || {
             let mut replica = rt::block_on(async move {
                 println!("Bootstrapping replica #{}", u32::from(id));
                 let mut replica = fut.await.unwrap();
@@ -130,7 +128,9 @@ fn main_() {
             });
 
             replica.run().unwrap();
-        }));
+        }).unwrap();
+
+        pending_threads.push(thread);
     }
 
     //We will only launch a single OS monitoring thread since all replicas also run on the same system
@@ -139,7 +139,7 @@ fn main_() {
     drop((secret_keys, public_keys, clients_config, replicas_config));
 
     // run forever
-    for x in pending_threads {
+    for mut x in pending_threads {
         x.join();
     }
 }
@@ -162,9 +162,7 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = std::env::var("FILL_BATCH")
-        .expect("Failed to read fill batch")
-        .parse().expect("FILL_BATCH is not a boolean");
+    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
 
     let (tx, mut rx) = channel::new_bounded(clients_config.len());
 
@@ -252,8 +250,8 @@ async fn client_async_main() {
 
     drop(clients_config);
 
-    for h in handles {
-        let _ = h.join();
+    for mut h in handles {
+        let _ = h.await;
     }
 
     let mut file = File::create("./latencies.out").unwrap();
@@ -273,7 +271,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
@@ -282,9 +280,9 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         r
     });
 
-    let concurrent_rqs: i32 = std::env::var("CONCURRENT_RQS")
-        .expect("Failed to read CONCURRENT_RQS env variable")
-        .parse().expect("CONCURRENT_RQS is not a number!");
+    let client = Arc::new(client);
+
+    let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
     let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
 
@@ -296,7 +294,9 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
     for req in iterator {
         if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            currently_pending_rqs.pop_front().await;
+            let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+
+            (&mut join_handle).await;
         }
 
         if MicrobenchmarkData::VERBOSE {
@@ -305,9 +305,15 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
         let last_send_instant = Utc::now();
 
-        let fut = rt::spawn(client.update(Arc::downgrade(&request)));
+        let client_ref = client.clone();
 
-        currently_pending_rqs.push_back(fut);
+        let rq = request.clone();
+
+        let handle = rt::spawn(async move {
+            client_ref.update(Arc::downgrade(&rq)).await
+        });
+
+        currently_pending_rqs.push_back(handle);
 
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
@@ -354,13 +360,22 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            currently_pending_rqs.pop_front().await;
+            let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+
+            (&mut join_handle).await;
         }
 
         let last_send_instant = Utc::now();
-        let fut = rt::spawn(client.update(Arc::downgrade(&request)));
 
-        currently_pending_rqs.push_back(fut);
+        let client_ref = client.clone();
+
+        let rq = request.clone();
+
+        let handle = rt::spawn(async move {
+            client_ref.update(Arc::downgrade(&rq)).await
+        });
+
+        currently_pending_rqs.push_back(handle);
 
         let exec_time = Utc::now();
         let latency = exec_time
@@ -399,7 +414,9 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
     }
 
     while !currently_pending_rqs.is_empty() {
-        currently_pending_rqs.pop_front().await;
+        let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+
+        (&mut join_handle).await;
     }
 
     if id == 1000 {

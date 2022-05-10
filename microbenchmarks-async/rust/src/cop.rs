@@ -84,9 +84,7 @@ fn main_(id: NodeId) {
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
-        let fill_batch : bool = std::env::var("FILL_BATCH")
-            .expect("Failed to read fill batch")
-            .parse().expect("FILL_BATCH is not a boolean");
+        let fill_batch: bool = MicrobenchmarkData::FILL_BATCH;
 
         println!("Finished reading keys.");
 
@@ -123,7 +121,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
-            fill_batch
+            fill_batch,
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -158,9 +156,7 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = std::env::var("FILL_BATCH")
-        .expect("Failed to read fill batch")
-        .parse().expect("FILL_BATCH is not a boolean");
+    let fill_batch: bool = MicrobenchmarkData::FILL_BATCH;
 
     let (tx, mut rx) = channel::new_bounded(8);
 
@@ -204,7 +200,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            fill_batch
+            fill_batch,
         );
 
         let mut tx = tx.clone();
@@ -257,8 +253,10 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
+
+    let client = Arc::new(client);
 
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
@@ -266,9 +264,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         r
     });
 
-    let concurrent_rqs: i32 = std::env::var("CONCURRENT_RQS")
-        .expect("Failed to read CONCURRENT_RQS env variable")
-        .parse().expect("CONCURRENT_RQS is not a number!");
+    let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
     let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
 
@@ -284,13 +280,22 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            currently_pending_rqs.pop_front().await;
+            let mut option = currently_pending_rqs.pop_front().unwrap();
+
+            (&mut option).await;
         }
 
         let last_send_instant = Utc::now();
 
-        currently_pending_rqs.push_back(
-            rt::spawn(client.update(Arc::downgrade(&request))));
+        let client_ref = client.clone();
+
+        let rq = request.clone();
+
+        let handle = rt::spawn(async move {
+            client_ref.update(Arc::downgrade(&rq)).await
+        });
+
+        currently_pending_rqs.push_back(handle);
 
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
@@ -336,12 +341,22 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            currently_pending_rqs.pop_front().await;
+            let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+
+            (&mut join_handle).await;
         }
 
         let last_send_instant = Utc::now();
 
-        currently_pending_rqs.push_back(client.update(Arc::downgrade(&request)));
+        let client_ref = client.clone();
+
+        let rq = request.clone();
+
+        let handle = rt::spawn(async move {
+            client_ref.update(Arc::downgrade(&rq)).await
+        });
+
+        currently_pending_rqs.push_back(handle);
 
         let exec_time = Utc::now();
         let latency = exec_time
@@ -379,7 +394,9 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
     }
 
     while !currently_pending_rqs.is_empty() {
-        currently_pending_rqs.pop_front().await;
+        let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+
+        (&mut join_handle).await;
     }
 
     if id == 1000 {

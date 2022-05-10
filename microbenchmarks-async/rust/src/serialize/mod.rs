@@ -68,6 +68,16 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
+    pub const FILL_BATCH :bool = {
+        let result = parse_bool(unwrap_or!(option_env!("FILL_BATCH"), "false"));
+        unwrap_ctx!(result)
+    };
+
+    pub const CONCURRENT_RQS: usize = {
+        let result = parse_usize(env!("OPS_NUMBER"));
+        unwrap_ctx!(result)
+    };
+
     const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
 

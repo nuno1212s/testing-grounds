@@ -83,9 +83,7 @@ fn main_(id: NodeId) {
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
-        let fill_batch : bool = std::env::var("FILL_BATCH")
-            .expect("Failed to read fill batch")
-            .parse().expect("FILL_BATCH is not a boolean");
+        let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
 
         println!("Finished reading keys.");
 
@@ -157,9 +155,7 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = std::env::var("FILL_BATCH")
-        .expect("Failed to read fill batch")
-        .parse().expect("FILL_BATCH is not a boolean");
+    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
 
     let (tx, mut rx) = channel::new_bounded(8);
 
