@@ -109,6 +109,7 @@ async fn node_config(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    fill_batch: bool
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size) = {
@@ -134,6 +135,7 @@ async fn node_config(
         replica_server_config: server_config_replica,
         first_cli: NodeId::from(1000u32),
         batch_size,
+        fill_batch
     }
 }
 
@@ -143,8 +145,9 @@ pub async fn setup_client(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    fill_batch: bool,
 ) -> Result<Client<MicrobenchmarkData>> {
-    let node = node_config(n, id, sk, addrs, pk).await;
+    let node = node_config(n, id, sk, addrs, pk, fill_batch).await;
     let conf = client::ClientConfig {
         node,
     };
@@ -157,11 +160,12 @@ pub async fn setup_replica(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    fill_batch: bool
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
     let (node, batch_size) = {
-        let n = node_config(n, id, sk, addrs, pk);
+        let n = node_config(n, id, sk, addrs, pk, fill_batch);
         let b = get_batch_size();
         futures::join!(n, b)
     };

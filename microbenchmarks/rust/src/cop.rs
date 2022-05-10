@@ -83,9 +83,11 @@ fn main_(id: NodeId) {
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
+        let fill_batch : bool = std::env::var("FILL_BATCH")
+            .expect("Failed to read fill batch")
+            .parse().expect("FILL_BATCH is not a boolean");
 
         println!("Finished reading keys.");
-
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -120,6 +122,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
+            fill_batch
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -153,6 +156,10 @@ async fn client_async_main() {
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
+
+    let fill_batch : bool = std::env::var("FILL_BATCH")
+        .expect("Failed to read fill batch")
+        .parse().expect("FILL_BATCH is not a boolean");
 
     let (tx, mut rx) = channel::new_bounded(8);
 
@@ -190,13 +197,16 @@ async fn client_async_main() {
             addrs
         };
         let sk = secret_keys.remove(id.into()).unwrap();
+
         let fut = setup_client(
             replicas_config.len(),
             id,
             sk,
             addrs,
             public_keys.clone(),
+            fill_batch
         );
+
         let mut tx = tx.clone();
         rt::spawn(async move {
             println!("Bootstrapping client #{}", u32::from(id));

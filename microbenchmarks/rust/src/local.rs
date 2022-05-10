@@ -69,6 +69,10 @@ fn main_() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
+    let fill_batch : bool = std::env::var("FILL_BATCH")
+        .expect("Failed to read fill batch")
+        .parse().expect("FILL_BATCH is not a boolean");
+
     println!("Read keys.");
 
     let mut pending_threads = Vec::with_capacity(4);
@@ -113,6 +117,7 @@ fn main_() {
             sk,
             addrs,
             public_keys.clone(),
+            fill_batch
         );
 
         pending_threads.push(std::thread::spawn(move || {
@@ -155,6 +160,10 @@ async fn client_async_main() {
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
+
+    let fill_batch : bool = std::env::var("FILL_BATCH")
+        .expect("Failed to read fill batch")
+        .parse().expect("FILL_BATCH is not a boolean");
 
     let (tx, mut rx) = channel::new_bounded(clients_config.len());
 
@@ -201,6 +210,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
+            fill_batch
         );
 
         let mut tx = tx.clone();
