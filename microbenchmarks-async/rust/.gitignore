@@ -1,3 +1,4 @@
 /env
 /*.vim
 os_stats
+/Cargo.lock
