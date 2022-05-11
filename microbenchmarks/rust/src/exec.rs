@@ -22,6 +22,7 @@ use crate::serialize::MicrobenchmarkData;
 pub struct Microbenchmark {
     id: NodeId,
     max_tp: f32,
+    batch_count: f32,
     max_tp_time: DateTime<Utc>,
     iterations: usize,
     reply: Arc<Vec<u8>>,
@@ -40,6 +41,7 @@ impl Microbenchmark {
             id: id.clone(),
             reply,
             max_tp: -1.0,
+            batch_count: 0.0,
             max_tp_time: Utc::now(),
             iterations: 0,
             measurements: Measurements::new(id),
@@ -81,6 +83,8 @@ impl Service for Microbenchmark {
             reply_batch.add(peer_id, sess, opid, reply);
         }
 
+        self.batch_count += 1.0;
+
         meta.execution_time = Utc::now();
 
         // take measurements
@@ -121,6 +125,18 @@ impl Service for Microbenchmark {
 
                 println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
                          self.id, tp, self.max_tp);
+
+                //This gives us the amount of batches per micro seconds, since the diff is in microseconds
+                let mut batches_per_second = (self.batch_count / diff as f32);
+
+                //This moves the amount of batches per microsecond to the amount of batches per second
+                batches_per_second *= 1000.0 * 1000.0;
+
+                println!("{:?} // Batch throughput = {} batches/sec",
+                         self.id, batches_per_second);
+
+                //Reset the amount of batches
+                self.batch_count = 0.0;
 
                 self.measurements.total_latency.log_latency("Total");
                 self.measurements.consensus_latency.log_latency("Consensus");
