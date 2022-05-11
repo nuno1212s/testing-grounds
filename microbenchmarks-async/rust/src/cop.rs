@@ -254,10 +254,6 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 }
 
 async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
-    let mut ramp_up: i32 = 1000;
-
-    let client = Arc::new(client);
-
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
         OsRng.fill_bytes(&mut r);
@@ -266,137 +262,129 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
     let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
-    let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
-
-    println!("Warm up...");
+    let mut sessions = Vec::with_capacity(concurrent_rqs);
 
     let id = u32::from(client.id());
 
-    let mut currently_pending_rqs = LinkedList::new();
+    println!("Warm up...");
 
-    for req in iterator {
-        if MicrobenchmarkData::VERBOSE {
-            print!("Sending req {}...", req);
-        }
+    for _session in 0..concurrent_rqs {
+        let mut ramp_up: i32 = 1000;
 
-        if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            let mut option = currently_pending_rqs.pop_front().unwrap();
+        let mut client = client.clone();
 
-            (&mut option).await;
-        }
+        let join_handle = rt::spawn(async move {
+            let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
-        let last_send_instant = Utc::now();
+            for req in iterator {
+                if MicrobenchmarkData::VERBOSE {
+                    print!("Sending req {}...", req);
+                }
 
-        let client_ref = client.clone();
+                let last_send_instant = Utc::now();
 
-        let rq = request.clone();
+                client.update(Arc::downgrade(&rq)).await;
 
-        let handle = rt::spawn(async move {
-            client_ref.update(Arc::downgrade(&rq)).await
+                let latency = Utc::now()
+                    .signed_duration_since(last_send_instant)
+                    .num_nanoseconds()
+                    .unwrap_or(i64::MAX);
+
+                let time_ms = Utc::now().timestamp_millis();
+
+                let _ = q.enqueue(
+                    format!(
+                        "{}\t{}\t{}\n",
+                        id,
+                        time_ms,
+                        latency,
+                    ),
+                );
+
+                if MicrobenchmarkData::VERBOSE {
+                    if req % 1000 == 0 {
+                        println!("{} // {} operations sent!", id, req);
+                    }
+
+                    println!(" sent!");
+                }
+
+                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+                } else if ramp_up > 0 {
+                    Delay::new(Duration::from_millis(ramp_up as u64)).await;
+                }
+
+                ramp_up -= 100;
+            }
         });
 
-        currently_pending_rqs.push_back(handle);
-
-        let latency = Utc::now()
-            .signed_duration_since(last_send_instant)
-            .num_nanoseconds()
-            .unwrap_or(i64::MAX);
-
-        let time_ms = Utc::now().timestamp_millis();
-
-        let _ = q.enqueue(
-            format!(
-                "{}\t{}\t{}\n",
-                id,
-                time_ms,
-                latency,
-            ),
-        );
-
-        if MicrobenchmarkData::VERBOSE {
-            println!(" sent!");
-        }
-        if MicrobenchmarkData::VERBOSE && (req % 1000 == 0) {
-            println!("{} // {} operations sent!", id, req);
-        }
-
-        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
-        } else if ramp_up > 0 {
-            Delay::new(Duration::from_millis(ramp_up as u64)).await;
-        }
-
-        ramp_up -= 100;
+        sessions.push(join_handle);
     }
+
+    for mut x in sessions {
+        x.await;
+    }
+
+    sessions.clear();
 
     let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
-    let iterator = MicrobenchmarkData::OPS_NUMBER / 2..MicrobenchmarkData::OPS_NUMBER;
+    for _session in 0..concurrent_rqs {
+        let mut client = client.clone();
 
-    for req in iterator {
-        if MicrobenchmarkData::VERBOSE {
-            print!("{} // Sending req {}...", id, req);
-        }
+        let join_handle = rt::spawn(async move {
 
-        if currently_pending_rqs.len() >= concurrent_rqs as usize {
-            let mut join_handle = currently_pending_rqs.pop_front().unwrap();
+            let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
-            (&mut join_handle).await;
-        }
+            for req in iterator {
+                if MicrobenchmarkData::VERBOSE {
+                    print!("Sending req {}...", req);
+                }
 
-        let last_send_instant = Utc::now();
+                let last_send_instant = Utc::now();
 
-        let client_ref = client.clone();
+                client.update(Arc::downgrade(&rq)).await;
 
-        let rq = request.clone();
+                let latency = Utc::now()
+                    .signed_duration_since(last_send_instant)
+                    .num_nanoseconds()
+                    .unwrap_or(i64::MAX);
 
-        let handle = rt::spawn(async move {
-            client_ref.update(Arc::downgrade(&rq)).await
+                let time_ms = Utc::now().timestamp_millis();
+
+                let _ = q.enqueue(
+                    format!(
+                        "{}\t{}\t{}\n",
+                        id,
+                        time_ms,
+                        latency,
+                    ),
+                );
+
+                (exec_time, last_send_instant).store(&mut st);
+
+                if MicrobenchmarkData::VERBOSE {
+                    if req % 1000 == 0 {
+                        println!("{} // {} operations sent!", id, req);
+                    }
+
+                    println!(" sent!");
+                }
+
+                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+                }
+            }
         });
 
-        currently_pending_rqs.push_back(handle);
-
-        let exec_time = Utc::now();
-        let latency = exec_time
-            .signed_duration_since(last_send_instant)
-            .num_nanoseconds()
-            .unwrap_or(i64::MAX);
-
-        let time_ms = Utc::now().timestamp_millis();
-
-        let _ = q.enqueue(
-            format!(
-                "{}\t{}\t{}\n",
-                id,
-                time_ms,
-                latency,
-            ),
-        );
-
-        if MicrobenchmarkData::VERBOSE {
-            println!(" sent!");
-        }
-
-        (exec_time, last_send_instant).store(&mut st);
-
-        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
-        } else if ramp_up > 0 {
-            Delay::new(Duration::from_millis(ramp_up as u64)).await;
-        }
-        ramp_up -= 100;
-
-        if MicrobenchmarkData::VERBOSE && (req % 1000 == 0) {
-            println!("{} // {} operations sent!", id, req);
-        }
+        sessions.push(join_handle);
     }
 
-    while !currently_pending_rqs.is_empty() {
-        let mut join_handle = currently_pending_rqs.pop_front().unwrap();
-
-        (&mut join_handle).await;
+    for x in sessions {
+        x.await;
     }
 
     if id == 1000 {
