@@ -69,8 +69,6 @@ fn main_() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
-
     println!("Read keys.");
 
     let mut pending_threads = Vec::with_capacity(4);
@@ -114,8 +112,7 @@ fn main_() {
             id,
             sk,
             addrs,
-            public_keys.clone(),
-            fill_batch
+            public_keys.clone()
         );
 
         pending_threads.push(std::thread::spawn(move || {
