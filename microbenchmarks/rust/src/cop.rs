@@ -125,7 +125,8 @@ fn main_(id: NodeId) {
         println!("Running replica #{}", u32::from(id));
 
         //Here we want to launch a statistics thread for each replica since they are on different machines
-        crate::os_statistics::start_statistics_thread(id);
+        //TODO: Disabled for testing the request reception
+        //crate::os_statistics::start_statistics_thread(id);
 
         replica
     };
