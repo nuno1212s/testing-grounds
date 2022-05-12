@@ -42,7 +42,7 @@ pub fn main() {
         //This should leave enough room for the threads that each replica requires to constantly
         //Have (which we want to avoid context switching on)
         pool_threads: num_cpus::get() / 4,
-        async_threads: if is_client { num_cpus::get() } else { num_cpus::get() / 2 },
+        async_threads: num_cpus::get(),
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -117,7 +117,7 @@ fn main_(id: NodeId) {
             id,
             sk,
             addrs,
-            public_keys.clone()
+            public_keys.clone(),
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -195,7 +195,7 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
-            public_keys.clone()
+            public_keys.clone(),
         );
 
         let mut tx = tx.clone();
