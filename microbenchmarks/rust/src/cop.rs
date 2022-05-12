@@ -266,11 +266,13 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
     for req in iterator {
         if MicrobenchmarkData::VERBOSE {
-            print!("Sending req {}...", req);
+            print!("{:?} // Sending req {}...", client.id(), req);
         }
 
         let last_send_instant = Utc::now();
+
         client.update(Arc::downgrade(&request)).await;
+
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
             .num_nanoseconds()
