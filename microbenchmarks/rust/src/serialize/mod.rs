@@ -73,6 +73,12 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
+    pub const CLIENTS_PER_POOL: usize = {
+        let result = parse_usize(env!("CLIENTS_PER_POOL"));
+
+        unwrap_ctx!(result)
+    };
+
     const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
 

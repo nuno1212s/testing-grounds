@@ -70,8 +70,6 @@ fn main_() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
-
     println!("Read keys.");
 
     let mut pending_threads = Vec::with_capacity(4);
@@ -115,8 +113,7 @@ fn main_() {
             id,
             sk,
             addrs,
-            public_keys.clone(),
-            fill_batch
+            public_keys.clone()
         );
 
         let thread = std::thread::Builder::new().name(format!("Node {:?}", id)).spawn(move || {
@@ -162,8 +159,6 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
-
     let (tx, mut rx) = channel::new_bounded(clients_config.len());
 
     let mut first_cli: u32 = u32::MAX;
@@ -208,8 +203,7 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
-            public_keys.clone(),
-            fill_batch
+            public_keys.clone()
         );
 
         let mut tx = tx.clone();
@@ -272,19 +266,9 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 }
 
 async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
-    let mut ramp_up: i32 = 1000;
-
-    let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        OsRng.fill_bytes(&mut r);
-        r
-    });
-
-    let client = Arc::new(client);
 
     let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
-    let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
     let mut sessions = Vec::with_capacity(concurrent_rqs);
 
@@ -297,6 +281,14 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         let mut client = client.clone();
 
+        let q = q.clone();
+
+        let request = Arc::new({
+            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+            OsRng.fill_bytes(&mut r);
+            r
+        });
+
         let join_handle = rt::spawn(async move {
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
@@ -307,7 +299,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
                 let last_send_instant = Utc::now();
 
-                client.update(Arc::downgrade(&rq)).await;
+                client.update(Arc::downgrade(&request)).await;
 
                 let latency = Utc::now()
                     .signed_duration_since(last_send_instant)
@@ -350,14 +342,22 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         x.await;
     }
 
-    sessions.clear();
-
-    let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
+    let mut sessions = Vec::with_capacity(concurrent_rqs);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
     for _session in 0..concurrent_rqs {
         let mut client = client.clone();
+
+        let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
+
+        let request = Arc::new({
+            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+            OsRng.fill_bytes(&mut r);
+            r
+        });
+
+        let q = q.clone();
 
         let join_handle = rt::spawn(async move {
 
@@ -370,7 +370,9 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
                 let last_send_instant = Utc::now();
 
-                client.update(Arc::downgrade(&rq)).await;
+                client.update(Arc::downgrade(&request)).await;
+
+                let exec_time = Utc::now();
 
                 let latency = Utc::now()
                     .signed_duration_since(last_send_instant)
@@ -402,10 +404,14 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
                     Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
                 }
             }
+
+            st
         });
 
         sessions.push(join_handle);
     }
+
+    let mut st = sessions.pop().unwrap().await.unwrap();
 
     for x in sessions {
         x.await;

@@ -83,8 +83,6 @@ fn main_(id: NodeId) {
             .map(|(id, sk)| (*id, sk.public_key().into()))
             .collect();
 
-        let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
-
         println!("Finished reading keys.");
 
         let addrs = {
@@ -119,8 +117,7 @@ fn main_(id: NodeId) {
             id,
             sk,
             addrs,
-            public_keys.clone(),
-            fill_batch
+            public_keys.clone()
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -154,8 +151,6 @@ async fn client_async_main() {
         .iter()
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
-
-    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
 
     let (tx, mut rx) = channel::new_bounded(8);
 
@@ -199,8 +194,7 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
-            public_keys.clone(),
-            fill_batch
+            public_keys.clone()
         );
 
         let mut tx = tx.clone();

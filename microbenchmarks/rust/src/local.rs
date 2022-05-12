@@ -159,8 +159,6 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let fill_batch : bool = MicrobenchmarkData::FILL_BATCH;
-
     let (tx, mut rx) = channel::new_bounded(clients_config.len());
 
     let mut first_cli : u32 = u32::MAX;
@@ -206,7 +204,6 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            fill_batch
         );
 
         let mut tx = tx.clone();
