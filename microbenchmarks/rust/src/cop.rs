@@ -217,7 +217,8 @@ async fn client_async_main() {
     }
 
     //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
+    //TODO: checking requests
+    //crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
