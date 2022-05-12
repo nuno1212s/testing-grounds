@@ -1,10 +1,12 @@
+use std::cmp::Ordering;
 use crate::common::*;
 use crate::serialize::MicrobenchmarkData;
 
 use std::fs::File;
 use std::io::Write;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicUsize;
+use std::time::{Duration, Instant};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
@@ -220,10 +222,15 @@ async fn client_async_main() {
     //TODO: checking requests
     //crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
+    let rq_count = Arc::new(AtomicUsize::new(0));
+
+    let time = Arc::new(Mutex::new(Instant::now()));
+
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
-        let h = rt::spawn(run_client(client, queue_tx));
+        let h = rt::spawn(run_client(client, queue_tx,
+                                     rq_count.clone(), time.clone()));
         handles.push(h);
     }
     drop(clients_config);
@@ -249,7 +256,10 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+const RQ_COUNT: usize = 999;
+
+async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>.
+                    count: Arc<AtomicUsize>, time: Arc<Mutex<Instant>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
@@ -270,6 +280,28 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
+
+        let rq = count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        if rq == 0 {
+            let mut guard = time.lock().unwrap();
+
+            std::mem::replace(&mut *guard, Instant::now());
+        } else if rq % 100 == 0 {
+            let init_time = (*time.lock().unwrap()).clone();
+
+            let duration = Instant::now()
+                .duration_since(init_time);
+
+            println!("RECEIVED {} REQUESTS IN {:?}", RQ_COUNT, duration);
+        } else if rq == RQ_COUNT {
+            let instant = (*time.lock().unwrap()).clone();
+
+            let duration = Instant::now()
+                .duration_since(instant);
+
+            println!("Received {} requests in {:?}", rq, duration);
+        }
 
         client.update(Arc::downgrade(&request)).await;
 
