@@ -43,7 +43,7 @@ pub fn main() {
         //Divide the logical cores into the thread pool and the async threadpool.
         //This should leave enough room for the threads that each replica requires to constantly
         //Have (which we want to avoid context switching on)
-        pool_threads: num_cpus::get() / 4,
+        pool_threads: num_cpus::get(),
         async_threads: num_cpus::get(),
     };
 
@@ -293,7 +293,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             let duration = Instant::now()
                 .duration_since(init_time);
 
-            println!("RECEIVED {} REQUESTS IN {:?}", RQ_COUNT, duration);
+            println!("RECEIVED {} REQUESTS IN {:?}", rq, duration);
         } else if rq == RQ_COUNT {
             let instant = (*time.lock().unwrap()).clone();
 
