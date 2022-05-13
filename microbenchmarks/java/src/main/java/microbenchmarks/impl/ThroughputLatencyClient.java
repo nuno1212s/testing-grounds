@@ -295,7 +295,7 @@ public class ThroughputLatencyClient {
 
                         long time_taken = currentTime - init_rq;
 
-                        System.out.println("Took " + TimeUnit.NANOSECONDS.toMicros(time_taken) + " micro seconds. ( " + TimeUnit.NANOSECONDS.toMillis(time_taken) + " ms)");
+                        System.out.println("Took " + TimeUnit.NANOSECONDS.toMicros(time_taken) + " micro seconds for " + rqs + ". ( " + TimeUnit.NANOSECONDS.toMillis(time_taken) + " ms)");
                     }
 
                     reply = proxy.invokeOrdered(request);
