@@ -293,14 +293,14 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             let duration = Instant::now()
                 .duration_since(init_time);
 
-            println!("RECEIVED {} REQUESTS IN {:?}", rq, duration);
+            println!("SENT {} REQUESTS IN {:?}", rq, duration);
         } else if rq == RQ_COUNT {
             let instant = (*time.lock().unwrap()).clone();
 
             let duration = Instant::now()
                 .duration_since(instant);
 
-            println!("Received {} requests in {:?}", rq, duration);
+            println!("Sent {} requests in {:?}", rq, duration);
         }
 
         client.update(Arc::downgrade(&request)).await;

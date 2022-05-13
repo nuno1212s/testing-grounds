@@ -38,12 +38,10 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Random;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Example client that updates a BFT replicated service (a counter).
@@ -76,6 +74,11 @@ public class ThroughputLatencyClient {
     public static String privKey = "MD4CAQAwEAYHKoZIzj0CAQYFK4EEAAoEJzAlAgEBBCBnhIob4JXH+WpaNiL72BlbtUMAIBQoM852d+tKFBb7fg==";
     public static String pubKey = "MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEavNEKGRcmB7u49alxowlwCi1s24ANOpOQ9UiFBxgqnO/RfOl3BJm0qE2IJgCnvL7XUetwj5C/8MnMWi9ux2aeQ==";
 
+    public static final int RQ_TOTAL = 999;
+
+    public static AtomicInteger RQ_COUNT = new AtomicInteger(0);
+
+    public static AtomicLong RQ_TIME = new AtomicLong(0);
 
     @SuppressWarnings("static-access")
     public static void main(String[] args) throws IOException {
@@ -277,10 +280,27 @@ public class ThroughputLatencyClient {
                 long last_send_instant = System.nanoTime();
 
                 byte[] reply = null;
+
                 if (readOnly)
                     reply = proxy.invokeUnordered(request);
-                else
+                else {
+                    final int rqs = RQ_COUNT.getAndIncrement();
+
+                    if (rqs == 0) {
+                        RQ_TIME.set(System.nanoTime());
+                    } else if (rqs % 100 == 0 || rqs == RQ_TOTAL) {
+                        final long currentTime = System.nanoTime();
+
+                        final long init_rq = RQ_TIME.get();
+
+                        long time_taken = currentTime - init_rq;
+
+                        System.out.println("Took " + TimeUnit.NANOSECONDS.toMicros(time_taken) + " micro seconds. ( " + TimeUnit.NANOSECONDS.toMillis(time_taken) + " ms)");
+                    }
+
                     reply = proxy.invokeOrdered(request);
+                }
+
                 long latency = System.nanoTime() - last_send_instant;
 
                 try {
