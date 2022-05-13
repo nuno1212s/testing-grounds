@@ -260,7 +260,7 @@ const RQ_COUNT: usize = 999;
 
 async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>,
                     count: Arc<AtomicUsize>, time: Arc<Mutex<Instant>>) {
-    let mut ramp_up: i32 = 1000;
+    let mut ramp_up: i32 = 0;
 
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
