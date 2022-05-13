@@ -43,7 +43,7 @@ pub fn main() {
         //Divide the logical cores into the thread pool and the async threadpool.
         //This should leave enough room for the threads that each replica requires to constantly
         //Have (which we want to avoid context switching on)
-        pool_threads: num_cpus::get(),
+        pool_threads: num_cpus::get() / 2,
         async_threads: num_cpus::get(),
     };
 
