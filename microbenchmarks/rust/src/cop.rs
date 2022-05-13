@@ -287,23 +287,20 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             let mut guard = time.lock().unwrap();
 
             std::mem::replace(&mut *guard, Instant::now());
-        } else if rq % 100 == 0 {
+        } else if rq % 100 == 0 || rq == RQ_COUNT {
             let init_time = (*time.lock().unwrap()).clone();
 
             let duration = Instant::now()
                 .duration_since(init_time);
 
             println!("SENT {} REQUESTS IN {:?}", rq, duration);
-        } else if rq == RQ_COUNT {
-            let instant = (*time.lock().unwrap()).clone();
-
-            let duration = Instant::now()
-                .duration_since(instant);
-
-            println!("Sent {} requests in {:?}", rq, duration);
         }
 
-        client.update(Arc::downgrade(&request)).await;
+        let mut new_cli = client.clone();
+
+        let request_2 = request.clone();
+
+        rt::spawn(async move { new_cli.update(Arc::downgrade(&request_2)).await; });
 
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
