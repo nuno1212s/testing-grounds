@@ -25,6 +25,7 @@ use febft::bft::{
     init,
     InitConfig,
 };
+use febft::bft::async_runtime::Barrier;
 use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
@@ -226,11 +227,17 @@ async fn client_async_main() {
 
     let time = Arc::new(Mutex::new(Instant::now()));
 
+    let client_barrier = Arc::new(Barrier::new(clients.len()));
+
     let mut handles = Vec::with_capacity(clients_config.len());
+
+    ///Start running the actual clients.
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
+
         let h = rt::spawn(run_client(client, queue_tx,
-                                     rq_count.clone(), time.clone()));
+                                     rq_count.clone(), time.clone(),
+                                     client_barrier.clone()));
         handles.push(h);
     }
     drop(clients_config);
@@ -259,7 +266,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 const RQ_COUNT: usize = 999;
 
 async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>,
-                    count: Arc<AtomicUsize>, time: Arc<Mutex<Instant>>) {
+                    count: Arc<AtomicUsize>, time: Arc<Mutex<Instant>>, client_barrier: Arc<Barrier>) {
     let mut ramp_up: i32 = 0;
 
     let request = Arc::new({
@@ -287,11 +294,15 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
             let mut guard = time.lock().unwrap();
 
             std::mem::replace(&mut *guard, Instant::now());
-        } else if rq % 100 == 0 || rq == RQ_COUNT {
+        } else if rq % 100 == 0 || rq == RQ_COUNT - 1 {
             let init_time = (*time.lock().unwrap()).clone();
 
             let duration = Instant::now()
                 .duration_since(init_time);
+
+            if rq == RQ_COUNT - 1 {
+                count.store(0, std::sync::atomic::Ordering::Relaxed);
+            }
 
             println!("SENT {} REQUESTS IN {:?}", rq, duration);
         }
@@ -301,6 +312,9 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         let request_2 = request.clone();
 
         rt::spawn(async move { new_cli.update(Arc::downgrade(&request_2)).await; });
+
+        //Wait for all other clients to perform their requests
+        client_barrier.wait().await;
 
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
