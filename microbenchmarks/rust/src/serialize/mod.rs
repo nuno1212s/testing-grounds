@@ -68,13 +68,25 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
-    pub const FILL_BATCH :bool = {
+    pub const FILL_BATCH: bool = {
         let result = parse_bool(unwrap_or!(option_env!("FILL_BATCH"), "false"));
         unwrap_ctx!(result)
     };
 
     pub const CLIENTS_PER_POOL: usize = {
         let result = parse_usize(env!("CLIENTS_PER_POOL"));
+
+        unwrap_ctx!(result)
+    };
+
+    pub const BATCH_TIMEOUT_MICROS: u64 = {
+        let result = parse_u64(env!("BATCH_TIMEOUT_MICROS"));
+
+        unwrap_ctx!(result)
+    };
+
+    pub const BATCH_SLEEP_MICROS: u64 = {
+        let result = parse_u64(env!("BATCH_SLEEP_MICROS"));
 
         unwrap_ctx!(result)
     };
@@ -88,15 +100,15 @@ impl SharedData for MicrobenchmarkData {
     type Reply = Weak<Vec<u8>>;
 
     fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
-    where
-        W: Write
+        where
+            W: Write
     {
         Ok(())
     }
 
     fn deserialize_state<R>(_r: R) -> Result<Vec<u8>>
-    where
-        R: Read
+        where
+            R: Read
     {
         Ok((0..)
             .into_iter()
@@ -106,8 +118,8 @@ impl SharedData for MicrobenchmarkData {
     }
 
     fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>) -> Result<()>
-    where
-        W: Write
+        where
+            W: Write
     {
         let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
         let sys_msg: messages_capnp::system::Builder = root.init_root();
@@ -122,7 +134,7 @@ impl SharedData for MicrobenchmarkData {
                 request.set_operation_id(m.sequence_number().into());
                 request.set_session_id(m.session_id().into());
                 request.set_data(&*operation);
-            },
+            }
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
                 let payload = match m.payload().upgrade() {
@@ -132,7 +144,7 @@ impl SharedData for MicrobenchmarkData {
                 reply.set_operation_id(m.sequence_number().into());
                 reply.set_session_id(m.session_id().into());
                 reply.set_data(&*payload);
-            },
+            }
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
                 consensus.set_seq_no(m.sequence_number().into());
@@ -160,11 +172,11 @@ impl SharedData for MicrobenchmarkData {
                                 request.set_data(&Self::REQUEST);
                             }
                         }
-                    },
+                    }
                     ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
                     ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
                 }
-            },
+            }
             _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
         }
         capnp::serialize::write_message(w, &root)
@@ -172,8 +184,8 @@ impl SharedData for MicrobenchmarkData {
     }
 
     fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>>
-    where
-        R: Read
+        where
+            R: Read
     {
         let reader = capnp::serialize::read_message(r, Default::default())
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
@@ -194,11 +206,11 @@ impl SharedData for MicrobenchmarkData {
                     .to_owned();
 
                 Ok(SystemMessage::Reply(ReplyMessage::new(session_id, operation_id, Weak::new())))
-            },
+            }
             messages_capnp::system::Which::Reply(_) => {
                 Err("Failed to read reply message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
             messages_capnp::system::Which::Request(Ok(request)) => {
                 let session_id: SeqNo = request.get_session_id().into();
                 let operation_id: SeqNo = request.get_operation_id().into();
@@ -207,11 +219,11 @@ impl SharedData for MicrobenchmarkData {
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
 
                 Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, Weak::new())))
-            },
+            }
             messages_capnp::system::Which::Request(_) => {
                 Err("Failed to read request message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
             messages_capnp::system::Which::Consensus(Ok(consensus)) => {
                 let seq: SeqNo = consensus
                     .reborrow()
@@ -256,26 +268,26 @@ impl SharedData for MicrobenchmarkData {
                         }
 
                         ConsensusMessageKind::PrePrepare(requests)
-                    },
+                    }
                     messages_capnp::consensus::Which::Prepare(Ok(digest)) => {
                         let digest = Digest::from_bytes(digest)
                             .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
                         ConsensusMessageKind::Prepare(digest)
-                    },
+                    }
                     messages_capnp::consensus::Which::Commit(Ok(digest)) => {
                         let digest = Digest::from_bytes(digest)
                             .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
                         ConsensusMessageKind::Commit(digest)
-                    },
+                    }
                     _ => return Err("Failed to read consensus message kind").wrapped(ErrorKind::CommunicationSerialize),
                 };
 
                 Ok(SystemMessage::Consensus(ConsensusMessage::new(seq, view, kind)))
-            },
+            }
             messages_capnp::system::Which::Consensus(_) => {
                 Err("Failed to read consensus message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
         }
     }
 }

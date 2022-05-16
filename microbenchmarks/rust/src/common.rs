@@ -135,7 +135,9 @@ async fn node_config(
         first_cli: NodeId::from(1000u32),
         batch_size,
         fill_batch: MicrobenchmarkData::FILL_BATCH,
-        clients_per_pool: MicrobenchmarkData::CLIENTS_PER_POOL
+        clients_per_pool: MicrobenchmarkData::CLIENTS_PER_POOL,
+        batch_timeout_micros: MicrobenchmarkData::BATCH_TIMEOUT_MICROS,
+        batch_sleep_micros: MicrobenchmarkData::BATCH_SLEEP_MICROS
     }
 }
 
