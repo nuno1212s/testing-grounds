@@ -74,7 +74,7 @@ impl MicrobenchmarkData {
     };
 
     pub const CONCURRENT_RQS: usize = {
-        let result = parse_usize(env!("OPS_NUMBER"));
+        let result = parse_usize(env!("CONCURRENT_RQS"));
         unwrap_ctx!(result)
     };
 
