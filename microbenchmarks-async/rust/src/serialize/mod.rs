@@ -84,6 +84,19 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
+    pub const BATCH_TIMEOUT_MICROS: u64 = {
+        let result = parse_u64(env!("BATCH_TIMEOUT_MICROS"));
+
+        unwrap_ctx!(result)
+    };
+
+    pub const BATCH_SLEEP_MICROS: u64 = {
+        let result = parse_u64(env!("BATCH_SLEEP_MICROS"));
+
+        unwrap_ctx!(result)
+    };
+
+
     const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
 

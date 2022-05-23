@@ -269,7 +269,8 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         });
 
         let q = q.clone();
-        
+
+        //Spawn a task for each concurrent client request stream
         let join_handle = rt::spawn(async move {
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
@@ -319,7 +320,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         sessions.push(join_handle);
     }
 
-    for mut x in sessions {
+    for x in sessions {
         x.await;
     }
 
