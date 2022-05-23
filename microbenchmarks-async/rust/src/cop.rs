@@ -274,6 +274,10 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         let join_handle = rt::spawn(async move {
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
+            if MicrobenchmarkData::VERBOSE {
+                print!("Starting concurrent thread with iteration {}..{}", iterator.start, iterator.end);
+            }
+
             for req in iterator {
                 if MicrobenchmarkData::VERBOSE {
                     print!("Sending req {}...", req);
