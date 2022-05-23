@@ -28,7 +28,7 @@ path = "../../../febft"
 default-features = false
 features = [
     "expose_impl",
-    "async_runtime_tokio",
+    "async_runtime_async_std",
     "threadpool_crossbeam",
     "socket_tokio_tcp",
     "channel_custom_dump",
