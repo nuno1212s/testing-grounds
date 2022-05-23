@@ -30,7 +30,7 @@ features = [
     "expose_impl",
     "async_runtime_async_std",
     "threadpool_crossbeam",
-    "socket_tokio_tcp",
+    "socket_async_std_tcp",
     "channel_custom_dump",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
