@@ -1,6 +1,11 @@
 package microbenchmarks_async.impl;
 
+import bftsmart.communication.client.ReplyListener;
+import bftsmart.tom.AsynchServiceProxy;
+import bftsmart.tom.RequestContext;
 import bftsmart.tom.ServiceProxy;
+import bftsmart.tom.core.messages.TOMMessage;
+import bftsmart.tom.core.messages.TOMMessageType;
 import bftsmart.tom.util.Storage;
 import bftsmart.tom.util.TOMUtil;
 import microbenchmarks_async.benchmarks.OSStatistics;
@@ -49,7 +54,7 @@ public class ThroughputLatencyClient {
             FileWriter f = null;
 
             try {
-                f = new FileWriter("./latencies_" +initId + ".txt");
+                f = new FileWriter("./latencies_" + initId + ".txt");
 
                 while (!writerThreadFlag.get()) {
                     f.write(latencies.take());
@@ -70,10 +75,10 @@ public class ThroughputLatencyClient {
         });
 
         int client_count = Integer.parseInt(args[1]);
-        int nr_ops = Integer.parseInt(args[2]);
+        int nrOps = Integer.parseInt(args[2]);
         int requestSize = Integer.parseInt(args[3]);
         int interval = Integer.parseInt(args[4]);
-        int concurrent_rqs = Integer.parseInt(args[5]);
+        int concurrentRqs = Integer.parseInt(args[5]);
         boolean readOnly = Boolean.parseBoolean(args[6]);
         boolean verbose = Boolean.parseBoolean(args[7]);
         String sign = args[8];
@@ -94,23 +99,24 @@ public class ThroughputLatencyClient {
             System.exit(0);
         }
 
-        Client[] clients = new Client[client_count * nr_ops];
+        Client[] clients = new Client[client_count * nrOps];
 
         int id = 0;
 
         for (int cli = 0; cli < client_count; cli++) {
-            for (int concurrent_op = 0; concurrent_op < concurrent_rqs; concurrent_op ++) {
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException ex) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ex) {
 
-                    ex.printStackTrace();
-                }
-
-                System.out.println("Launching client " + (initId + id));
-                clients[id] = new ThroughputLatencyClient.Client(initId + id, nr_ops, requestSize, interval, readOnly, verbose, s);
-                id++;
+                ex.printStackTrace();
             }
+
+            System.out.println("Launching client " + (initId + id));
+
+            clients[id] = new ThroughputLatencyClient.Client(initId + id, nrOps, requestSize, interval,
+                    concurrentRqs, readOnly, verbose, s);
+
+            id++;
         }
 
         ExecutorService execs = Executors.newFixedThreadPool(clients.length);
@@ -160,22 +166,25 @@ public class ThroughputLatencyClient {
         int numberOfOps;
         int requestSize;
         int interval;
+
+        int concurrentRqs;
         boolean readOnly;
         boolean verbose;
-        ServiceProxy proxy;
+        AsynchServiceProxy proxy;
         byte[] request;
         int rampup = 1000;
 
-        public Client(int id, int numberOfOps, int requestSize, int interval, boolean readOnly, boolean verbose, int sign) {
+        public Client(int id, int numberOfOps, int requestSize, int interval, int concurrent_rqs, boolean readOnly, boolean verbose, int sign) {
             super("Client " + id);
 
             this.id = id;
             this.numberOfOps = numberOfOps;
             this.requestSize = requestSize;
             this.interval = interval;
+            this.concurrentRqs = concurrent_rqs;
             this.readOnly = readOnly;
             this.verbose = verbose;
-            this.proxy = new ServiceProxy(id);
+            this.proxy = new AsynchServiceProxy(id);
             this.request = new byte[this.requestSize];
 
             Random rand = new Random(System.nanoTime() + this.id);
@@ -231,23 +240,51 @@ public class ThroughputLatencyClient {
 
             int req = 0;
 
+            Semaphore semaphore = new Semaphore(concurrentRqs);
+
             for (int i = 0; i < numberOfOps / 2; i++, req++) {
+                try {
+                    //Attempt to acquire the semaphore.
+                    //This should only be possible if there are no more than concurrentRqs currently awaiting response
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
                 if (verbose) System.out.print("Sending req " + req + "...");
 
                 long last_send_instant = System.nanoTime();
 
-                byte[] reply = null;
-                if (readOnly)
-                    reply = proxy.invokeUnordered(request);
-                else
-                    reply = proxy.invokeOrdered(request);
-                long latency = System.nanoTime() - last_send_instant;
+                ReplyListener replyListener = new ReplyListener() {
+                    @Override
+                    public void reset() {
+                        //Do nothing
+                    }
 
-                try {
-                    if (reply != null) latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
+                    @Override
+                    public void replyReceived(RequestContext context, TOMMessage reply) {
+                        long latency = System.nanoTime() - last_send_instant;
+
+                        try {
+                            if (reply != null) latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+
+                        //Release another request so the client can go back to making more requests
+                        semaphore.release();
+                    }
+                };
+
+                TOMMessageType type;
+
+                if (readOnly) {
+                    type = TOMMessageType.UNORDERED_REQUEST;
+                } else {
+                    type = TOMMessageType.ORDERED_REQUEST;
                 }
+
+                proxy.invokeAsynchRequest(request, replyListener, type);
 
                 if (verbose) System.out.println(" sent!");
 
@@ -257,11 +294,11 @@ public class ThroughputLatencyClient {
 
                     //sleeps interval ms before sending next request
                     if (interval > 0) {
-
                         Thread.sleep(interval);
                     } else if (this.rampup > 0) {
                         Thread.sleep(this.rampup);
                     }
+
                     this.rampup -= 100;
 
                 } catch (InterruptedException ex) {
@@ -274,24 +311,49 @@ public class ThroughputLatencyClient {
             System.out.println("Executing experiment for " + numberOfOps / 2 + " ops");
 
             for (int i = 0; i < numberOfOps / 2; i++, req++) {
-                long last_send_instant = System.nanoTime();
-                if (verbose) System.out.print(this.id + " // Sending req " + req + "...");
-
-                if (readOnly)
-                    proxy.invokeUnordered(request);
-                else
-                    proxy.invokeOrdered(request);
-                long latency = System.nanoTime() - last_send_instant;
 
                 try {
-                    latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
 
-                if (verbose) System.out.println(this.id + " // sent!");
-                st.store(latency);
+                if (verbose) System.out.print(this.id + " // Sending req " + req + "...");
 
+                long last_send_instant = System.nanoTime();
+
+                ReplyListener replyListener = new ReplyListener() {
+                    @Override
+                    public void reset() {
+                        //Do nothing
+                    }
+
+                    @Override
+                    public void replyReceived(RequestContext context, TOMMessage reply) {
+                        long latency = System.nanoTime() - last_send_instant;
+
+                        try {
+                            if (reply != null) latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+
+                        st.store(latency);
+
+                        //Release another request so the client can make it again
+                        semaphore.release();
+                    }
+                };
+
+                TOMMessageType type;
+
+                if (readOnly) {
+                    type = TOMMessageType.UNORDERED_REQUEST;
+                } else {
+                    type = TOMMessageType.ORDERED_REQUEST;
+                }
+
+                proxy.invokeAsynchRequest(request, replyListener, type);
 
                 try {
 
@@ -307,7 +369,6 @@ public class ThroughputLatencyClient {
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
                 }
-
 
                 if (verbose && (req % 1000 == 0)) System.out.println(this.id + " // " + req + " operations sent!");
             }
