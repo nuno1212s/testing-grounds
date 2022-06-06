@@ -156,7 +156,7 @@ async fn client_async_main() {
         .map(|(id, sk)| (*id, sk.public_key().into()))
         .collect();
 
-    let (tx, mut rx) = channel::new_bounded(clients_config.len());
+    let (tx, mut rx) = channel::new_bounded_async(clients_config.len());
 
     let mut first_cli : u32 = u32::MAX;
 
