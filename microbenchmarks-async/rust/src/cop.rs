@@ -263,6 +263,12 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
     println!("Warm up...");
 
+    let request = Arc::new({
+        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        OsRng.fill_bytes(&mut r);
+        r
+    });
+
     for _session in 0..concurrent_rqs {
         let mut ramp_up: i32 = 1000;
 
@@ -270,11 +276,7 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
         let client_id = client.id();
 
-        let request = Arc::new({
-            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-            OsRng.fill_bytes(&mut r);
-            r
-        });
+        let request = request.clone();
 
         let q = q.clone();
 
@@ -357,7 +359,11 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
         let q = q.clone();
 
-        let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
+        let mut st = if _session == 0 {
+            Some(BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2))
+        } else {
+            None
+        };
 
         let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), _session)).spawn(move || {
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
@@ -389,7 +395,9 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
                     ),
                 );
 
-                (exec_time, last_send_instant).store(&mut st);
+                if let Some( mut st) = &mut st {
+                    (exec_time, last_send_instant).store(&mut st);
+                }
 
                 if MicrobenchmarkData::VERBOSE {
                     if req % 1000 == 0 {
@@ -410,7 +418,7 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
         sessions.push(join_handle);
     }
 
-    let mut st = sessions.pop().unwrap().join().unwrap();
+    let mut st = sessions.pop().unwrap().join().unwrap().expect("First client must run benchmark helper!");
 
     for x in sessions {
         x.join().expect("FAILED TO PANIC");
