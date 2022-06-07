@@ -395,8 +395,8 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
                     ),
                 );
 
-                if let Some( mut st) = &mut st {
-                    (exec_time, last_send_instant).store(&mut st);
+                if let Some( st) = st.as_mut() {
+                    (exec_time, last_send_instant).store(st);
                 }
 
                 if MicrobenchmarkData::VERBOSE {
