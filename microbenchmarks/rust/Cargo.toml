@@ -30,7 +30,10 @@ features = [
     "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_tokio_tcp",
-    "channel_custom_dump",
+    "channel_flume_mpmc",
+    "channel_sync_crossbeam",
+    "channel_mixed_flume",
+    "channel_mult_custom_dump",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
     "collections_randomstate_fxhash"
