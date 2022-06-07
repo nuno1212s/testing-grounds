@@ -15,11 +15,13 @@ use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
+use febft::bft;
 
 use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::core::client::Client;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
+use febft::bft::threadpool as threadpool;
 use febft::bft::{
     init,
     InitConfig,
@@ -211,6 +213,7 @@ async fn client_async_main() {
     let queue_tx = Arc::new(queue_tx);
 
     let mut clients = Vec::with_capacity(clients_config.len());
+
     for _i in 0..clients_config.len() {
         clients.push(rx.recv().await.unwrap());
     }
@@ -221,13 +224,17 @@ async fn client_async_main() {
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
-        let h = rt::spawn(run_client(client, queue_tx));
+        let id = client.id();
+        let h = std::thread::Builder::new()
+            .name(format!("Client {:?}", client.id()))
+            .spawn(move || { run_client(client, queue_tx) })
+            .expect(format!("Failed to start thread for client {:?} ", &id.id()).as_str());
         handles.push(h);
     }
     drop(clients_config);
 
     for h in handles {
-        let _ = h.await;
+        let _ = h.join();
     }
 
     let mut file = File::create("./latencies.out").unwrap();
@@ -247,7 +254,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
 
     let mut sessions = Vec::with_capacity(concurrent_rqs);
@@ -261,6 +268,8 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         let mut client = client.clone();
 
+        let client_id = client.id();
+
         let request = Arc::new({
             let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
             OsRng.fill_bytes(&mut r);
@@ -270,12 +279,13 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         let q = q.clone();
 
         //Spawn a task for each concurrent client request stream
-        let join_handle = rt::spawn(async move {
+        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(),
+                                                                   _session)).spawn(move || {
             let iterator = 0..((MicrobenchmarkData::OPS_NUMBER / 2) / concurrent_rqs);
 
             if MicrobenchmarkData::VERBOSE {
                 println!("Starting concurrent thread with iteration {}..{}, because {} and {}", iterator.start, iterator.end,
-                       MicrobenchmarkData::OPS_NUMBER, concurrent_rqs);
+                         MicrobenchmarkData::OPS_NUMBER, concurrent_rqs);
             }
 
             for req in iterator {
@@ -285,7 +295,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
                 let last_send_instant = Utc::now();
 
-                client.update(Arc::downgrade(&request)).await;
+                rt::block_on(client.update(Arc::downgrade(&request)));
 
                 let latency = Utc::now()
                     .signed_duration_since(last_send_instant)
@@ -312,20 +322,20 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
                 }
 
                 if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+                    std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
                 } else if ramp_up > 0 {
-                    Delay::new(Duration::from_millis(ramp_up as u64)).await;
+                    std::thread::sleep(Duration::from_millis(ramp_up as u64));
                 }
 
                 ramp_up -= 100;
             }
-        });
+        }).expect(format!("Failed to allocate thread Client {:?} session {:?}", client_id, _session).as_str());
 
         sessions.push(join_handle);
     }
 
     for x in sessions {
-        x.await;
+        x.join().expect("PANIC IN THREAD");
     }
 
     let mut sessions = Vec::with_capacity(concurrent_rqs);
@@ -334,6 +344,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
     for _session in 0..concurrent_rqs {
         let mut client = client.clone();
+        let client_id = client.id();
 
         let request = Arc::new({
             let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
@@ -345,7 +356,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
-        let join_handle = rt::spawn(async move {
+        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), _session)).spawn(move || {
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
             for req in iterator {
@@ -355,7 +366,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
                 let last_send_instant = Utc::now();
 
-                client.update(Arc::downgrade(&request)).await;
+                rt::block_on(client.update(Arc::downgrade(&request)));
 
                 let exec_time = Utc::now();
 
@@ -386,20 +397,20 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
                 }
 
                 if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
+                    std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
                 }
             }
 
             st
-        });
+        }).expect(format!("Failed to allocate thread Client {:?} session {:?}", client_id, _session).as_str());
 
         sessions.push(join_handle);
     }
 
-    let mut st = sessions.pop().unwrap().await.unwrap();
+    let mut st = sessions.pop().unwrap().join().unwrap();
 
     for x in sessions {
-        x.await;
+        x.join().expect("FAILED TO PANIC");
     }
 
     if id == 1000 {
