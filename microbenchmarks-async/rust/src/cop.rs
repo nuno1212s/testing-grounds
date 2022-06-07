@@ -342,15 +342,18 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
+    let request = Arc::new({
+        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        OsRng.fill_bytes(&mut r);
+        r
+    });
+
     for _session in 0..concurrent_rqs {
         let mut client = client.clone();
+
         let client_id = client.id();
 
-        let request = Arc::new({
-            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-            OsRng.fill_bytes(&mut r);
-            r
-        });
+        let request = request.clone();
 
         let q = q.clone();
 
