@@ -138,6 +138,10 @@ fn main_(id: NodeId) {
 }
 
 async fn client_async_main() {
+
+    //Start the OS resource monitoring thread
+    crate::os_statistics::start_statistics_thread(NodeId(1000));
+
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -216,9 +220,6 @@ async fn client_async_main() {
     for _i in 0..clients_config.len() {
         clients.push(rx.recv().await.unwrap());
     }
-
-    //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
