@@ -3,6 +3,7 @@ package microbenchmarks_async.impl;
 import bftsmart.communication.client.ReplyListener;
 import bftsmart.tom.AsynchServiceProxy;
 import bftsmart.tom.RequestContext;
+import bftsmart.tom.ServiceProxy;
 import bftsmart.tom.core.messages.TOMMessage;
 import bftsmart.tom.core.messages.TOMMessageType;
 import bftsmart.tom.util.Storage;
@@ -37,6 +38,7 @@ public class ThroughputLatencyClient {
 
     public static void main(String[] args) {
         if (args.length < 9) {
+
             System.out.println("Usage: ... ThroughputLatencyClient <init client id> <nr clients> <nr ops> <rq size> <interval (ms)> <concurrent_rqs> <read only?> <verbose?> <nosig | default | ecdsa>");
 
             System.exit(2);
