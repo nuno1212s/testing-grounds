@@ -1,6 +1,7 @@
 package microbenchmarks_async;
 
-import bftsmart.benchmark.ThroughputLatencyClient;
+import microbenchmarks_async.impl.ThroughputLatencyClient;
+import microbenchmarks_async.impl.ThroughputLatencyServer;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.SimpleLayout;
@@ -30,10 +31,11 @@ public class App {
         switch (args[0]) {
             case "client":
                 newArgs = Arrays.copyOfRange(args, 1, args.length);
+                ThroughputLatencyClient.main(newArgs);
                 break;
             case "server":
                 newArgs = Arrays.copyOfRange(args, 1, args.length);
-
+                ThroughputLatencyServer.main(newArgs);
                 break;
         }
         
