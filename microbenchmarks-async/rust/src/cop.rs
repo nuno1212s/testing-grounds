@@ -1,3 +1,5 @@
+use std::alloc::System;
+use std::cell::Cell;
 use std::collections::LinkedList;
 use crate::common::*;
 use crate::serialize::MicrobenchmarkData;
@@ -5,7 +7,7 @@ use crate::serialize::MicrobenchmarkData;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
@@ -256,6 +258,8 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
     println!("Warm up...");
 
+    let rng = fastrand::Rng::with_seed(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64);
+
     for _session in 0..concurrent_rqs {
         let mut ramp_up: i32 = 1000;
 
@@ -269,8 +273,15 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         let q = q.clone();
 
+        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
+
         //Spawn a task for each concurrent client request stream
         let join_handle = rt::spawn(async move {
+
+            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
+                Delay::new(Duration::from_micros(random)).await
+            }
+
             let iterator = 0..((MicrobenchmarkData::OPS_NUMBER / 2) / concurrent_rqs);
 
             if MicrobenchmarkData::VERBOSE {
@@ -345,7 +356,14 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
+        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
+
         let join_handle = rt::spawn(async move {
+
+            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
+                Delay::new(Duration::from_micros(random)).await
+            }
+
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
             for req in iterator {

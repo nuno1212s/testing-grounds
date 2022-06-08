@@ -96,6 +96,12 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
+    pub const CLIENT_SLEEP_INITIAL: u64 = {
+        let result = parse_u64(unwrap_or!(option_env!("CLIENT_SLEEP"), "1000"));
+
+        unwrap_ctx!(result)
+    };
+
 
     const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
