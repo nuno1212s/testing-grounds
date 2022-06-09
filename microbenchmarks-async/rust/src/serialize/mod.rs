@@ -12,6 +12,7 @@ use konst::{
     option::unwrap_or,
     unwrap_ctx,
 };
+use konst::primitive::parse_u128;
 
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
@@ -98,6 +99,18 @@ impl MicrobenchmarkData {
 
     pub const CLIENT_SLEEP_INITIAL: u64 = {
         let result = parse_u64(unwrap_or!(option_env!("CLIENT_SLEEP"), "1000"));
+
+        unwrap_ctx!(result)
+    };
+
+    pub const GLOBAL_BATCH_SIZE: usize = {
+        let result = parse_usize(env!("GLOBAL_BATCH_SIZE"));
+
+        unwrap_ctx!(result)
+    };
+
+    pub const GLOBAL_BATCH_SLEEP_MICROS: u128 = {
+        let result = parse_u128(env!("GLOBAL_BATCH_SLEEP_MICROS"));
 
         unwrap_ctx!(result)
     };

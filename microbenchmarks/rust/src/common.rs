@@ -173,9 +173,11 @@ pub async fn setup_replica(
     let conf = ReplicaConfig {
         node,
         batch_size,
+        global_batch_size: MicrobenchmarkData::GLOBAL_BATCH_SIZE,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
+        batch_timeout: MicrobenchmarkData::GLOBAL_BATCH_SLEEP_MICROS
     };
 
     Replica::bootstrap(conf).await
