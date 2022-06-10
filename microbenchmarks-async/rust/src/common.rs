@@ -179,7 +179,7 @@ pub async fn setup_replica(
 
 async fn get_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute(move || {
+    threadpool::execute_replicas(move || {
         let mut buf = String::new();
         let mut f = open_file("./config/batch.config");
         f.read_to_string(&mut buf).unwrap();
@@ -204,7 +204,7 @@ fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
 
 async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute(move || {
+    threadpool::execute_replicas(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
 
@@ -248,7 +248,7 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
 
 async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute(move || {
+    threadpool::execute_replicas(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
 
@@ -292,7 +292,7 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
 async fn get_client_config(id: NodeId) -> ClientConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute(move || {
+    threadpool::execute_replicas(move || {
         let id = usize::from(id);
         let mut cfg = ClientConfig::new();
 
@@ -335,7 +335,7 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
 async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
     let (tx, rx) = oneshot::channel();
 
-    threadpool::execute(move || {
+    threadpool::execute_replicas(move || {
         let id = usize::from(id);
         let mut cfg = rustls::ClientConfig::new();
 
