@@ -38,12 +38,11 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
-        //Divide the logical cores into the thread pool and the async threadpool.
-        //This should leave enough room for the threads that each replica requires to constantly
-        //Have (which we want to avoid context switching on)
-        replica_threads: 10,
-        async_threads: if is_client { num_cpus::get() } else { 2 },
-        client_threads: num_cpus::get() - 10,
+        //If we are the client, we want to have many threads to send stuff to replicas
+        replica_threads: if is_client { num_cpus::get() / 2 } else { 10 },
+        async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
+        //If we are the client, we don't want any threads to send to other clients as that will never happen
+        client_threads: if is_client { 1 } else { num_cpus::get() - 15 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -276,7 +275,6 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
         //Spawn a task for each concurrent client request stream
         let join_handle = rt::spawn(async move {
-
             if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
                 Delay::new(Duration::from_micros(random)).await
             }
@@ -285,7 +283,7 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
 
             if MicrobenchmarkData::VERBOSE {
                 println!("Starting concurrent thread with iteration {}..{}, because {} and {}", iterator.start, iterator.end,
-                       MicrobenchmarkData::OPS_NUMBER, concurrent_rqs);
+                         MicrobenchmarkData::OPS_NUMBER, concurrent_rqs);
             }
 
             for req in iterator {
@@ -358,7 +356,6 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
         let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
 
         let join_handle = rt::spawn(async move {
-
             if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
                 Delay::new(Duration::from_micros(random)).await
             }
