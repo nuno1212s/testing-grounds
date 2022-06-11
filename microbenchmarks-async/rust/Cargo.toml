@@ -29,7 +29,7 @@ path = "../../../febft"
 default-features = false
 features = [
     "expose_impl",
-    "async_runtime_async_std",
+    "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_async_std_tcp",
     "channel_flume_mpmc",
