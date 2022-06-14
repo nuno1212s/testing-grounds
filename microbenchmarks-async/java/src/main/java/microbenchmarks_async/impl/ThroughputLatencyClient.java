@@ -84,7 +84,7 @@ public class ThroughputLatencyClient {
         String path = null;
 
         if (args.length >= 10) {
-            path = args[8];
+            path = args[9];
         }
 
         int s = 0;
