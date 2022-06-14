@@ -223,6 +223,7 @@ async fn client_async_main() {
     }
 
     let mut handles = Vec::with_capacity(clients_config.len());
+
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
         let id = client.id();
@@ -386,6 +387,11 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
         }
+    }
+
+    //Wait for all requests to finish
+    for _ in 0..concurrent_rqs {
+        semaphore.acquire();
     }
 
     /*
