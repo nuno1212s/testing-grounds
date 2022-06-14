@@ -304,14 +304,14 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
             let time_ms = Utc::now().timestamp_millis();
 
-            let _ = q.enqueue(
+            /*let _ = q.enqueue(
                 format!(
                     "{}\t{}\t{}\n",
                     id,
                     time_ms,
                     latency,
                 ),
-            );
+            );*/
 
             if MicrobenchmarkData::VERBOSE {
                 if req % 1000 == 0 {
@@ -363,14 +363,14 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
             let time_ms = Utc::now().timestamp_millis();
 
-            let _ = q.enqueue(
+            /*let _ = q.enqueue(
                 format!(
                     "{}\t{}\t{}\n",
                     id,
                     time_ms,
                     latency,
                 ),
-            );
+            );*/
 
             //(exec_time, last_send_instant).store(st);
 
