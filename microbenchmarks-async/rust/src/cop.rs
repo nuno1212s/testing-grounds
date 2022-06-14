@@ -8,19 +8,16 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
-use febft::bft;
 
 use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::core::client::Client;
 use febft::bft::communication::NodeId;
 use febft::bft::async_runtime as rt;
-use febft::bft::threadpool as threadpool;
 use febft::bft::{
     init,
     InitConfig,
@@ -205,6 +202,8 @@ async fn client_async_main() {
 
         let mut tx = tx.clone();
         rt::spawn(async move {
+            //We can have this async initializer no problem, just don't want it to be used to actually send
+            //The requests/control the clients
             println!("Bootstrapping client #{}", u32::from(id));
             let client = fut.await.unwrap();
             println!("Done bootstrapping client #{}", u32::from(id));
@@ -327,9 +326,10 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
         } else if ramp_up > 0 {
             std::thread::sleep(Duration::from_millis(ramp_up as u64));
+
+            ramp_up -= 100;
         }
 
-        ramp_up -= 100;
     }
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
@@ -357,12 +357,12 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
             //Release another request for this client
             sem_clone.release();
 
-            let latency = Utc::now()
+            /* let latency = Utc::now()
                 .signed_duration_since(last_send_instant)
                 .num_nanoseconds()
                 .unwrap_or(i64::MAX);
 
-            let time_ms = Utc::now().timestamp_millis();
+            let time_ms = Utc::now().timestamp_millis();*/
 
             /*let _ = q.enqueue(
                 format!(
