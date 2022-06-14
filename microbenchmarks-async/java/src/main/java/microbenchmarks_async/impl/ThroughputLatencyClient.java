@@ -84,7 +84,7 @@ public class ThroughputLatencyClient {
         String path = null;
 
         if (args.length >= 10) {
-            path = args[8];
+            path = args[9];
         }
 
         int s = 0;
@@ -117,6 +117,16 @@ public class ThroughputLatencyClient {
             id++;
         }
 
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(initId, path);
+
+            statistics.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
+        }
+
         ExecutorService execs = Executors.newFixedThreadPool(clients.length);
 
         Collection<Future<?>> futures = new LinkedList<>();
@@ -124,15 +134,6 @@ public class ThroughputLatencyClient {
         for (Client client : clients) {
             futures.add(execs.submit(client));
         }
-
-        OSStatistics os_stats = null;
-
-        if (path != null) {
-            os_stats = new OSStatistics(initId, path);
-
-            os_stats.start();
-        }
-
         // wait for tasks completion
         for (Future<?> currTask : futures) {
             try {
@@ -141,9 +142,6 @@ public class ThroughputLatencyClient {
                 ex.printStackTrace();
             }
         }
-
-        if (os_stats != null)
-            os_stats.cancel();
 
         execs.shutdown();
 

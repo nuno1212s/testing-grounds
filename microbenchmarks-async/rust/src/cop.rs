@@ -1,11 +1,10 @@
-use std::collections::LinkedList;
 use crate::common::*;
 use crate::serialize::MicrobenchmarkData;
 
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
@@ -41,11 +40,11 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
-        //Divide the logical cores into the thread pool and the async threadpool.
-        //This should leave enough room for the threads that each replica requires to constantly
-        //Have (which we want to avoid context switching on)
-        pool_threads: num_cpus::get() / 4,
-        async_threads: if is_client { num_cpus::get() } else { num_cpus::get() / 2 },
+        //If we are the client, we want to have many threads to send stuff to replicas
+        replica_threads: if is_client { num_cpus::get() / 2 } else { 10 },
+        async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
+        //If we are the client, we don't want any threads to send to other clients as that will never happen
+        client_threads: if is_client { 1 } else { num_cpus::get() - 15 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -138,6 +137,10 @@ fn main_(id: NodeId) {
 }
 
 async fn client_async_main() {
+
+    //Start the OS resource monitoring thread
+    crate::os_statistics::start_statistics_thread(NodeId(1000));
+
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -218,9 +221,6 @@ async fn client_async_main() {
         clients.push(rx.recv().await.unwrap());
     }
 
-    //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
-
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
@@ -263,6 +263,8 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
     println!("Warm up...");
 
+    let rng = fastrand::Rng::with_seed(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64);
+
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
         OsRng.fill_bytes(&mut r);
@@ -280,9 +282,14 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
         let q = q.clone();
 
+        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
+
         //Spawn a task for each concurrent client request stream
-        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(),
-                                                                   _session)).spawn(move || {
+        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), session)).spawn(move || {
+            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
+                Delay::new(Duration::from_micros(random)).await
+            }
+
             let iterator = 0..((MicrobenchmarkData::OPS_NUMBER / 2) / concurrent_rqs);
 
             if MicrobenchmarkData::VERBOSE {
@@ -364,8 +371,15 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
         } else {
             None
         };
+        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
 
-        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), _session)).spawn(move || {
+        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), _session))
+            .spawn(move || {
+
+            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
+                Delay::new(Duration::from_micros(random)).await
+            }
+
             let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
             for req in iterator {

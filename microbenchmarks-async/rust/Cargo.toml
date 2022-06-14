@@ -20,6 +20,7 @@ nolock = "0.3"
 chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 mprober-lib = "0.1.7"
+fastrand = "1.7.0"
 
 [dependencies.febft]
 path = "../../../febft"
@@ -28,7 +29,7 @@ path = "../../../febft"
 default-features = false
 features = [
     "expose_impl",
-    "async_runtime_async_std",
+    "async_runtime_tokio",
     "threadpool_crossbeam",
     "socket_async_std_tcp",
     "channel_flume_mpmc",

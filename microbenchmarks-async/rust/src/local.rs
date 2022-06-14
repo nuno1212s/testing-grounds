@@ -39,8 +39,9 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
-        pool_threads: num_cpus::get() / 4,
+        replica_threads: 5,
         async_threads: num_cpus::get() / 1,
+        client_threads: 50,
     };
 
     let _guard = unsafe { init(conf).unwrap() };
