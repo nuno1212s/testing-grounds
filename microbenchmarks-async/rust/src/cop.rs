@@ -25,6 +25,7 @@ use febft::bft::{
     init,
     InitConfig,
 };
+use semaphores::RawSemaphore;
 use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
@@ -225,12 +226,15 @@ async fn client_async_main() {
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
         let id = client.id();
+
         let h = std::thread::Builder::new()
             .name(format!("Client {:?}", client.id()))
             .spawn(move || { run_client(client, queue_tx) })
             .expect(format!("Failed to start thread for client {:?} ", &id.id()).as_str());
+
         handles.push(h);
     }
+
     drop(clients_config);
 
     for h in handles {
@@ -254,190 +258,137 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
     let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
-
-    let mut sessions = Vec::with_capacity(concurrent_rqs);
 
     let id = u32::from(client.id());
 
     println!("Warm up...");
 
-    let rng = fastrand::Rng::with_seed(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64);
-
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
         OsRng.fill_bytes(&mut r);
         r
     });
 
-    for _session in 0..concurrent_rqs {
-        let mut ramp_up: i32 = 1000;
+    let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
 
-        let mut client = client.clone();
+    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
 
-        let client_id = client.id();
+    let mut ramp_up = 1000;
 
-        let request = request.clone();
+    for req in iterator {
+
+        //Only allow concurrent_rqs per client at the network
+        semaphore.acquire();
+
+        if MicrobenchmarkData::VERBOSE {
+            print!("Sending req {}...", req);
+        }
+
+        let last_send_instant = Utc::now();
+
+        let sem_clone = semaphore.clone();
 
         let q = q.clone();
 
-        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
+        client.update_callback(Arc::downgrade(&request), Box::new(move |reply| {
 
-        //Spawn a task for each concurrent client request stream
-        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), session)).spawn(move || {
-            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
-                Delay::new(Duration::from_micros(random)).await
-            }
+            //Release another request for this client
+            sem_clone.release();
 
-            let iterator = 0..((MicrobenchmarkData::OPS_NUMBER / 2) / concurrent_rqs);
+            let latency = Utc::now()
+                .signed_duration_since(last_send_instant)
+                .num_nanoseconds()
+                .unwrap_or(i64::MAX);
+
+            let time_ms = Utc::now().timestamp_millis();
+
+            let _ = q.enqueue(
+                format!(
+                    "{}\t{}\t{}\n",
+                    id,
+                    time_ms,
+                    latency,
+                ),
+            );
 
             if MicrobenchmarkData::VERBOSE {
-                println!("Starting concurrent thread with iteration {}..{}, because {} and {}", iterator.start, iterator.end,
-                         MicrobenchmarkData::OPS_NUMBER, concurrent_rqs);
+                if req % 1000 == 0 {
+                    println!("{} // {} operations sent!", id, req);
+                }
+
+                println!(" sent!");
             }
+        }));
 
-            for req in iterator {
-                if MicrobenchmarkData::VERBOSE {
-                    print!("Sending req {}...", req);
-                }
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        } else if ramp_up > 0 {
+            std::thread::sleep(Duration::from_millis(ramp_up as u64));
+        }
 
-                let last_send_instant = Utc::now();
-
-                rt::block_on(client.update(Arc::downgrade(&request)));
-
-                let latency = Utc::now()
-                    .signed_duration_since(last_send_instant)
-                    .num_nanoseconds()
-                    .unwrap_or(i64::MAX);
-
-                let time_ms = Utc::now().timestamp_millis();
-
-                let _ = q.enqueue(
-                    format!(
-                        "{}\t{}\t{}\n",
-                        id,
-                        time_ms,
-                        latency,
-                    ),
-                );
-
-                if MicrobenchmarkData::VERBOSE {
-                    if req % 1000 == 0 {
-                        println!("{} // {} operations sent!", id, req);
-                    }
-
-                    println!(" sent!");
-                }
-
-                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
-                } else if ramp_up > 0 {
-                    std::thread::sleep(Duration::from_millis(ramp_up as u64));
-                }
-
-                ramp_up -= 100;
-            }
-        }).expect(format!("Failed to allocate thread Client {:?} session {:?}", client_id, _session).as_str());
-
-        sessions.push(join_handle);
+        ramp_up -= 100;
     }
-
-    for x in sessions {
-        x.join().expect("PANIC IN THREAD");
-    }
-
-    let mut sessions = Vec::with_capacity(concurrent_rqs);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
-    let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        OsRng.fill_bytes(&mut r);
-        r
-    });
+    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
 
-    for _session in 0..concurrent_rqs {
-        let mut client = client.clone();
+    //let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
-        let client_id = client.id();
+    for req in iterator {
+        semaphore.acquire();
 
-        let request = request.clone();
+        if MicrobenchmarkData::VERBOSE {
+            print!("Sending req {}...", req);
+        }
 
         let q = q.clone();
 
-        let mut st = if _session == 0 {
-            Some(BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2))
-        } else {
-            None
-        };
-        let random = rng.u64(0..MicrobenchmarkData::CLIENT_SLEEP_INITIAL);
+        let last_send_instant = Utc::now();
 
-        let join_handle = std::thread::Builder::new().name(format!("Client {:?} rq stream {}", client.id(), _session))
-            .spawn(move || {
+        let sem_clone = semaphore.clone();
 
-            if MicrobenchmarkData::CLIENT_SLEEP_INITIAL != 0 {
-                Delay::new(Duration::from_micros(random)).await
+        client.update_callback(Arc::downgrade(&request),
+                               Box::new(move |reply| {
+
+            //Release another request for this client
+            sem_clone.release();
+
+            let latency = Utc::now()
+                .signed_duration_since(last_send_instant)
+                .num_nanoseconds()
+                .unwrap_or(i64::MAX);
+
+            let time_ms = Utc::now().timestamp_millis();
+
+            let _ = q.enqueue(
+                format!(
+                    "{}\t{}\t{}\n",
+                    id,
+                    time_ms,
+                    latency,
+                ),
+            );
+
+            //(exec_time, last_send_instant).store(st);
+
+            if MicrobenchmarkData::VERBOSE {
+                if req % 1000 == 0 {
+                    println!("{} // {} operations sent!", id, req);
+                }
+
+                println!(" sent!");
             }
+        }));
 
-            let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
-
-            for req in iterator {
-                if MicrobenchmarkData::VERBOSE {
-                    print!("Sending req {}...", req);
-                }
-
-                let last_send_instant = Utc::now();
-
-                rt::block_on(client.update(Arc::downgrade(&request)));
-
-                let exec_time = Utc::now();
-
-                let latency = Utc::now()
-                    .signed_duration_since(last_send_instant)
-                    .num_nanoseconds()
-                    .unwrap_or(i64::MAX);
-
-                let time_ms = Utc::now().timestamp_millis();
-
-                let _ = q.enqueue(
-                    format!(
-                        "{}\t{}\t{}\n",
-                        id,
-                        time_ms,
-                        latency,
-                    ),
-                );
-
-                if let Some( st) = st.as_mut() {
-                    (exec_time, last_send_instant).store(st);
-                }
-
-                if MicrobenchmarkData::VERBOSE {
-                    if req % 1000 == 0 {
-                        println!("{} // {} operations sent!", id, req);
-                    }
-
-                    println!(" sent!");
-                }
-
-                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
-                }
-            }
-
-            st
-        }).expect(format!("Failed to allocate thread Client {:?} session {:?}", client_id, _session).as_str());
-
-        sessions.push(join_handle);
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        }
     }
 
-    let mut st = sessions.pop().unwrap().join().unwrap().expect("First client must run benchmark helper!");
-
-    for x in sessions {
-        x.join().expect("FAILED TO PANIC");
-    }
-
+    /*
     if id == 1000 {
         println!("{} // Average time for {} executions (-10%) = {} us",
                  id,
@@ -464,4 +415,5 @@ fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
                  MicrobenchmarkData::OPS_NUMBER / 2,
                  st.max(false) / 1000);
     }
+    */
 }

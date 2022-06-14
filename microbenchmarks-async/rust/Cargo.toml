@@ -21,6 +21,7 @@ chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 mprober-lib = "0.1.7"
 fastrand = "1.7.0"
+semaphores = {version = "0.1.1", git = "https://github.com/nuno1212s/Semaphores" }
 
 [dependencies.febft]
 path = "../../../febft"
