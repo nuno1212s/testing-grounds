@@ -283,7 +283,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         semaphore.acquire();
 
         if MicrobenchmarkData::VERBOSE {
-            print!("Sending req {}...", req);
+            println!("{:?} // Sending req {}...", client.id(), req);
         }
 
         let last_send_instant = Utc::now();
@@ -393,6 +393,8 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
     for _ in 0..concurrent_rqs {
         semaphore.acquire();
     }
+
+    println!("{:?} // Done.", client.id());
 
     /*
     if id == 1000 {
