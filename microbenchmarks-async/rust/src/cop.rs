@@ -292,7 +292,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let q = q.clone();
 
-        client.update_callback(Arc::downgrade(&request), Box::new(move |reply| {
+        client.clone().update_callback(Arc::downgrade(&request), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
