@@ -8,6 +8,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
+use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -233,6 +234,8 @@ async fn client_async_main() {
             .expect(format!("Failed to start thread for client {:?} ", &id.id()).as_str());
 
         handles.push(h);
+
+        Delay::new(Duration::from_millis(150)).await;
     }
 
     drop(clients_config);
