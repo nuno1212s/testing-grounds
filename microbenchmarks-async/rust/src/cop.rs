@@ -28,10 +28,7 @@ use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
 };
-use febft::bft::benchmarks::{
-    BenchmarkHelper,
-    BenchmarkHelperStore,
-};
+use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -111,6 +108,13 @@ fn main_(id: NodeId) {
             addrs
         };
 
+        //TODO: don't have this hardcoded?
+        let first_cli = NodeId::from(1000u32);
+
+        let comm_stats = Arc::new(CommStats::new(id,
+                                                 first_cli,
+                                                 10000));
+
         let sk = secret_keys.remove(id.into()).unwrap();
 
         let fut = setup_replica(
@@ -119,6 +123,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
+            Some(comm_stats)
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -192,6 +197,11 @@ async fn client_async_main() {
 
             addrs
         };
+
+        let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
+                                                 NodeId::from(first_cli),
+                                                 10000));
+
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
             replicas_config.len(),
@@ -199,6 +209,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
+            Some(comm_stats.clone())
         );
 
         let mut tx = tx.clone();

@@ -114,7 +114,8 @@ fn main_() {
             id,
             sk,
             addrs,
-            public_keys.clone()
+            public_keys.clone(),
+            None
         );
 
         let thread = std::thread::Builder::new().name(format!("Node {:?}", id)).spawn(move || {
@@ -204,7 +205,8 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
-            public_keys.clone()
+            public_keys.clone(),
+            None
         );
 
         let mut tx = tx.clone();

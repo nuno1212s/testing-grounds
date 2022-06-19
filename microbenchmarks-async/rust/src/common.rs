@@ -3,10 +3,12 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use intmap::IntMap;
 use regex::Regex;
 use rustls::{AllowAnyAuthenticatedClient, ClientConfig, internal::pemfile, PrivateKey, RootCertStore, ServerConfig};
+use febft::bft::benchmarks::CommStats;
 
 use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
 use febft::bft::core::client::{
@@ -103,6 +105,7 @@ async fn node_config(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    comm_stats: Option<Arc<CommStats>>
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size) = {
@@ -131,7 +134,8 @@ async fn node_config(
         fill_batch: MicrobenchmarkData::FILL_BATCH,
         clients_per_pool: MicrobenchmarkData::CLIENTS_PER_POOL,
         batch_timeout_micros: MicrobenchmarkData::BATCH_TIMEOUT_MICROS,
-        batch_sleep_micros: MicrobenchmarkData::BATCH_SLEEP_MICROS
+        batch_sleep_micros: MicrobenchmarkData::BATCH_SLEEP_MICROS,
+        comm_stats
     }
 }
 
@@ -141,8 +145,9 @@ pub async fn setup_client(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    comm_stats: Option<Arc<CommStats>>
 ) -> Result<Client<MicrobenchmarkData>> {
-    let node = node_config(n, id, sk, addrs, pk).await;
+    let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
         node,
     };
@@ -155,11 +160,12 @@ pub async fn setup_replica(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
+    comm_stats: Option<Arc<CommStats>>
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
     let (node, batch_size) = {
-        let n = node_config(n, id, sk, addrs, pk);
+        let n = node_config(n, id, sk, addrs, pk, comm_stats);
         let b = get_batch_size();
         futures::join!(n, b)
     };
