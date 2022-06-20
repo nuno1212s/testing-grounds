@@ -145,8 +145,8 @@ async fn node_config(
         first_cli: NodeId::from(1000u32),
         batch_size,
         clients_per_pool,
-        batch_timeout_micros: batch_timeout,
-        batch_sleep_micros: batch_sleep,
+        batch_timeout_micros: batch_timeout as u64,
+        batch_sleep_micros: batch_sleep as u64,
         comm_stats,
     }
 }

@@ -107,13 +107,18 @@ fn main_() {
 
         let sk = secret_keys.remove(id.into()).unwrap();
 
+        let comm_stats = Arc::new(CommStats::new(id,
+                                                 first_cli,
+                                                 10000));
+
         println!("Setting up replica...");
         let fut = setup_replica(
             replicas_config.len(),
             id,
             sk,
             addrs,
-            public_keys.clone()
+            public_keys.clone(),
+            Some(comm_stats)
         );
 
         pending_threads.push(std::thread::spawn(move || {
@@ -161,6 +166,19 @@ async fn client_async_main() {
 
     let mut first_cli : u32 = u32::MAX;
 
+
+    for client in &clients_config {
+        let id = NodeId::from(client.id);
+
+        if client.id < first_cli {
+            first_cli = client.id;
+        }
+    }
+
+    let comm_stats = Arc::new(CommStats::new(id,
+                                             first_cli,
+                                             10000));
+
     for client in &clients_config {
         let id = NodeId::from(client.id);
 
@@ -202,6 +220,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
+            Some(comm_stats)
         );
 
         let mut tx = tx.clone();
