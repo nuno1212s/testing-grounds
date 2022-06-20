@@ -100,14 +100,6 @@ impl Service for Microbenchmark {
         (meta.commit_sent_time, meta.first_prepare_received).store(&mut self.measurements.prepare_time_taken);
         (meta.consensus_decision_time, meta.first_commit_received).store(&mut self.measurements.commit_time_taken);
 
-        meta.message_passing_latencies.store(&mut self.measurements.message_passing_time_taken);
-        meta.message_signing_latencies.store(&mut self.measurements.message_signing_time_taken);
-        meta.message_send_to_create.store(&mut self.measurements.message_send_to_create);
-        meta.message_passing_latencies_own.store(&mut self.measurements.message_passing_time_taken_own);
-        meta.message_sending_latencies.store(&mut self.measurements.message_sending_time_taken);
-        meta.message_sending_latencies_own.store(&mut self.measurements.message_sending_time_taken_own);
-
-
         for _ in 0..batch_len {
             // increase iter count
             self.iterations += 1;
@@ -152,12 +144,6 @@ impl Service for Microbenchmark {
                 self.measurements.propose_time_latency.log_latency("Propose time");
                 self.measurements.prepare_time_taken.log_latency("Prepare time taken");
                 self.measurements.commit_time_taken.log_latency("Commit time taken");
-                self.measurements.message_passing_time_taken_own.log_latency("Message passing (Own)");
-                self.measurements.message_passing_time_taken.log_latency("Message passing");
-                self.measurements.message_sending_time_taken.log_latency("Message sending");
-                self.measurements.message_sending_time_taken_own.log_latency("Message sending (Own)");
-                self.measurements.message_signing_time_taken.log_latency("Message signing");
-                self.measurements.message_send_to_create.log_latency("Create send to objects");
                 self.measurements.batch_size.log_batch();
 
                 self.max_tp_time = Utc::now();
