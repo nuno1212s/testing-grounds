@@ -172,6 +172,18 @@ async fn client_async_main() {
         if client.id < first_cli {
             first_cli = client.id;
         }
+    }
+
+    let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
+                                             NodeId::from(first_cli),
+                                             100000));
+
+    for client in &clients_config {
+        let id = NodeId::from(client.id);
+
+        if client.id < first_cli {
+            first_cli = client.id;
+        }
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -197,10 +209,6 @@ async fn client_async_main() {
 
             addrs
         };
-
-        let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
-                                                 NodeId::from(first_cli),
-                                                 100000));
 
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
