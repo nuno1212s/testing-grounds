@@ -270,7 +270,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 
 async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
 
-    let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
+    let concurrent_rqs: usize = crate::common::get_concurrent_rqs();
 
 
     let mut sessions = Vec::with_capacity(concurrent_rqs);

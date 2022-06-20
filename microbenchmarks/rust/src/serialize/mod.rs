@@ -69,41 +69,6 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
-    pub const FILL_BATCH: bool = {
-        let result = parse_bool(unwrap_or!(option_env!("FILL_BATCH"), "false"));
-        unwrap_ctx!(result)
-    };
-
-    pub const CLIENTS_PER_POOL: usize = {
-        let result = parse_usize(env!("CLIENTS_PER_POOL"));
-
-        unwrap_ctx!(result)
-    };
-
-    pub const BATCH_TIMEOUT_MICROS: u64 = {
-        let result = parse_u64(env!("BATCH_TIMEOUT_MICROS"));
-
-        unwrap_ctx!(result)
-    };
-
-    pub const BATCH_SLEEP_MICROS: u64 = {
-        let result = parse_u64(env!("BATCH_SLEEP_MICROS"));
-
-        unwrap_ctx!(result)
-    };
-
-    pub const GLOBAL_BATCH_SIZE: usize = {
-        let result = parse_usize(env!("GLOBAL_BATCH_SIZE"));
-
-        unwrap_ctx!(result)
-    };
-
-    pub const GLOBAL_BATCH_SLEEP_MICROS: u128 = {
-        let result = parse_u128(env!("GLOBAL_BATCH_SLEEP_MICROS"));
-
-        unwrap_ctx!(result)
-    };
-
     const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
 }
 

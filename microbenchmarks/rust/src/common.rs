@@ -6,6 +6,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use intmap::IntMap;
+use konst::primitive::{parse_u128, parse_usize};
+use konst::unwrap_ctx;
 use regex::Regex;
 use rustls::{
     AllowAnyAuthenticatedClient,
@@ -111,16 +113,21 @@ async fn node_config(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
-    comm_stats: Option<Arc<CommStats>>
+    comm_stats: Option<Arc<CommStats>>,
 ) -> NodeConfig {
     // read TLS configs concurrently
-    let (client_config, server_config, client_config_replica, server_config_replica, batch_size) = {
+    let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
+    batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_server_config(id);
         let cli_rustls = get_client_config_replica(id);
         let srv_rustls = get_server_config_replica(id);
         let batch_size = get_batch_size();
-        futures::join!(cli, srv, cli_rustls, srv_rustls, batch_size)
+        let batch_timeout = get_batch_timeout();
+        let batch_sleep = get_batch_sleep();
+        let clients_per_pool = get_clients_per_pool();
+        futures::join!(cli, srv, cli_rustls, srv_rustls, batch_size,
+            batch_timeout, batch_sleep, clients_per_pool)
     };
 
     // build the node conf
@@ -137,11 +144,10 @@ async fn node_config(
         replica_server_config: server_config_replica,
         first_cli: NodeId::from(1000u32),
         batch_size,
-        fill_batch: MicrobenchmarkData::FILL_BATCH,
-        clients_per_pool: MicrobenchmarkData::CLIENTS_PER_POOL,
-        batch_timeout_micros: MicrobenchmarkData::BATCH_TIMEOUT_MICROS,
-        batch_sleep_micros: MicrobenchmarkData::BATCH_SLEEP_MICROS,
-        comm_stats
+        clients_per_pool,
+        batch_timeout_micros: batch_timeout,
+        batch_sleep_micros: batch_sleep,
+        comm_stats,
     }
 }
 
@@ -151,7 +157,7 @@ pub async fn setup_client(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
-    comm_stats: Option<Arc<CommStats>>
+    comm_stats: Option<Arc<CommStats>>,
 ) -> Result<Client<MicrobenchmarkData>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
@@ -166,24 +172,24 @@ pub async fn setup_replica(
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
-    comm_stats: Option<Arc<CommStats>>
+    comm_stats: Option<Arc<CommStats>>,
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
-    let (node, batch_size) = {
+    let (node, global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, sk, addrs, pk, comm_stats);
-        let b = get_batch_size();
-        futures::join!(n, b)
+        let b = get_global_batch_size();
+        let timeout = get_global_batch_timeout();
+        futures::join!(n, b, timeout)
     };
 
     let conf = ReplicaConfig {
         node,
-        batch_size,
-        global_batch_size: MicrobenchmarkData::GLOBAL_BATCH_SIZE,
+        global_batch_size,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
-        batch_timeout: MicrobenchmarkData::GLOBAL_BATCH_SLEEP_MICROS
+        batch_timeout: global_batch_timeout,
     };
 
     Replica::bootstrap(conf).await
@@ -196,6 +202,61 @@ async fn get_batch_size() -> usize {
         let mut f = open_file("./config/batch.config");
         f.read_to_string(&mut buf).unwrap();
         tx.send(buf.trim().parse().unwrap()).unwrap();
+    });
+    rx.await.unwrap()
+}
+
+async fn get_global_batch_size() -> usize {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_usize(&*std::env::var("GLOBAL_BATCH_SIZE")
+            .expect("Failed to find required env var GLOBAL_BATCH_SIZE"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
+    });
+    rx.await.unwrap()
+}
+
+async fn get_global_batch_timeout() -> u128 {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_u128(&*std::env::var("GLOBAL_BATCH_SLEEP_MICROS")
+            .expect("Failed to find required env var GLOBAL_BATCH_SLEEP_MICROS"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
+    });
+    rx.await.unwrap()
+}
+
+async fn get_batch_timeout() -> u128 {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_u128(&*std::env::var("BATCH_TIMEOUT_MICROS")
+            .expect("Failed to find required env var BATCH_TIMEOUT_MICROS"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
+    });
+    rx.await.unwrap()
+}
+
+async fn get_batch_sleep() -> u128 {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_u128(&*std::env::var("BATCH_SLEEP_MICROS")
+            .expect("Failed to find required env var BATCH_SLEEP_MICROS"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
+    });
+    rx.await.unwrap()
+}
+
+async fn get_clients_per_pool() -> usize {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_usize(&*std::env::var("CLIENTS_PER_POOL")
+            .expect("Failed to find required env var CLIENTS_PER_POOL"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
     });
     rx.await.unwrap()
 }

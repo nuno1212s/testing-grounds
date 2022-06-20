@@ -273,7 +273,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 }
 
 fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
-    let concurrent_rqs: usize = MicrobenchmarkData::CONCURRENT_RQS;
+    let concurrent_rqs: usize = crate::common::get_concurrent_rqs();
 
     let id = u32::from(client.id());
 
