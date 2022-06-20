@@ -110,7 +110,8 @@ async fn node_config(
     comm_stats: Option<Arc<CommStats>>,
 ) -> NodeConfig {
     // read TLS configs concurrently
-    let (client_config, server_config, client_config_replica, server_config_replica, batch_size) = {
+    let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
+    batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_server_config(id);
         let cli_rustls = get_client_config_replica(id);
@@ -119,7 +120,8 @@ async fn node_config(
         let batch_timeout = get_batch_timeout();
         let batch_sleep = get_batch_sleep();
         let clients_per_pool = get_clients_per_pool();
-        futures::join!(cli, srv, cli_rustls, srv_rustls, batch_size)
+        futures::join!(cli, srv, cli_rustls, srv_rustls, batch_size,
+            batch_timeout, batch_sleep, clients_per_pool)
     };
 
     // build the node conf
@@ -137,8 +139,8 @@ async fn node_config(
         first_cli: NodeId::from(1000u32),
         batch_size,
         clients_per_pool,
-        batch_timeout_micros: batch_timeout,
-        batch_sleep_micros: batch_sleep,
+        batch_timeout_micros: batch_timeout as u64,
+        batch_sleep_micros: batch_sleep as u64,
         comm_stats,
     }
 }
@@ -168,19 +170,20 @@ pub async fn setup_replica(
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
-    let (node, global_batch_size) = {
+    let (node, global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, sk, addrs, pk, comm_stats);
         let b = get_global_batch_size();
-        futures::join!(n, b)
+        let timeout = get_global_batch_timeout();
+        futures::join!(n, b, timeout)
     };
 
     let conf = ReplicaConfig {
         node,
-        global_batch_size: global_batch_size,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
-        batch_timeout: MicrobenchmarkData::GLOBAL_BATCH_SLEEP_MICROS,
+        global_batch_size,
+        batch_timeout: global_batch_timeout,
     };
 
     Replica::bootstrap(conf).await
@@ -202,6 +205,17 @@ async fn get_global_batch_size() -> usize {
     threadpool::execute_replicas(move || {
         let res = parse_usize(&*std::env::var("GLOBAL_BATCH_SIZE")
             .expect("Failed to find required env var GLOBAL_BATCH_SIZE"));
+
+        tx.send(unwrap_ctx!(res)).expect("Failed to send");
+    });
+    rx.await.unwrap()
+}
+
+async fn get_global_batch_timeout() -> u128 {
+    let (tx, rx) = oneshot::channel();
+    threadpool::execute_replicas(move || {
+        let res = parse_u128(&*std::env::var("GLOBAL_BATCH_SLEEP_MICROS")
+            .expect("Failed to find required env var GLOBAL_BATCH_SLEEP_MICROS"));
 
         tx.send(unwrap_ctx!(res)).expect("Failed to send");
     });
