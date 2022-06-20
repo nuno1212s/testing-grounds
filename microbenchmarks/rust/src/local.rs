@@ -217,7 +217,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats)
+            Some(comm_stats.clone())
         );
 
         let mut tx = tx.clone();
