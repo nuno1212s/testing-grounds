@@ -71,6 +71,8 @@ fn main_() {
 
     let mut pending_threads = Vec::with_capacity(4);
 
+    let first_cli = NodeId::from(1000u32);
+
     for replica in &replicas_config {
         let id = NodeId::from(replica.id);
 
