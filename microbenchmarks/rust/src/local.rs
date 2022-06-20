@@ -17,10 +17,7 @@ use febft::bft::{
     InitConfig,
 };
 use febft::bft::async_runtime as rt;
-use febft::bft::benchmarks::{
-    BenchmarkHelper,
-    BenchmarkHelperStore,
-};
+use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::communication::NodeId;
 use febft::bft::core::client::Client;
@@ -175,8 +172,8 @@ async fn client_async_main() {
         }
     }
 
-    let comm_stats = Arc::new(CommStats::new(id,
-                                             first_cli,
+    let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
+                                             NodeId::from(first_cli),
                                              10000));
 
     for client in &clients_config {
