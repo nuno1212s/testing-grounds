@@ -113,7 +113,7 @@ fn main_(id: NodeId) {
 
         let comm_stats = Arc::new(CommStats::new(id,
                                                  first_cli,
-                                                 10000));
+                                                 100000));
 
         let sk = secret_keys.remove(id.into()).unwrap();
 
@@ -200,7 +200,7 @@ async fn client_async_main() {
 
         let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                                  NodeId::from(first_cli),
-                                                 10000));
+                                                 100000));
 
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
@@ -273,7 +273,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
 }
 
 fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
-    let concurrent_rqs: usize = crate::common::get_concurrent_rqs();
+    let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());
 
