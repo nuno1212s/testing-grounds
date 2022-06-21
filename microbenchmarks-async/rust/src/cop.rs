@@ -9,6 +9,8 @@ use std::time::{Duration};
 use intmap::IntMap;
 use chrono::offset::Utc;
 use futures_timer::Delay;
+use konst::primitive::parse_u32;
+use konst::unwrap_ctx;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -178,12 +180,10 @@ async fn client_async_main() {
                                              NodeId::from(first_cli),
                                              100000));
 
+    let start_client = unwrap_ctx!(parse_u32(std::env::var("CLIENT_START_POINT").unwrap_or(String::from("0")).as_str()));
+
     for client in &clients_config {
         let id = NodeId::from(client.id);
-
-        if client.id < first_cli {
-            first_cli = client.id;
-        }
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -209,6 +209,11 @@ async fn client_async_main() {
 
             addrs
         };
+
+        if first_cli + id.0 < start_client {
+            //Split clients into various machines.
+            continue
+        }
 
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
@@ -254,7 +259,7 @@ async fn client_async_main() {
 
         handles.push(h);
 
-        Delay::new(Duration::from_millis(25)).await;
+        Delay::new(Duration::from_millis(5)).await;
     }
 
     drop(clients_config);
