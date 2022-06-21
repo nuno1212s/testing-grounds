@@ -4,7 +4,7 @@ use crate::serialize::MicrobenchmarkData;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
@@ -28,7 +28,7 @@ use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
 };
-use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
+use febft::bft::benchmarks::{ BenchmarkHelperStore, CommStats};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
