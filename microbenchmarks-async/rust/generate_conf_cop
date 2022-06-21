@@ -6,11 +6,11 @@ cd config
 echo $BATCH_SIZE > batch.config
 
 rm -f clients.config
-CLIENT_MACHINES=("10.11.12.5" "192.168.70.16")
+CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
 CURR_MACHINE=0
-for ip in "${CLIENT_MACHINES[@]}"; do
-  for i in `seq 0 $(expr $NUM_CLIENTS - 1)`; do
+for ip in $CLIENT_MACHINES; do
+  for i in $(seq 0 $(expr $NUM_CLIENTS - 1)); do
       id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* $NUM_CLIENTS) + $i))
       sni=cli${id}
       port=$(expr 11000 + $i)
