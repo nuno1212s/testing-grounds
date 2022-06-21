@@ -373,7 +373,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let sem_clone = semaphore.clone();
 
-        client.update_callback(Arc::downgrade(&request),
+        client.clone().update_callback(Arc::downgrade(&request),
                                Box::new(move |reply| {
 
             //Release another request for this client
