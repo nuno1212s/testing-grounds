@@ -35,7 +35,7 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
-        replica_threads: 5,
+        threadpool_threads: 5,
         async_threads: num_cpus::get() / 1,
         client_threads: num_cpus::get()
     };

@@ -138,10 +138,10 @@ async fn node_config(
         sk,
         pk,
         addrs,
-        client_config,
-        server_config,
-        replica_client_config: client_config_replica,
-        replica_server_config: server_config_replica,
+        async_client_config: client_config,
+        async_server_config: server_config,
+        sync_client_config: client_config_replica,
+        sync_server_config: server_config_replica,
         first_cli: NodeId::from(1000u32),
         batch_size,
         clients_per_pool,
@@ -197,7 +197,7 @@ pub async fn setup_replica(
 
 async fn get_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let mut buf = String::new();
         let mut f = open_file("./config/batch.config");
         f.read_to_string(&mut buf).unwrap();
@@ -208,7 +208,7 @@ async fn get_batch_size() -> usize {
 
 async fn get_global_batch_size() -> usize {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let res = parse_usize(&*std::env::var("GLOBAL_BATCH_SIZE")
             .expect("Failed to find required env var GLOBAL_BATCH_SIZE"));
 
@@ -219,7 +219,7 @@ async fn get_global_batch_size() -> usize {
 
 async fn get_global_batch_timeout() -> u128 {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let res = parse_u128(&*std::env::var("GLOBAL_BATCH_SLEEP_MICROS")
             .expect("Failed to find required env var GLOBAL_BATCH_SLEEP_MICROS"));
 
@@ -230,7 +230,7 @@ async fn get_global_batch_timeout() -> u128 {
 
 async fn get_batch_timeout() -> u128 {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let res = parse_u128(&*std::env::var("BATCH_TIMEOUT_MICROS")
             .expect("Failed to find required env var BATCH_TIMEOUT_MICROS"));
 
@@ -241,7 +241,7 @@ async fn get_batch_timeout() -> u128 {
 
 async fn get_batch_sleep() -> u128 {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let res = parse_u128(&*std::env::var("BATCH_SLEEP_MICROS")
             .expect("Failed to find required env var BATCH_SLEEP_MICROS"));
 
@@ -252,7 +252,7 @@ async fn get_batch_sleep() -> u128 {
 
 async fn get_clients_per_pool() -> usize {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let res = parse_usize(&*std::env::var("CLIENTS_PER_POOL")
             .expect("Failed to find required env var CLIENTS_PER_POOL"));
 
@@ -263,7 +263,7 @@ async fn get_clients_per_pool() -> usize {
 
 async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
 
@@ -307,7 +307,7 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
 
 async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
 
@@ -351,7 +351,7 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
 async fn get_client_config(id: NodeId) -> ClientConfig {
     let (tx, rx) = oneshot::channel();
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut cfg = ClientConfig::new();
 
@@ -392,7 +392,7 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
 async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
     let (tx, rx) = oneshot::channel();
 
-    threadpool::execute_replicas(move || {
+    threadpool::execute(move || {
         let id = usize::from(id);
         let mut cfg = rustls::ClientConfig::new();
 

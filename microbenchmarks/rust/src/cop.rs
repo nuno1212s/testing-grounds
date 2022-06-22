@@ -38,7 +38,7 @@ pub fn main() {
         //Divide the logical cores into the thread pool and the async threadpool.
         //This should leave enough room for the threads that each replica requires to constantly
         //Have (which we want to avoid context switching on)
-        replica_threads: if is_client { num_cpus::get() / 2 } else { 10 },
+        threadpool_threads: if is_client { num_cpus::get() / 2 } else { 10 },
         async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
         client_threads: if is_client { 1 } else { num_cpus::get() - 20 },

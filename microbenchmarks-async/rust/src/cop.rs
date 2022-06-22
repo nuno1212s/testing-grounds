@@ -8,7 +8,6 @@ use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use futures_timer::Delay;
 use konst::primitive::parse_u32;
 use konst::unwrap_ctx;
 use rand_core::{OsRng, RngCore};
@@ -30,7 +29,7 @@ use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
 };
-use febft::bft::benchmarks::{ BenchmarkHelperStore, CommStats};
+use febft::bft::benchmarks::{ CommStats};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -39,7 +38,7 @@ pub fn main() {
 
     let conf = InitConfig {
         //If we are the client, we want to have many threads to send stuff to replicas
-        replica_threads: if is_client { 200 } else { 10 },
+        threadpool_threads: if is_client { 200 } else { 10 },
         async_threads: if is_client { 2 } else { 2 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
         client_threads: if is_client { 4 } else { num_cpus::get() - 15 },
