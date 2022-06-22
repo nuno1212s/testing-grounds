@@ -36,9 +36,12 @@ pub fn main() {
         .map(|x| x == "1")
         .unwrap_or(false);
 
+    let threadpool_threads = parse_u32(std::env::var("THREADPOOL_THREADS")
+        .unwrap_or(String::from("2")).as_str()).unwrap();
+
     let conf = InitConfig {
         //If we are the client, we want to have many threads to send stuff to replicas
-        threadpool_threads: 2,
+        threadpool_threads: threadpool_threads as usize,
         async_threads: if is_client { 2 } else { 2 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
     };
