@@ -38,10 +38,9 @@ pub fn main() {
 
     let conf = InitConfig {
         //If we are the client, we want to have many threads to send stuff to replicas
-        threadpool_threads: if is_client { 200 } else { 10 },
+        threadpool_threads: if is_client { 10 } else { 10 },
         async_threads: if is_client { 2 } else { 2 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
-        client_threads: if is_client { 4 } else { num_cpus::get() - 15 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
