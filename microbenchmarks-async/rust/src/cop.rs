@@ -259,7 +259,7 @@ async fn client_async_main() {
 
         handles.push(h);
 
-        Delay::new(Duration::from_millis(5)).await;
+        // Delay::new(Duration::from_millis(5)).await;
     }
 
     drop(clients_config);
