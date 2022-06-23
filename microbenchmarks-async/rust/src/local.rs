@@ -7,7 +7,6 @@ use std::time::Duration;
 use chrono::offset::Utc;
 use futures_timer::Delay;
 use intmap::IntMap;
-use konst::primitive::parse_u32;
 use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
@@ -39,11 +38,8 @@ pub fn main() {
         .map(|x| x == "1")
         .unwrap_or(false);
 
-    let threadpool_threads = parse_u32(std::env::var("THREADPOOL_THREADS")
-        .unwrap_or(String::from("2")).as_str()).unwrap();
-
     let conf = InitConfig {
-        threadpool_threads: threadpool_threads as usize,
+        threadpool_threads: 5,
         async_threads: 2,
     };
 
