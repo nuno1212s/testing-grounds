@@ -7,8 +7,19 @@ echo $BATCH_SIZE > batch.config
 
 rm -f clients.config
 
-REPLICA_MACHINES="10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4"
+if [[ -v CLUSTER ]]; then
+  if [[ $CLUSTER == "1" ]]; then
+    #Flag to set on the machines in the cop cluster
+    REPLICA_MACHINES="192.168.85.24 192.168.85.25 192.168.85.26 192.168.85.27";
+  else
+    REPLICA_MACHINES="10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4";
+  fi
+else
+  REPLICA_MACHINES="10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4";
+fi
+
 REPLICA_MACHINES_A=($REPLICA_MACHINES)
+
 #10gbe
 CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
