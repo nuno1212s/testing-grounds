@@ -32,7 +32,7 @@ CLIENT_MACHINES_A=("$CLIENT_MACHINES")
 #1gbe
 #CLIENT_MACHINES="192.168.85.30"
 
-if [[ $CLIENT -eq 1 ]]; then
+if [[ $CLIENT -eq "1" ]]; then
 
   IP=${CLIENT_MACHINES_A[$CLUSTER]}
 
