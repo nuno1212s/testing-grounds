@@ -49,5 +49,5 @@ for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
     #echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
 
     #10gbe
-    echo "$id" "$sni" "${REPLICA_MACHINES[$host]}" "$port" "$rep_port" >> replicas.config
+    echo "$id" "$sni" "${REPLICA_MACHINES["$host"]}" "$port" "$rep_port" >> replicas.config
 done
