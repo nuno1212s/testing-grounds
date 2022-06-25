@@ -33,7 +33,7 @@ for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
 
     #1gbe
     host=$(expr 24 + $host)
-    Gecho $id $sni 192.168.85.$host $port $rep_port >> replicas.config
+    echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
 
     #10gbe
     #host=$(expr 1 + $host)
