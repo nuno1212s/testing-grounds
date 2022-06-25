@@ -12,9 +12,11 @@ if [[ -v CLUSTER ]]; then
     #Flag to set on the machines in the cop cluster
     REPLICA_MACHINES=("192.168.85.24" "192.168.85.25" "192.168.85.26" "192.168.85.27")
   else
+    #No more clusters
     REPLICA_MACHINES=("10.11.12.1" "10.11.12.2" "10.11.12.3" "10.11.12.4")
   fi
 else
+  CLUSTER=0
   REPLICA_MACHINES=("10.11.12.1" "10.11.12.2" "10.11.12.3" "10.11.12.4")
 fi
 
@@ -25,20 +27,37 @@ fi
 #10gbe
 CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
+CLIENT_MACHINES_A=("$CLIENT_MACHINES")
+
 #1gbe
 #CLIENT_MACHINES="192.168.85.30"
 
-CURR_MACHINE=0
-for ip in $CLIENT_MACHINES; do
+if [[ $CLIENT -eq 1 ]]; then
+
+  IP=${CLIENT_MACHINES_A[$CLUSTER]}
+
   for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-      id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
+      id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
       sni=cli${id}
       port=$(expr 11000 + "$i")
       echo "$id" "$sni" "$ip" "$port" >> clients.config
   done
 
-  CURR_MACHINE=$(expr $CURR_MACHINE + 1)
-done
+  else
+  #Replicas have all IPS stored
+  CURR_MACHINE=0
+  for ip in $CLIENT_MACHINES; do
+      for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
+        id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
+        sni=cli${id}
+        port=$(expr 11000 + "$i")
+        echo "$id" "$sni" "$ip" "$port" >> clients.config
+      done
+
+    CURR_MACHINE=$(expr $CURR_MACHINE + 1)
+  done
+fi
+
 
 rm -f replicas.config
 
