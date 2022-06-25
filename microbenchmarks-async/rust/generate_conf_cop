@@ -18,6 +18,10 @@ else
   REPLICA_MACHINES=("10.11.12.1" "10.11.12.2" "10.11.12.3" "10.11.12.4")
 fi
 
+if [[ ! -v MAX_CLIENTS ]]; then
+  MAX_CLIENTS=$NUM_CLIENTS
+fi
+
 #10gbe
 CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
@@ -27,7 +31,7 @@ CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 CURR_MACHINE=0
 for ip in $CLIENT_MACHINES; do
   for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-      id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$NUM_CLIENTS") + "$i"))
+      id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
       sni=cli${id}
       port=$(expr 11000 + "$i")
       echo "$id" "$sni" "$ip" "$port" >> clients.config
