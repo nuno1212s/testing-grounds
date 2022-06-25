@@ -27,7 +27,7 @@ fi
 #10gbe
 CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
-CLIENT_MACHINES_A=($(echo $CLIENT_MACHINES | tr " " "\n"))
+CLIENT_MACHINES_A=($(echo "$CLIENT_MACHINES" | tr " " "\n"))
 
 #1gbe
 #CLIENT_MACHINES="192.168.85.30"
@@ -40,7 +40,7 @@ if [[ $CLIENT -eq "1" ]]; then
       id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
       sni=cli${id}
       port=$(expr 11000 + "$i")
-      echo "$id" "$sni" "$ip" "$port" >> clients.config
+      echo "$id" "$sni" "$IP" "$port" >> clients.config
   done
 
   else
