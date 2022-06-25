@@ -7,10 +7,10 @@ echo $BATCH_SIZE > batch.config
 
 rm -f clients.config
 #10gbe
-#CLIENT_MACHINES="10.11.12.5"
+CLIENT_MACHINES="10.11.12.5"
 
 #1gbe
-CLIENT_MACHINES="192.168.85.30"
+#CLIENT_MACHINES="192.168.85.30"
 
 CURR_MACHINE=0
 for ip in $CLIENT_MACHINES; do
@@ -32,10 +32,10 @@ for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
     host=$(expr $id % 4)
 
     #1gbe
-    host=$(expr 24 + $host)
-    echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
+    #host=$(expr 24 + $host)
+    #echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
 
     #10gbe
-    #host=$(expr 1 + $host)
-    #echo $id $sni 10.11.12.$host $port $rep_port >> replicas.config
+    host=$(expr 1 + $host)
+    echo $id $sni 10.11.12.$host $port $rep_port >> replicas.config
 done
