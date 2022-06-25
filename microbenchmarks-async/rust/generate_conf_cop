@@ -3,19 +3,19 @@
 mkdir -p config || exit
 cd config || exit
 
-echo $BATCH_SIZE > batch.config
+echo "$BATCH_SIZE" > batch.config
 
 rm -f clients.config
 
 if [[ -v CLUSTER ]]; then
   if [[ $CLUSTER == "1" ]]; then
     #Flag to set on the machines in the cop cluster
-    REPLICA_MACHINES=("192.168.85.24 192.168.85.25 192.168.85.26 192.168.85.27");
+    REPLICA_MACHINES=("192.168.85.24 192.168.85.25 192.168.85.26 192.168.85.27")
   else
-    REPLICA_MACHINES=("10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4");
+    REPLICA_MACHINES=("10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4")
   fi
 else
-  REPLICA_MACHINES=("10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4");
+  REPLICA_MACHINES=("10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4")
 fi
 
 
@@ -27,27 +27,27 @@ CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
 CURR_MACHINE=0
 for ip in $CLIENT_MACHINES; do
-  for i in $(seq 0 $(expr $NUM_CLIENTS - 1)); do
-      id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* $NUM_CLIENTS) + $i))
+  for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
+      id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$NUM_CLIENTS") + "$i"))
       sni=cli${id}
-      port=$(expr 11000 + $i)
-      echo $id $sni $ip $port >> clients.config
+      port=$(expr 11000 + "$i")
+      echo "$id" "$sni" "$ip" "$port" >> clients.config
   done
 
   CURR_MACHINE=$(expr $CURR_MACHINE + 1)
 done
 
 rm -f replicas.config
-for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
+for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
     sni=srv${id}
-    port=$(expr 10000 + $id)
-    rep_port=$(expr 12000 + $id)
-    host=$(expr $id % 4)
+    port=$(expr 10000 + "$id")
+    rep_port=$(expr 12000 + "$id")
+    host=$(expr "$id" % 4)
 
     #1gbe
     #host=$(expr 24 + $host)
     #echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
 
     #10gbe
-    echo $id $sni ${REPLICA_MACHINES[$host]} $port $rep_port >> replicas.config
+    echo "$id" "$sni" "${REPLICA_MACHINES[$host]}" "$port" "$rep_port" >> replicas.config
 done
