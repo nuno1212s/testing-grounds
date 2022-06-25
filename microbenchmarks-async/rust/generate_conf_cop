@@ -38,6 +38,8 @@ for ip in $CLIENT_MACHINES; do
 done
 
 rm -f replicas.config
+
+CURR_IP=0
 for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
     sni=srv${id}
     port=$(expr 10000 + "$id")
@@ -49,5 +51,7 @@ for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
     #echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
 
     #10gbe
-    echo "$id" "$sni" "${REPLICA_MACHINES["$host"]}" "$port" "$rep_port" >> replicas.config
+    echo "$id" "$sni" "${REPLICA_MACHINES[$CURR_IP]}" "$port" "$rep_port" >> replicas.config
+
+    CURR_IP=$(expr $CURR_IP + 1)
 done
