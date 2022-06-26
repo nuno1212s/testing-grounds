@@ -217,6 +217,7 @@ async fn client_async_main() {
         }
 
         let sk = secret_keys.remove(id.into()).unwrap();
+
         let fut = setup_client(
             replicas_config.len(),
             id,
