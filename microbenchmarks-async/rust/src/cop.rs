@@ -8,7 +8,7 @@ use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use konst::primitive::parse_u32;
+use konst::primitive::{parse_u32, parse_usize};
 use konst::unwrap_ctx;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
@@ -29,7 +29,7 @@ use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
 };
-use febft::bft::benchmarks::{ CommStats};
+use febft::bft::benchmarks::{CommStats};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -126,7 +126,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats)
+            Some(comm_stats),
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -151,10 +151,28 @@ async fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
+    let max_clients = parse_usize(std::env::var("MAX_CLIENTS").unwrap_or(String::from("1000")).as_str()).unwrap();
+
+    let mut first_cli = 1000u32;
+    let mut last_cli = 0;
+
+    for client in &clients_config {
+        let id = NodeId::from(client.id);
+
+        if client.id < first_cli {
+            first_cli = client.id;
+        }
+        if client.id > last_cli {
+            last_cli = client.id;
+        }
+    }
+
+    let first_cli_for_this_machine = last_cli as usize - max_clients;
+
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
-        .take(clients_config.len())
+        .take((last_cli - first_cli) as usize)
         .enumerate()
-        .map(|(id, sk)| (1000 + id as u64, sk))
+        .map(|(id, sk)| ((first_cli_for_this_machine + id) as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
@@ -167,15 +185,6 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    let mut first_cli = u32::MAX;
-
-    for client in &clients_config {
-        let id = NodeId::from(client.id);
-
-        if client.id < first_cli {
-            first_cli = client.id;
-        }
-    }
 
     let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                              NodeId::from(first_cli),
@@ -213,7 +222,7 @@ async fn client_async_main() {
 
         if first_cli + id.0 < start_client {
             //Split clients into various machines.
-            continue
+            continue;
         }
 
         let sk = secret_keys.remove(id.into()).expect(format!("Failed to read keys for client {:?}", id).as_str());
@@ -224,7 +233,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats.clone())
+            Some(comm_stats.clone()),
         );
 
         let mut tx = tx.clone();
@@ -358,7 +367,6 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
             ramp_up -= 100;
         }
-
     }
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
@@ -381,37 +389,37 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         let sem_clone = semaphore.clone();
 
         client.clone().update_callback(Arc::downgrade(&request),
-                               Box::new(move |reply| {
+                                       Box::new(move |reply| {
 
-            //Release another request for this client
-            sem_clone.release();
+                                           //Release another request for this client
+                                           sem_clone.release();
 
-            /* let latency = Utc::now()
-                .signed_duration_since(last_send_instant)
-                .num_nanoseconds()
-                .unwrap_or(i64::MAX);
+                                           /* let latency = Utc::now()
+                                               .signed_duration_since(last_send_instant)
+                                               .num_nanoseconds()
+                                               .unwrap_or(i64::MAX);
 
-            let time_ms = Utc::now().timestamp_millis();*/
+                                           let time_ms = Utc::now().timestamp_millis();*/
 
-            /*let _ = q.enqueue(
-                format!(
-                    "{}\t{}\t{}\n",
-                    id,
-                    time_ms,
-                    latency,
-                ),
-            );*/
+                                           /*let _ = q.enqueue(
+                                               format!(
+                                                   "{}\t{}\t{}\n",
+                                                   id,
+                                                   time_ms,
+                                                   latency,
+                                               ),
+                                           );*/
 
-            //(exec_time, last_send_instant).store(st);
+                                           //(exec_time, last_send_instant).store(st);
 
-            if MicrobenchmarkData::VERBOSE {
-                if req % 1000 == 0 {
-                    println!("{} // {} operations sent!", id, req);
-                }
+                                           if MicrobenchmarkData::VERBOSE {
+                                               if req % 1000 == 0 {
+                                                   println!("{} // {} operations sent!", id, req);
+                                               }
 
-                println!(" sent!");
-            }
-        }));
+                                               println!(" sent!");
+                                           }
+                                       }));
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
