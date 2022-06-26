@@ -216,7 +216,7 @@ async fn client_async_main() {
             continue
         }
 
-        let sk = secret_keys.remove(id.into()).unwrap();
+        let sk = secret_keys.remove(id.into()).expect(format!("Failed to read keys for client {:?}", id).as_str());
 
         let fut = setup_client(
             replicas_config.len(),
