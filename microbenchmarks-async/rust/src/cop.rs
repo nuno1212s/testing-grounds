@@ -148,8 +148,6 @@ async fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
-    let max_clients = parse_usize(std::env::var("MAX_CLIENTS").unwrap_or(String::from("1000")).as_str()).unwrap();
-
     let first_cli = 1000u32;
     let mut last_cli = 0;
     let mut first_cli_for_this_machine = u32::MAX;
@@ -218,6 +216,7 @@ async fn client_async_main() {
         };
 
         if id.0 < first_cli_for_this_machine {
+            print!("WHAT?");
             //Split clients into various machines.
             continue;
         }
