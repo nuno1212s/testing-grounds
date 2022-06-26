@@ -287,7 +287,7 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
 
             if (tp > maxTp) maxTp = tp;
 
-            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Throughput = " + tp +" operations/sec (Maximum observed: " + maxTp + " ops/sec)");
+            System.out.println("NodeId(" + id + ") // " + "Throughput = " + tp +" operations/sec (Maximum observed: " + maxTp + " ops/sec)");
 
             System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Total latency = " + totalLatency.getAverage(false) / 1000 + " (+/- "+ (long)totalLatency.getDP(false) / 1000 +") us ");
             totalLatency.reset();
