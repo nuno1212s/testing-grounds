@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use intmap::IntMap;
@@ -46,6 +46,57 @@ pub struct ConfigEntry {
     pub id: u32,
     pub hostname: String,
     pub ipaddr: String,
+}
+
+pub struct BindConfigEntry {
+    pub id: u32,
+    pub ipaddr: String,
+}
+
+pub fn parse_bind_config(path: &str) -> Option<Vec<BindConfigEntry>> {
+    let re = Regex::new("([^ ]+)").ok()?;
+
+    let file = File::open(path).ok()?;
+    let mut file = BufReader::new(file);
+
+    let mut buf = String::new();
+    let mut config = Vec::new();
+
+    loop {
+        match file.read_line(&mut buf) {
+            Ok(0) | Err(_) => break,
+            _ => {
+                match parse_bind_entry(&re, &buf) {
+                    Some(entry) => config.push(entry),
+                    None => (),
+                }
+                buf.clear();
+            }
+        }
+    }
+
+    Some(config)
+}
+
+fn parse_bind_entry(re: &Regex, line: &str) -> Option<BindConfigEntry> {
+    let line = line.trim();
+
+    if line.chars().next() == Some('#') {
+        return None;
+    }
+
+    let matches: Vec<_> = re
+        .find_iter(line)
+        .collect();
+
+    if matches.len() < 2 {
+        return None;
+    }
+
+    let id: u32 = matches[0].as_str().parse().ok()?;
+    let ipaddr: String = matches[1].as_str().to_string();
+
+    Some(BindConfigEntry { id, ipaddr })
 }
 
 pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
@@ -106,12 +157,13 @@ async fn node_config(
     id: NodeId,
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
+    bind_addrs: Option<IntMap<IpAddr>>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
-    batch_timeout, batch_sleep, clients_per_pool) = {
+        batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_server_config(id);
         let cli_rustls = get_client_config_replica(id);
@@ -142,6 +194,7 @@ async fn node_config(
         batch_timeout_micros: batch_timeout as u64,
         batch_sleep_micros: batch_sleep as u64,
         comm_stats,
+        bind_connection_addrs: bind_addrs,
     }
 }
 
@@ -150,10 +203,11 @@ pub async fn setup_client(
     id: NodeId,
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
+    bind_addrs: Option<IntMap<IpAddr>>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
 ) -> Result<Client<MicrobenchmarkData>> {
-    let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
+    let node = node_config(n, id, sk, addrs, bind_addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
         node,
     };
@@ -165,13 +219,14 @@ pub async fn setup_replica(
     id: NodeId,
     sk: KeyPair,
     addrs: IntMap<PeerAddr>,
+    bind_addrs: Option<IntMap<IpAddr>>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
 ) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
     let (node, global_batch_size, global_batch_timeout) = {
-        let n = node_config(n, id, sk, addrs, pk, comm_stats);
+        let n = node_config(n, id, sk, addrs, bind_addrs, pk, comm_stats);
         let b = get_global_batch_size();
         let timeout = get_global_batch_timeout();
         futures::join!(n, b, timeout)

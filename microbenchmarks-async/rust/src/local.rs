@@ -117,6 +117,7 @@ fn main_() {
             id,
             sk,
             addrs,
+            None,
             public_keys.clone(),
             None
         );
@@ -208,6 +209,7 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
+            None,
             public_keys.clone(),
             None
         );

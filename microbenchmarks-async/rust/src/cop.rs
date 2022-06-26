@@ -3,6 +3,8 @@ use crate::serialize::MicrobenchmarkData;
 
 use std::fs::File;
 use std::io::Write;
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration};
 
@@ -66,6 +68,7 @@ fn main_(id: NodeId) {
 
         let clients_config = parse_config("./config/clients.config").unwrap();
         let replicas_config = parse_config("./config/replicas.config").unwrap();
+        let replicas_bind_config = parse_bind_config("./config/replica_client_binds.config");
 
         println!("Finished reading replica config.");
 
@@ -111,6 +114,18 @@ fn main_(id: NodeId) {
             addrs
         };
 
+        let bind_config = if let Some(replicas_bind_config) = &replicas_bind_config {
+            let mut map = IntMap::new();
+
+            for entry in replicas_bind_config {
+                map.insert(entry.id as u64, IpAddr::V4(entry.ipaddr.parse().expect("Failed to parse IP")));
+            }
+
+            Some(map)
+        } else {
+            None
+        };
+
         //TODO: don't have this hardcoded?
         let first_cli = NodeId::from(1000u32);
 
@@ -125,6 +140,7 @@ fn main_(id: NodeId) {
             id,
             sk,
             addrs,
+            bind_config,
             public_keys.clone(),
             Some(comm_stats),
         );
@@ -146,7 +162,9 @@ fn main_(id: NodeId) {
 async fn client_async_main() {
 
     let clients_config = parse_config("./config/clients.config").unwrap();
+
     let replicas_config = parse_config("./config/replicas.config").unwrap();
+    let replicas_bind_config = parse_bind_config("./config/replica_client_binds.config");
 
     let first_cli = 1000u32;
     let mut last_cli = 0;
@@ -215,6 +233,18 @@ async fn client_async_main() {
             addrs
         };
 
+        let bind_config = if let Some(replicas_bind_config) = &replicas_bind_config {
+            let mut map = IntMap::new();
+
+            for entry in replicas_bind_config {
+                map.insert(entry.id as u64, IpAddr::V4(entry.ipaddr.parse().expect("Failed to parse IP")));
+            }
+
+            Some(map)
+        } else {
+            None
+        };
+
         let sk = secret_keys.remove(id.into()).expect(format!("Failed to read keys for client {:?}", id).as_str());
 
         let fut = setup_client(
@@ -222,6 +252,7 @@ async fn client_async_main() {
             id,
             sk,
             addrs,
+            bind_config,
             public_keys.clone(),
             Some(comm_stats.clone()),
         );
