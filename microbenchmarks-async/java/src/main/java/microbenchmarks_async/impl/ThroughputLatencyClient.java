@@ -369,6 +369,13 @@ public class ThroughputLatencyClient {
                 if (verbose && (req % 1000 == 0)) System.out.println(this.id + " // " + req + " operations sent!");
             }
 
+            try {
+                //Wait for all requests to finish
+                semaphore.acquire(concurrentRqs);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
             if (id == initId) {
                 System.out.println(this.id + " // Average time for " + numberOfOps / 2 + " executions (-10%) = " + st.getAverage(true) / 1000 + " us ");
                 System.out.println(this.id + " // Standard desviation for " + numberOfOps / 2 + " executions (-10%) = " + st.getDP(true) / 1000 + " us ");
