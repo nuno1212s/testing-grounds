@@ -167,7 +167,7 @@ async fn client_async_main() {
     crate::os_statistics::start_statistics_thread(NodeId(first_cli_for_this_machine as u32));
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
-        .take((last_cli - first_cli) as usize)
+        .take((last_cli - first_cli) as usize + 1)
         .enumerate()
         .map(|(id, sk)| ((first_cli_for_this_machine as usize + id) as u64, sk))
         .chain(sk_stream()
@@ -214,12 +214,6 @@ async fn client_async_main() {
 
             addrs
         };
-
-        if id.0 < first_cli_for_this_machine {
-            print!("WHAT?");
-            //Split clients into various machines.
-            continue;
-        }
 
         let sk = secret_keys.remove(id.into()).expect(format!("Failed to read keys for client {:?}", id).as_str());
 
