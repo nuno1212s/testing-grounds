@@ -1,5 +1,3 @@
-cargo-features = ["edition2021"]
-
 [package]
 name = "microbenchmarks-async"
 version = "0.1.0"

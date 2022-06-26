@@ -7,8 +7,8 @@ echo "$BATCH_SIZE" > batch.config
 
 rm -f clients.config
 
-REPLICAS_SAFE_CLUSTER_IPS=("10.11.12.1" "10.11.12.2" "10.11.12.3" "10.11.12.4")
-REPLICAS_COP_CLUSTER_IPS=("192.168.85.24" "192.168.85.25" "192.168.85.26" "192.168.85.27")
+REPLICAS_SAFE_CLUSTER_IPS="10.11.12.1 10.11.12.2 10.11.12.3 10.11.12.4"
+REPLICAS_COP_CLUSTER_IPS="192.168.85.24 192.168.85.25 192.168.85.26 192.168.85.27"
 
 #The replica IPs for each cluster
 REPLICAS=("$REPLICAS_SAFE_CLUSTER_IPS" "$REPLICAS_COP_CLUSTER_IPS")
@@ -32,6 +32,8 @@ else
   CLUSTER=0
   REPLICA_MACHINES=${REPLICAS[$CLUSTER]}
 fi
+
+REPLICA_MACHINES=($(echo "$REPLICA_MACHINES" | tr " " "\n"))
 
 if [[ ! -v MAX_CLIENTS ]]; then
   MAX_CLIENTS=$NUM_CLIENTS
@@ -94,6 +96,8 @@ if [[ ! $CLIENT -eq "1" ]]; then
   CURR_MACHINE=0
   for REPLICA_IPS in "${REPLICAS[@]}"; do
     #Get the IP of our own replica
+    REPLICA_IPS=($(echo "$REPLICA_IPS" | tr " " "\n"))
+
        REPLICA_IP=${REPLICA_IPS[$ID]}
 
         for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
