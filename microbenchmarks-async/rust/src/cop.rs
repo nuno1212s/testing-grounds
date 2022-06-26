@@ -150,21 +150,20 @@ async fn client_async_main() {
 
     let max_clients = parse_usize(std::env::var("MAX_CLIENTS").unwrap_or(String::from("1000")).as_str()).unwrap();
 
-    let mut first_cli = 1000u32;
+    let first_cli = 1000u32;
     let mut last_cli = 0;
+    let mut first_cli_for_this_machine = u32::MAX;
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
 
-        if client.id < first_cli {
-            first_cli = client.id;
+        if client.id < first_cli_for_this_machine {
+            first_cli_for_this_machine = client.id;
         }
         if client.id > last_cli {
             last_cli = client.id;
         }
     }
-
-    let first_cli_for_this_machine = last_cli as usize - clients_config.len();
 
     //Start the OS resource monitoring thread
     crate::os_statistics::start_statistics_thread(NodeId(first_cli_for_this_machine as u32));
@@ -172,7 +171,7 @@ async fn client_async_main() {
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take((last_cli - first_cli) as usize)
         .enumerate()
-        .map(|(id, sk)| ((first_cli_for_this_machine + id) as u64, sk))
+        .map(|(id, sk)| ((first_cli_for_this_machine as usize + id) as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
@@ -189,8 +188,6 @@ async fn client_async_main() {
     let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                              NodeId::from(first_cli),
                                              100000));
-
-    let start_client = unwrap_ctx!(parse_u32(std::env::var("CLIENT_START_POINT").unwrap_or(String::from("0")).as_str()));
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
@@ -220,7 +217,7 @@ async fn client_async_main() {
             addrs
         };
 
-        if first_cli + id.0 < start_client {
+        if id.0 < first_cli_for_this_machine {
             //Split clients into various machines.
             continue;
         }
