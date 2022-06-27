@@ -62,6 +62,12 @@ public class OSStatistics extends Thread {
                     System.out.println(s);
                 }
 
+                long freeRam = Runtime.getRuntime().freeMemory();
+                long totalMemory = Runtime.getRuntime().totalMemory();
+
+                System.out.printf("NodeId(%d) // %d // RAM Usage %d Free %d Total%n", node_id, System.currentTimeMillis(),
+                        freeRam, totalMemory);
+
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
