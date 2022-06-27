@@ -31,7 +31,7 @@ public class OSStatistics extends Thread {
         while (!cancelled.get()) {
             try {
 
-                Process proc = Runtime.getRuntime().exec(String.format(command, node_id));
+                Process proc = Runtime.getRuntime().exec(String.format(command, node_id) + " false");
 
                 proc.waitFor();
 
