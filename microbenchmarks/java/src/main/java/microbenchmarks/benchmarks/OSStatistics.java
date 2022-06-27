@@ -31,7 +31,7 @@ public class OSStatistics extends Thread {
         while (!cancelled.get()) {
             try {
 
-                Process proc = Runtime.getRuntime().exec(String.format(command, node_id));
+                Process proc = Runtime.getRuntime().exec(String.format(command, node_id) + " false");
 
                 proc.waitFor();
 
@@ -61,6 +61,12 @@ public class OSStatistics extends Thread {
                 while ((s = reader.readLine()) != null) {
                     System.out.println(s);
                 }
+
+                long freeRam = Runtime.getRuntime().freeMemory();
+                long totalMemory = Runtime.getRuntime().totalMemory();
+
+                System.out.printf("NodeId(%d) // %d // RAM Usage %d Free %d Total%n", node_id, System.currentTimeMillis(),
+                        freeRam, totalMemory);
 
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
