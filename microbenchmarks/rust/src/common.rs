@@ -138,6 +138,7 @@ async fn node_config(
         sk,
         pk,
         addrs,
+        bin_connection_addrs: None,
         async_client_config: client_config,
         async_server_config: server_config,
         sync_client_config: client_config_replica,
