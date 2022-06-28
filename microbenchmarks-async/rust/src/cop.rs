@@ -151,10 +151,20 @@ async fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
+    let mut first_cli = 1000u32;
+
+    let mut local_first_cli = u32::MAX;
+
+    for client in &clients_config {
+        if client.id < first_cli {
+            local_first_cli = client.id;
+        }
+    }
+
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
         .enumerate()
-        .map(|(id, sk)| (1000 + id as u64, sk))
+        .map(|(id, sk)| (local_first_cli as u64 + id as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
@@ -166,16 +176,6 @@ async fn client_async_main() {
         .collect();
 
     let (tx, mut rx) = channel::new_bounded_async(8);
-
-    let mut first_cli = 1000u32;
-
-    for client in &clients_config {
-        let id = NodeId::from(client.id);
-
-        if client.id < first_cli {
-            first_cli = client.id;
-        }
-    }
 
     let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                              NodeId::from(first_cli),
