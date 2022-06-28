@@ -52,11 +52,11 @@ if [[ $CLIENT -eq "1" ]]; then
       echo "$id" "$sni" "$IP" "$port" >> clients.config
   done
 
-  else
+else
   #Replicas have all IPS stored
   CURR_MACHINE=0
   for ip in $CLIENT_MACHINES; do
-      for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
+      for i in $(seq 0 $(expr "$MAX_CLIENTS" - 1)); do
         id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
         sni=cli${id}
         port=$(expr 11000 + "$i")
