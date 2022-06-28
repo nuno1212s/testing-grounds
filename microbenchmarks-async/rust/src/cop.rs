@@ -167,7 +167,7 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    let mut first_cli = u32::MAX;
+    let mut first_cli = 1000u32;
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
@@ -180,8 +180,6 @@ async fn client_async_main() {
     let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                              NodeId::from(first_cli),
                                              100000));
-
-    let start_client = unwrap_ctx!(parse_u32(std::env::var("CLIENT_START_POINT").unwrap_or(String::from("0")).as_str()));
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
@@ -211,11 +209,6 @@ async fn client_async_main() {
             addrs
         };
 
-        if first_cli + id.0 < start_client {
-            //Split clients into various machines.
-            continue
-        }
-
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
             replicas_config.len(),
@@ -236,6 +229,7 @@ async fn client_async_main() {
             tx.send(client).await.unwrap();
         });
     }
+
     drop((secret_keys, public_keys, replicas_config));
 
     let (mut queue, queue_tx) = async_queue();
