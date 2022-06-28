@@ -64,6 +64,9 @@ fn main_(id: NodeId) {
     let mut replica = {
         println!("Started working on the replica");
 
+        //TODO: don't have this hardcoded?
+        let first_cli = NodeId::from(1000u32);
+
         let clients_config = parse_config("./config/clients.config").unwrap();
         let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -110,9 +113,6 @@ fn main_(id: NodeId) {
 
             addrs
         };
-
-        //TODO: don't have this hardcoded?
-        let first_cli = NodeId::from(1000u32);
 
         let comm_stats = Arc::new(CommStats::new(id,
                                                  first_cli,
