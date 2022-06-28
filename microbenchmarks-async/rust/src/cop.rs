@@ -42,7 +42,7 @@ pub fn main() {
     let conf = InitConfig {
         //If we are the client, we want to have many threads to send stuff to replicas
         threadpool_threads: threadpool_threads as usize,
-        async_threads: if is_client { 1 } else { 1 },
+        async_threads: if is_client { 4 } else { 1 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
     };
 
