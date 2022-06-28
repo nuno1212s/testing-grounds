@@ -3,15 +3,13 @@ use crate::serialize::MicrobenchmarkData;
 
 use std::fs::File;
 use std::io::Write;
-use std::net::{IpAddr, Ipv4Addr};
-use std::str::FromStr;
+use std::net::{IpAddr};
 use std::sync::Arc;
 use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use konst::primitive::{parse_u32, parse_usize};
-use konst::unwrap_ctx;
+use konst::primitive::{parse_u32};
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -39,12 +37,12 @@ pub fn main() {
         .unwrap_or(false);
 
     let threadpool_threads = parse_u32(std::env::var("THREADPOOL_THREADS")
-        .unwrap_or(String::from("2")).as_str()).unwrap();
+        .unwrap_or(String::from("4")).as_str()).unwrap();
 
     let conf = InitConfig {
         //If we are the client, we want to have many threads to send stuff to replicas
         threadpool_threads: threadpool_threads as usize,
-        async_threads: if is_client { 2 } else { 2 },
+        async_threads: if is_client { 4 } else { 4 },
         //If we are the client, we don't want any threads to send to other clients as that will never happen
     };
 
