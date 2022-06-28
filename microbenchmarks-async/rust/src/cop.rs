@@ -209,6 +209,14 @@ async fn client_async_main() {
             addrs
         };
 
+        println!("Finding secret keys for client {:?}. Available clients:", id);
+
+        for key in secret_keys.keys() {
+            print!("{}, ", key);
+        }
+
+        println!();
+
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
             replicas_config.len(),
