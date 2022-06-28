@@ -156,7 +156,7 @@ async fn client_async_main() {
     let mut local_first_cli = u32::MAX;
 
     for client in &clients_config {
-        if client.id < first_cli {
+        if client.id < local_first_cli {
             local_first_cli = client.id;
         }
     }
@@ -208,14 +208,6 @@ async fn client_async_main() {
 
             addrs
         };
-
-        println!("Finding secret keys for client {:?}. Available clients:", id);
-
-        for key in secret_keys.keys() {
-            print!("{}, ", key);
-        }
-
-        println!();
 
         let sk = secret_keys.remove(id.into()).unwrap();
         let fut = setup_client(
