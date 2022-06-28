@@ -194,7 +194,7 @@ async fn node_config(
         batch_timeout_micros: batch_timeout as u64,
         batch_sleep_micros: batch_sleep as u64,
         comm_stats,
-        bind_connection_addrs: bind_addrs,
+        //bind_connection_addrs: bind_addrs,
     }
 }
 
