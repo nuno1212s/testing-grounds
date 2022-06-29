@@ -145,9 +145,6 @@ fn main_(id: NodeId) {
 
 async fn client_async_main() {
 
-    //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(1000));
-
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -160,6 +157,9 @@ async fn client_async_main() {
             local_first_cli = client.id;
         }
     }
+
+    //Start the OS resource monitoring thread
+    crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
