@@ -12,7 +12,7 @@ fi
 if [[ -v PREV_SUM ]]; then
   if [ "$SUM" == "$PREV_SUM" ]; then
   echo "Script has not changed, not running"
-  return
+  exit
   fi
 fi
 
