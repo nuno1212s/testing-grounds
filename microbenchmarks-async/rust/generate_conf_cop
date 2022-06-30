@@ -2,8 +2,11 @@
 
 SUM=$(md5sum "$0")
 
+echo "SUM IS $SUM"
+
 if [[ -f prevsum ]]; then
   PREV_SUM=$(< prevsum)
+  echo "PREV SUM IS $PREV_SUM"
 fi
 
 if [[ -v $PREV_SUM && $SUM == "$PREV_SUM" ]]; then
