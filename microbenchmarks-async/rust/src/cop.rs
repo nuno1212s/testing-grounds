@@ -177,7 +177,7 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
+    let comm_stats = Arc::new(CommStats::new(NodeId::from(local_first_cli),
                                              NodeId::from(first_cli),
                                              100000));
 
