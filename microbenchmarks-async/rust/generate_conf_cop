@@ -15,7 +15,7 @@ REPLICAS_COP_CLUSTER_IPS="192.168.85.24 192.168.85.25 192.168.85.26 192.168.85.2
 REPLICAS=("$REPLICAS_SAFE_CLUSTER_IPS" "$REPLICAS_COP_CLUSTER_IPS")
 
 #10gbe
-CLIENT_MACHINES="10.11.12.5 192.168.70.16"
+CLIENT_MACHINES="10.11.12.5 192.168.70.16 192.168.70.17 192.168.70.18 192.168.70.19"
 
 #1gbe
 #CLIENT_MACHINES="192.168.85.30"
@@ -44,7 +44,13 @@ CLIENT_MACHINES_A=($(echo "$CLIENT_MACHINES" | tr " " "\n"))
 
 if [[ $CLIENT -eq "1" ]]; then
 
-  IP=${CLIENT_MACHINES_A[$CLUSTER]}
+  if [[ ! -v CLIENT_MACHINE ]]; then
+    #Client machine inside the cluster
+    CLIENT_MACHINE=1
+  fi
+
+  #TODO: Fix this, as this only works for the current model where the cluster 0 has 1 client machine and nothing else
+  IP=${CLIENT_MACHINES_A[$(expr $CLIENT_MACHINE \* $CLUSTER)]}
 
   for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
       id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
