@@ -46,11 +46,10 @@ if [[ $CLIENT -eq "1" ]]; then
 
   if [[ ! -v CLIENT_MACHINE ]]; then
     #Client machine inside the cluster
-    CLIENT_MACHINE=1
+    CLIENT_MACHINE=0
   fi
 
-  #TODO: Fix this, as this only works for the current model where the cluster 0 has 1 client machine and nothing else
-  IP=${CLIENT_MACHINES_A[$(expr $CLIENT_MACHINE \* $CLUSTER)]}
+  IP=${CLIENT_MACHINES_A[$CLIENT_MACHINE]}
 
   for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
       id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
