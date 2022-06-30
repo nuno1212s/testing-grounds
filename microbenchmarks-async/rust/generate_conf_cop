@@ -52,7 +52,7 @@ if [[ $CLIENT -eq "1" ]]; then
   IP=${CLIENT_MACHINES_A[$CLIENT_MACHINE]}
 
   for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-      id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
+      id=$(expr 1000 + $(expr $(expr $CLIENT_MACHINE \* "$MAX_CLIENTS") + "$i"))
       sni=cli${id}
       port=$(expr 11000 + "$i")
       echo "$id" "$sni" "$IP" "$port" >> clients.config
