@@ -17,9 +17,6 @@ if [[ -v PREV_SUM ]]; then
 fi
 
 echo "Script has changed, running"
-echo "$SUM" > prevsum
-
-
 
 mkdir -p config || exit
 cd config || exit
@@ -112,3 +109,5 @@ for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
 
     CURR_IP=$(expr $CURR_IP + 1)
 done
+
+echo "$SUM" > prevsum
