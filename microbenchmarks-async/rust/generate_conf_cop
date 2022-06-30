@@ -9,7 +9,7 @@ if [[ -f prevsum ]]; then
   echo "PREV SUM IS $PREV_SUM"
 fi
 
-if [[ -v $PREV_SUM && "$SUM" == "$PREV_SUM" ]]; then
+if [ -v $PREV_SUM ] && [ "$SUM" == "$PREV_SUM" ]; then
   echo "Script has not changed, not running"
   return
 else
