@@ -1,5 +1,18 @@
 #!/bin/bash
 
+SUM=$(md5sum "$0")
+
+PREV_SUM=$(< prevsum)
+
+if [[ $SUM -eq $PREV_SUM ]]; then
+  echo "Script has not changed, not running"
+  return
+else
+  echo "Script has changed, running"
+  echo "$SUM" > prevsum
+fi
+
+
 mkdir -p config || exit
 cd config || exit
 
