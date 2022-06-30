@@ -2,9 +2,11 @@
 
 SUM=$(md5sum "$0")
 
-PREV_SUM=$(< prevsum)
+if [[ -f prevsum ]]; then
+  PREV_SUM=$(< prevsum)
+fi
 
-if [[ $SUM -eq $PREV_SUM ]]; then
+if [[ -v $PREV_SUM && $SUM == "$PREV_SUM" ]]; then
   echo "Script has not changed, not running"
   return
 else
