@@ -9,7 +9,6 @@ use std::time::{Duration};
 use intmap::IntMap;
 use chrono::offset::Utc;
 use konst::primitive::parse_u32;
-use konst::unwrap_ctx;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,

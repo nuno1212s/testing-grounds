@@ -110,4 +110,5 @@ for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
     CURR_IP=$(expr $CURR_IP + 1)
 done
 
+echo "WRITING CHECKSUM"
 echo "$SUM" > prevsum
