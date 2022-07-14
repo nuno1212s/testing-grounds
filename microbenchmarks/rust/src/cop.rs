@@ -40,8 +40,6 @@ pub fn main() {
         //Have (which we want to avoid context switching on)
         threadpool_threads: if is_client { num_cpus::get() / 2 } else { 10 },
         async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
-        //If we are the client, we don't want any threads to send to other clients as that will never happen
-        client_threads: if is_client { 1 } else { num_cpus::get() - 20 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
