@@ -17,15 +17,9 @@ use konst::primitive::parse_u128;
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
-use febft::bft::communication::message::{
-    Header,
-    ReplyMessage,
-    StoredMessage,
-    SystemMessage,
-    RequestMessage,
-    ConsensusMessage,
-    ConsensusMessageKind,
-};
+use febft::bft::communication::message::{Header, ReplyMessage, StoredMessage, SystemMessage, RequestMessage, ConsensusMessage, ConsensusMessageKind, ObserverMessage, ObserveEventKind};
+use febft::bft::communication::message::ObserverMessage::ObservedValue;
+use febft::bft::communication::NodeId;
 use febft::bft::ordering::{
     SeqNo,
     Orderable,
@@ -89,15 +83,15 @@ impl SharedData for MicrobenchmarkData {
     type Reply = Weak<Vec<u8>>;
 
     fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
-    where
-        W: Write
+        where
+            W: Write
     {
         Ok(())
     }
 
     fn deserialize_state<R>(_r: R) -> Result<Vec<u8>>
-    where
-        R: Read
+        where
+            R: Read
     {
         Ok((0..)
             .into_iter()
@@ -107,8 +101,8 @@ impl SharedData for MicrobenchmarkData {
     }
 
     fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>) -> Result<()>
-    where
-        W: Write
+        where
+            W: Write
     {
         let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
         let sys_msg: messages_capnp::system::Builder = root.init_root();
@@ -123,7 +117,7 @@ impl SharedData for MicrobenchmarkData {
                 request.set_operation_id(m.sequence_number().into());
                 request.set_session_id(m.session_id().into());
                 request.set_data(&*operation);
-            },
+            }
             SystemMessage::Reply(m) => {
                 let mut reply = sys_msg.init_reply();
                 let payload = match m.payload().upgrade() {
@@ -133,7 +127,7 @@ impl SharedData for MicrobenchmarkData {
                 reply.set_operation_id(m.sequence_number().into());
                 reply.set_session_id(m.session_id().into());
                 reply.set_data(&*payload);
-            },
+            }
             SystemMessage::Consensus(m) => {
                 let mut consensus = sys_msg.init_consensus();
                 consensus.set_seq_no(m.sequence_number().into());
@@ -161,11 +155,60 @@ impl SharedData for MicrobenchmarkData {
                                 request.set_data(&Self::REQUEST);
                             }
                         }
-                    },
+                    }
                     ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
                     ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
                 }
-            },
+            }
+            SystemMessage::ObserverMessage(observer_message) => {
+                let mut capnp_observer = sys_msg.init_observer_message();
+
+                let mut obs_message_type = capnp_observer.init_message_type();
+
+                match observer_message {
+                    ObserverMessage::ObserverRegister => {
+                        obs_message_type.set_observer_register(());
+                    }
+                    ObserverMessage::ObserverRegisterResponse(response) => {
+                        obs_message_type.set_observer_register_response((*response));
+                    }
+                    ObserverMessage::ObserverUnregister => {
+                        obs_message_type.set_observer_unregister(());
+                    }
+                    ObserverMessage::ObservedValue(observed_value) => {
+                        let mut observer_value_msg = obs_message_type.init_observed_value();
+
+                        let mut value = observer_value_msg.init_value();
+
+                        match observed_value {
+                            ObserveEventKind::CheckpointStart(start) => {
+                                value.set_checkpoint_start((*start).into());
+                            }
+                            ObserveEventKind::CheckpointEnd(end) => {
+                                value.set_checkpoint_end((*end).into());
+                            }
+                            ObserveEventKind::Consensus(seq_no) => {
+                                value.set_consensus((*seq_no).into());
+                            }
+                            ObserveEventKind::NormalPhase((view, seq, leader)) => {
+
+                                let mut normal_phase = value.init_normal_phase();
+
+                                normal_phase.set_view((*view).into());
+                                normal_phase.set_seq_num((*seq).into());
+                                normal_phase.set_leader((*leader).into());
+
+                            }
+                            ObserveEventKind::ViewChangePhase => {
+                                value.set_view_change(());
+                            }
+                            ObserveEventKind::CollabStateTransfer => {
+                                value.set_collab_state_transfer(());
+                            }
+                        }
+                    }
+                }
+            }
             _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
         }
         capnp::serialize::write_message(w, &root)
@@ -173,8 +216,8 @@ impl SharedData for MicrobenchmarkData {
     }
 
     fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>>
-    where
-        R: Read
+        where
+            R: Read
     {
         let reader = capnp::serialize::read_message(r, Default::default())
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
@@ -195,11 +238,11 @@ impl SharedData for MicrobenchmarkData {
                     .to_owned();
 
                 Ok(SystemMessage::Reply(ReplyMessage::new(session_id, operation_id, Weak::new())))
-            },
+            }
             messages_capnp::system::Which::Reply(_) => {
                 Err("Failed to read reply message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
             messages_capnp::system::Which::Request(Ok(request)) => {
                 let session_id: SeqNo = request.get_session_id().into();
                 let operation_id: SeqNo = request.get_operation_id().into();
@@ -208,11 +251,11 @@ impl SharedData for MicrobenchmarkData {
                     .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
 
                 Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, Weak::new())))
-            },
+            }
             messages_capnp::system::Which::Request(_) => {
                 Err("Failed to read request message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
             messages_capnp::system::Which::Consensus(Ok(consensus)) => {
                 let seq: SeqNo = consensus
                     .reborrow()
@@ -257,26 +300,85 @@ impl SharedData for MicrobenchmarkData {
                         }
 
                         ConsensusMessageKind::PrePrepare(requests)
-                    },
+                    }
                     messages_capnp::consensus::Which::Prepare(Ok(digest)) => {
                         let digest = Digest::from_bytes(digest)
                             .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
                         ConsensusMessageKind::Prepare(digest)
-                    },
+                    }
                     messages_capnp::consensus::Which::Commit(Ok(digest)) => {
                         let digest = Digest::from_bytes(digest)
                             .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
                         ConsensusMessageKind::Commit(digest)
-                    },
+                    }
                     _ => return Err("Failed to read consensus message kind").wrapped(ErrorKind::CommunicationSerialize),
                 };
 
                 Ok(SystemMessage::Consensus(ConsensusMessage::new(seq, view, kind)))
-            },
+            }
             messages_capnp::system::Which::Consensus(_) => {
                 Err("Failed to read consensus message")
                     .wrapped(ErrorKind::CommunicationSerialize)
-            },
+            }
+            messages_capnp::system::Which::ObserverMessage(Ok(observerMessage)) => {
+
+                let message_kind = observerMessage.reborrow()
+                    .get_message_type()
+                    .which().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get message type")?;
+
+                match message_kind {
+
+                    messages_capnp::observer_message::message_type::Which::ObserverRegister(()) => {
+                        Ok(SystemMessage::ObserverMessage(ObserverMessage::ObserverRegister))
+                    }
+                    messages_capnp::observer_message::message_type::Which::ObserverRegisterResponse(value) => {
+                        Ok(SystemMessage::ObserverMessage(ObserverMessage::ObserverRegisterResponse(value)))
+                    }
+                    messages_capnp::observer_message::message_type::Which::ObserverUnregister(()) => {
+                        Ok(SystemMessage::ObserverMessage(ObserverMessage::ObserverUnregister))
+                    }
+                    messages_capnp::observer_message::message_type::Which::ObservedValue(Ok(value)) => {
+
+                        let observed_kind = value.get_value().which().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get message type")?;
+
+                        let event = match observed_kind {
+                            messages_capnp::observed_value::value::Which::CheckpointStart(value) => {
+                                Ok(ObserveEventKind::CheckpointStart(value.into()))
+                            }
+                            messages_capnp::observed_value::value::Which::CheckpointEnd(value) => {
+                                Ok(ObserveEventKind::CheckpointEnd(value.into()))
+                            }
+                            messages_capnp::observed_value::value::Which::Consensus(value) => {
+                                Ok(ObserveEventKind::Consensus(value.into()))
+                            }
+                            messages_capnp::observed_value::value::Which::NormalPhase(Ok(phase_data)) => {
+                                let view : SeqNo = phase_data.reborrow().get_view().into();
+                                let seq_num : SeqNo = phase_data.reborrow().get_seq_num().into();
+                                let leader :NodeId = phase_data.reborrow().get_leader().into();
+
+                                Ok(ObserveEventKind::NormalPhase((view, seq_num, leader)))
+                            }
+                            messages_capnp::observed_value::value::Which::NormalPhase(_) => {
+                                Err("Failed to read normal phase values").wrapped(ErrorKind::CommunicationSerialize)
+                            }
+                            messages_capnp::observed_value::value::Which::ViewChange(()) => {
+                                Ok(ObserveEventKind::ViewChangePhase)
+                            }
+                            messages_capnp::observed_value::value::Which::CollabStateTransfer(()) => {
+                                Ok(ObserveEventKind::CollabStateTransfer)
+                            }
+                        }?;
+
+                        Ok(SystemMessage::ObserverMessage(ObservedValue(event)))
+                    }
+                    messages_capnp::observer_message::message_type::Which::ObservedValue(_) => {
+                        Err("Error reading observed value").wrapped(ErrorKind::CommunicationSerialize)
+                    }
+                }
+            }
+            messages_capnp::system::Which::ObserverMessage(_) => {
+                Err("Failed to read observer message").wrapped(ErrorKind::CommunicationSerialize)
+            }
         }
     }
 }

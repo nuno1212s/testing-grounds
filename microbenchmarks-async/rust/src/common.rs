@@ -2,7 +2,6 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek};
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use intmap::IntMap;
@@ -13,10 +12,12 @@ use rustls::{AllowAnyAuthenticatedClient, ClientConfig, internal::pemfile, Priva
 use febft::bft::benchmarks::CommStats;
 
 use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
+use febft::bft::communication::message::ObserveEventKind;
 use febft::bft::core::client::{
     self,
     Client,
 };
+use febft::bft::core::client::observing::ObserverCallback;
 use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
@@ -38,6 +39,33 @@ macro_rules! addr {
         let addr: ::std::net::SocketAddr = $a.parse().unwrap();
         (addr, String::from($h))
     }}
+}
+
+pub struct ObserverCall;
+
+impl ObserverCallback for ObserverCall {
+    fn handle_event(&self, event: ObserveEventKind) {
+        match event {
+            ObserveEventKind::CheckpointStart(start_cp) => {
+                println!("Received checkpoint start")
+            }
+            ObserveEventKind::CheckpointEnd(end_cp) => {
+                println!("Received checkpoint end")
+            }
+            ObserveEventKind::Consensus(consensus_instance) => {
+                println!("Received consensus phase with seq {:?}", consensus_instance)
+            }
+            ObserveEventKind::NormalPhase((view, seq, leader)) => {
+                println!("Received normal phase message with seq {:?} for view {:?} with the current leader {:?}", seq, view, leader);
+            }
+            ObserveEventKind::ViewChangePhase => {
+                println!("Received view change phase message")
+            }
+            ObserveEventKind::CollabStateTransfer => {
+                println!("Received collab state transfer message")
+            }
+        }
+    }
 }
 
 pub struct ConfigEntry {
@@ -111,7 +139,7 @@ async fn node_config(
 ) -> NodeConfig {
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
-    batch_timeout, batch_sleep, clients_per_pool) = {
+        batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_server_config(id);
         let cli_rustls = get_client_config_replica(id);

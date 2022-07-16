@@ -8,6 +8,7 @@ struct System {
         request   @0 :Request;
         reply     @1 :Reply;
         consensus @2 :Consensus;
+        observerMessage  @3 :ObserverMessage;
     }
 }
 
@@ -36,4 +37,36 @@ struct Consensus {
 struct ForwardedRequest {
     header  @0 :Data;
     request @1 :Request;
+}
+
+struct ObserverMessage {
+
+    messageType: union {
+        observerRegister         @0 :Void;
+        observerRegisterResponse @1 :Bool;
+        observerUnregister       @2 :Void;
+        observedValue            @3 :ObservedValue;
+    }
+
+}
+
+struct ObservedValue {
+
+    value: union {
+        checkpointStart     @0 :UInt32;
+        checkpointEnd       @1 :UInt32;
+        consensus           @2 :UInt32;
+        normalPhase         @3 :NormalPhase;
+        viewChange          @4 :Void;
+        collabStateTransfer @5 :Void;
+    }
+
+}
+
+struct NormalPhase {
+
+    view   @0 :UInt32;
+    seqNum @1 :UInt32;
+    leader @2 :UInt32;
+
 }

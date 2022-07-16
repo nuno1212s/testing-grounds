@@ -1,4 +1,3 @@
-use std::collections::LinkedList;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -132,7 +131,7 @@ fn main_() {
     }
 
     //We will only launch a single OS monitoring thread since all replicas also run on the same system
-    crate::os_statistics::start_statistics_thread(NodeId(0));
+    //crate::os_statistics::start_statistics_thread(NodeId(0));
 
     drop((secret_keys, public_keys, clients_config, replicas_config));
 
@@ -230,14 +229,25 @@ async fn client_async_main() {
     }
 
     //We have all the clients, start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
+    //crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
     let mut handles = Vec::with_capacity(clients_config.len());
 
-    for client in clients {
+    for mut client in clients {
         let queue_tx = Arc::clone(&queue_tx);
 
         let h = rt::spawn({
+
+            {
+                let observer = client.bootstrap_observer().await;
+
+                let mut guard = observer.lock().unwrap();
+
+                if let Some(observer_reg) = &mut *guard {
+                    observer_reg.register_observer(Box::new(ObserverCall));
+                }
+            }
+
             run_client(client, queue_tx)
         });
 
