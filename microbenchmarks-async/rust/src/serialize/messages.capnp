@@ -59,6 +59,8 @@ struct ObservedValue {
         normalPhase         @3 :NormalPhase;
         viewChange          @4 :Void;
         collabStateTransfer @5 :Void;
+        prepare             @6 :UInt32;
+        commit              @7 :UInt32;
     }
 
 }

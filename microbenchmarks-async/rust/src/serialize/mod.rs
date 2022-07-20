@@ -12,7 +12,6 @@ use konst::{
     option::unwrap_or,
     unwrap_ctx,
 };
-use konst::primitive::parse_u128;
 
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
@@ -205,6 +204,12 @@ impl SharedData for MicrobenchmarkData {
                             ObserveEventKind::CollabStateTransfer => {
                                 value.set_collab_state_transfer(());
                             }
+                            ObserveEventKind::Prepare(seq_no) => {
+                                value.set_prepare((*seq_no).into());
+                            }
+                            ObserveEventKind::Commit(seq_no) => {
+                                value.set_commit((*seq_no).into());
+                            }
                         }
                     }
                 }
@@ -366,6 +371,12 @@ impl SharedData for MicrobenchmarkData {
                             }
                             messages_capnp::observed_value::value::Which::CollabStateTransfer(()) => {
                                 Ok(ObserveEventKind::CollabStateTransfer)
+                            }
+                            messages_capnp::observed_value::value::Which::Prepare(seq_no) => {
+                                Ok(ObserveEventKind::Prepare(seq_no.into()))
+                            }
+                            messages_capnp::observed_value::value::Which::Commit(seq_no) => {
+                                Ok(ObserveEventKind::Commit(seq_no.into()))
                             }
                         }?;
 

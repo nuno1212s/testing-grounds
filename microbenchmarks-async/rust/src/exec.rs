@@ -1,4 +1,3 @@
-use std::default::Default;
 use std::sync::{Arc, Weak};
 
 use chrono::DateTime;
