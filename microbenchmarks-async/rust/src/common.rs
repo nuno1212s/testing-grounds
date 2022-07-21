@@ -47,10 +47,10 @@ impl ObserverCallback for ObserverCall {
     fn handle_event(&self, event: ObserveEventKind) {
         match event {
             ObserveEventKind::CheckpointStart(start_cp) => {
-                println!("Received checkpoint start")
+                println!("Received checkpoint start with seq {:?}", start_cp)
             }
             ObserveEventKind::CheckpointEnd(end_cp) => {
-                println!("Received checkpoint end")
+                println!("Received checkpoint end with seq {:?}", end_cp)
             }
             ObserveEventKind::Consensus(consensus_instance) => {
                 println!("Received consensus phase with seq {:?}", consensus_instance)
@@ -63,6 +63,12 @@ impl ObserverCallback for ObserverCall {
             }
             ObserveEventKind::CollabStateTransfer => {
                 println!("Received collab state transfer message")
+            }
+            ObserveEventKind::Prepare(seq) => {
+                println!("Received prepare stage with seq {:?}", seq)
+            }
+            ObserveEventKind::Commit(seq) => {
+                println!("Received commit stage with seq {:?}", seq)
             }
         }
     }

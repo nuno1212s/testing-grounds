@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 regex = "1"
-intmap = "0.7"
+intmap = "2.0.0"
 rustls = "0.19"
 futures = "0.3"
 oneshot = "0.1"
