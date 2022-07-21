@@ -2,20 +2,16 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
+use std::iter;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use chrono::format::Item;
 
 use intmap::IntMap;
 use konst::primitive::{parse_u128, parse_usize};
 use konst::unwrap_ctx;
 use regex::Regex;
-use rustls::{
-    AllowAnyAuthenticatedClient,
-    ClientConfig,
-    internal::pemfile,
-    RootCertStore,
-    ServerConfig,
-};
+use rustls::{AllowAnyAuthenticatedClient, Certificate, ClientConfig, internal::pemfile, PrivateKey, RootCertStore, ServerConfig};
 use febft::bft::benchmarks::CommStats;
 
 use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
@@ -261,6 +257,61 @@ async fn get_clients_per_pool() -> usize {
     rx.await.unwrap()
 }
 
+fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
+    let mut certs = Vec::new();
+
+    for item in iter::from_fn(|| read_one(&mut file).transpose()) {
+        match item.unwrap() {
+            Item::X509Certificate(cert) => {
+                certs.push(Certificate(cert));
+            }
+            Item::RSAKey(_) => {
+                panic!("Key given in place of a certificate")
+            }
+            Item::PKCS8Key(_) => {
+                panic!("Key given in place of a certificate")
+            }
+            Item::ECKey(_) => {
+                panic!("Key given in place of a certificate")
+            }
+            _ => {
+                panic!("Key given in place of a certificate")
+            }
+        }
+    }
+
+    certs
+}
+
+#[inline]
+fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
+
+    let mut certs = Vec::new();
+
+    for item in iter::from_fn(|| read_one(&mut file).transpose()) {
+        match item.unwrap() {
+            Item::RSAKey(rsa) => {
+                certs.push(PrivateKey(rsa))
+            }
+            Item::PKCS8Key(rsa) => {
+                certs.push(PrivateKey(rsa))
+            }
+            Item::ECKey(rsa) => {
+                certs.push(PrivateKey(rsa))
+            }
+            _ => {
+                panic!("Key given in place of a certificate")
+            }
+        }
+    }
+
+    certs
+}
+
+fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
+    read_private_keys_from_file(file).pop().unwrap()
+}
+
 async fn get_server_config(id: NodeId) -> ServerConfig {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
@@ -268,15 +319,15 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
         let mut root_store = RootCertStore::empty();
 
         // read ca file
-        let certs = {
+        let cert = {
             let mut file = open_file("./ca-root/crt");
-            pemfile::certs(&mut file).expect("root cert")
-        };
-        root_store.add(&certs[0]).unwrap();
 
-        // create server conf
-        let auth = AllowAnyAuthenticatedClient::new(root_store);
-        let mut cfg = ServerConfig::new(auth);
+            let certs = read_certificates_from_file(&mut file);
+
+            root_store.add(&certs[0]).expect("Failed to put root store");
+
+            certs
+        };
 
         // configure our cert chain and secret key
         let sk = {
@@ -285,20 +336,33 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
+
         let chain = {
             let mut file = if id < 1000 {
                 open_file(&format!("./ca-root/srv{}/crt", id))
             } else {
                 open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("srv cert");
-            c.extend(certs);
-            c
+
+            let mut certs = read_certificates_from_file(&mut file);
+
+            certs.extend(cert);
+            certs
         };
-        cfg.set_single_cert(chain, sk).unwrap();
+
+        // create server conf
+        let auth = AllowAnyAuthenticatedClient::new(root_store);
+        let cfg = ServerConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_client_cert_verifier(auth)
+            .with_single_cert(chain, sk)
+            .expect("Failed to make cfg");
 
         tx.send(cfg).unwrap();
     });
@@ -307,6 +371,7 @@ async fn get_server_config(id: NodeId) -> ServerConfig {
 
 async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     let (tx, rx) = oneshot::channel();
+
     threadpool::execute(move || {
         let id = usize::from(id);
         let mut root_store = RootCertStore::empty();
@@ -314,13 +379,11 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
         // read ca file
         let certs = {
             let mut file = open_file("./ca-root/crt");
-            pemfile::certs(&mut file).expect("root cert")
-        };
-        root_store.add(&certs[0]).unwrap();
 
-        // create server conf
-        let auth = AllowAnyAuthenticatedClient::new(root_store);
-        let mut cfg = rustls::ServerConfig::new(auth);
+            read_certificates_from_file(&mut file)
+        };
+
+        root_store.add(&certs[0]).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -329,8 +392,8 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
         let chain = {
             let mut file = if id < 1000 {
@@ -338,11 +401,25 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("srv cert");
+
+            let mut c = read_certificates_from_file(&mut file);
+
             c.extend(certs);
+
             c
         };
-        cfg.set_single_cert(chain, sk).unwrap();
+
+        // create server conf
+        let auth = AllowAnyAuthenticatedClient::new(root_store);
+
+        let cfg = ServerConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_client_cert_verifier(auth)
+            .with_single_cert(chain, sk)
+            .expect("Failed to make cfg");
 
         tx.send(cfg).unwrap();
     });
@@ -353,14 +430,16 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
     let (tx, rx) = oneshot::channel();
     threadpool::execute(move || {
         let id = usize::from(id);
-        let mut cfg = ClientConfig::new();
+
+        let mut root_store = RootCertStore::empty();
 
         // configure ca file
         let certs = {
             let mut file = open_file("./ca-root/crt");
-            pemfile::certs(&mut file).expect("root cert")
+            read_certificates_from_file(&mut file)
         };
-        cfg.root_store.add(&certs[0]).unwrap();
+
+        root_store.add(&certs[0]).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -369,20 +448,30 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
+
         let chain = {
             let mut file = if id < 1000 {
                 open_file(&format!("./ca-root/srv{}/crt", id))
             } else {
                 open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("srv cert");
+            let mut c = read_certificates_from_file(&mut file);
+
             c.extend(certs);
             c
         };
-        cfg.set_single_client_cert(chain, sk).unwrap();
+
+        let cfg = ClientConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_root_certificates(root_store)
+            .with_single_cert(chain, sk)
+            .expect("bad cert/key");
 
         tx.send(cfg).unwrap();
     });
@@ -394,15 +483,16 @@ async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 
     threadpool::execute(move || {
         let id = usize::from(id);
-        let mut cfg = rustls::ClientConfig::new();
+
+        let mut root_store = RootCertStore::empty();
 
         // configure ca file
         let certs = {
             let mut file = open_file("./ca-root/crt");
-            pemfile::certs(&mut file).expect("root cert")
+            read_certificates_from_file(&mut file)
         };
 
-        cfg.root_store.add(&certs[0]).unwrap();
+        root_store.add(&certs[0]).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -411,20 +501,30 @@ async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
             } else {
                 open_file(&format!("./ca-root/cli{}/key", id))
             };
-            let mut sk = pemfile::rsa_private_keys(&mut file).expect("secret key");
-            sk.remove(0)
+
+            read_private_key_from_file(file)
         };
+
         let chain = {
             let mut file = if id < 1000 {
                 open_file(&format!("./ca-root/srv{}/crt", id))
             } else {
                 open_file(&format!("./ca-root/cli{}/crt", id))
             };
-            let mut c = pemfile::certs(&mut file).expect("srv cert");
+            let mut c = read_certificates_from_file(&mut file);
+
             c.extend(certs);
             c
         };
-        cfg.set_single_client_cert(chain, sk).unwrap();
+
+        let cfg = ClientConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_root_certificates(root_store)
+            .with_single_cert(chain, sk)
+            .expect("bad cert/key");
 
         tx.send(cfg).unwrap();
     });
