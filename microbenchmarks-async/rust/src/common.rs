@@ -30,7 +30,7 @@ use febft::bft::crypto::signature::{
     PublicKey,
 };
 use febft::bft::error::*;
-use febft::bft::ordering::SeqNo;
+use febft::bft::ordering::{Orderable, SeqNo};
 use febft::bft::threadpool;
 
 use crate::exec::Microbenchmark;
@@ -58,8 +58,8 @@ impl ObserverCallback for ObserverCall {
             ObserveEventKind::Consensus(consensus_instance) => {
                 println!("Received consensus phase with seq {:?}", consensus_instance)
             }
-            ObserveEventKind::NormalPhase((view, seq, leader)) => {
-                println!("Received normal phase message with seq {:?} for view {:?} with the current leader {:?}", seq, view, leader);
+            ObserveEventKind::NormalPhase((view, seq)) => {
+                println!("Received normal phase message with seq {:?} for view {:?} with the current leader {:?}", seq, view.sequence_number(), view.leader());
             }
             ObserveEventKind::ViewChangePhase => {
                 println!("Received view change phase message")

@@ -19,6 +19,7 @@ use febft::bft::communication::serialize::SharedData;
 use febft::bft::communication::message::{Header, ReplyMessage, StoredMessage, SystemMessage, RequestMessage, ConsensusMessage, ConsensusMessageKind, ObserverMessage, ObserveEventKind};
 use febft::bft::communication::message::ObserverMessage::ObservedValue;
 use febft::bft::communication::NodeId;
+use febft::bft::core::server::ViewInfo;
 use febft::bft::ordering::{
     SeqNo,
     Orderable,
@@ -189,14 +190,17 @@ impl SharedData for MicrobenchmarkData {
                             ObserveEventKind::Consensus(seq_no) => {
                                 value.set_consensus((*seq_no).into());
                             }
-                            ObserveEventKind::NormalPhase((view, seq, leader)) => {
+                            ObserveEventKind::NormalPhase((view, seq)) => {
 
                                 let mut normal_phase = value.init_normal_phase();
 
-                                normal_phase.set_view((*view).into());
                                 normal_phase.set_seq_num((*seq).into());
-                                normal_phase.set_leader((*leader).into());
 
+                                let mut view_info = normal_phase.init_view();
+
+                                view_info.set_view_num(view.sequence_number().into());
+                                view_info.set_n(view.params().n() as u32);
+                                view_info.set_f(view.params().f() as u32);
                             }
                             ObserveEventKind::ViewChangePhase => {
                                 value.set_view_change(());
@@ -209,6 +213,12 @@ impl SharedData for MicrobenchmarkData {
                             }
                             ObserveEventKind::Commit(seq_no) => {
                                 value.set_commit((*seq_no).into());
+                            }
+                            ObserveEventKind::Ready(seq) => {
+                                value.set_ready((*seq).into());
+                            }
+                            ObserveEventKind::Executed(seq) => {
+                                value.set_executed((*seq).into());
                             }
                         }
                     }
@@ -356,12 +366,18 @@ impl SharedData for MicrobenchmarkData {
                             messages_capnp::observed_value::value::Which::Consensus(value) => {
                                 Ok(ObserveEventKind::Consensus(value.into()))
                             }
-                            messages_capnp::observed_value::value::Which::NormalPhase(Ok(phase_data)) => {
-                                let view : SeqNo = phase_data.reborrow().get_view().into();
-                                let seq_num : SeqNo = phase_data.reborrow().get_seq_num().into();
-                                let leader :NodeId = phase_data.reborrow().get_leader().into();
+                            messages_capnp::observed_value::value::Which::NormalPhase(Ok(phase)) => {
+                                let seq_num: SeqNo = phase.get_seq_num().into();
 
-                                Ok(ObserveEventKind::NormalPhase((view, seq_num, leader)))
+                                let view = phase.get_view().unwrap();
+
+                                let view_seq :SeqNo= view.get_view_num().into();
+                                let n: usize = view.get_n() as usize;
+                                let f: usize = view.get_f() as usize;
+
+                                let view_info = ViewInfo::new(view_seq, n, f).unwrap();
+
+                                Ok(ObserveEventKind::NormalPhase((view_info, seq_num)))
                             }
                             messages_capnp::observed_value::value::Which::NormalPhase(_) => {
                                 Err("Failed to read normal phase values").wrapped(ErrorKind::CommunicationSerialize)
@@ -377,6 +393,12 @@ impl SharedData for MicrobenchmarkData {
                             }
                             messages_capnp::observed_value::value::Which::Commit(seq_no) => {
                                 Ok(ObserveEventKind::Commit(seq_no.into()))
+                            }
+                            messages_capnp::observed_value::value::Ready(seq) => {
+                                Ok(ObserveEventKind::Ready(seq.into()))
+                            }
+                            messages_capnp::observed_value::value::Executed(seq) => {
+                                Ok(ObserveEventKind::Executed(seq.into()))
                             }
                         }?;
 

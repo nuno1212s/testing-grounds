@@ -17,15 +17,8 @@ use konst::primitive::parse_u128;
 use febft::bft::error::*;
 use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
-use febft::bft::communication::message::{
-    Header,
-    ReplyMessage,
-    StoredMessage,
-    SystemMessage,
-    RequestMessage,
-    ConsensusMessage,
-    ConsensusMessageKind,
-};
+use febft::bft::communication::message::{Header, ReplyMessage, StoredMessage, SystemMessage, RequestMessage, ConsensusMessage, ConsensusMessageKind, ObserverMessage, ObserveEventKind};
+use febft::bft::core::server::ViewInfo;
 use febft::bft::ordering::{
     SeqNo,
     Orderable,
@@ -155,6 +148,69 @@ impl SharedData for MicrobenchmarkData {
                     ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
                 }
             }
+            SystemMessage::ObserverMessage(observer_message) => {
+                let capnp_observer = sys_msg.init_observer_message();
+
+                let mut obs_message_type = capnp_observer.init_message_type();
+
+                match observer_message {
+                    ObserverMessage::ObserverRegister => {
+                        obs_message_type.set_observer_register(());
+                    }
+                    ObserverMessage::ObserverRegisterResponse(response) => {
+                        obs_message_type.set_observer_register_response(*response);
+                    }
+                    ObserverMessage::ObserverUnregister => {
+                        obs_message_type.set_observer_unregister(());
+                    }
+                    ObserverMessage::ObservedValue(observed_value) => {
+                        let mut observer_value_msg = obs_message_type.init_observed_value();
+
+                        let mut value = observer_value_msg.init_value();
+
+                        match observed_value {
+                            ObserveEventKind::CheckpointStart(start) => {
+                                value.set_checkpoint_start((*start).into());
+                            }
+                            ObserveEventKind::CheckpointEnd(end) => {
+                                value.set_checkpoint_end((*end).into());
+                            }
+                            ObserveEventKind::Consensus(seq_no) => {
+                                value.set_consensus((*seq_no).into());
+                            }
+                            ObserveEventKind::NormalPhase((view, seq)) => {
+                                let mut normal_phase = value.init_normal_phase();
+
+                                let mut view_info = normal_phase.init_view();
+
+                                view_info.set_view_num(view.sequence_number().into());
+                                view_info.set_n(view.params().n() as u32);
+                                view_info.set_f(view.params().f() as u32);
+
+                                normal_phase.set_seq_num((*seq).into());
+                            }
+                            ObserveEventKind::ViewChangePhase => {
+                                value.set_view_change(());
+                            }
+                            ObserveEventKind::CollabStateTransfer => {
+                                value.set_collab_state_transfer(());
+                            }
+                            ObserveEventKind::Prepare(seq_no) => {
+                                value.set_prepare((*seq_no).into());
+                            }
+                            ObserveEventKind::Commit(seq_no) => {
+                                value.set_commit((*seq_no).into());
+                            }
+                            ObserveEventKind::Ready(seq) => {
+                                value.set_ready((*seq).into());
+                            }
+                            ObserveEventKind::Executed(seq) => {
+                                value.set_executed((*seq).into());
+                            }
+                        }
+                    }
+                }
+            }
             _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
         }
         capnp::serialize::write_message(w, &root)
@@ -265,6 +321,82 @@ impl SharedData for MicrobenchmarkData {
             messages_capnp::system::Which::Consensus(_) => {
                 Err("Failed to read consensus message")
                     .wrapped(ErrorKind::CommunicationSerialize)
+            }
+            messages_capnp::system::Which::ObserverMessage(Ok(obs_req)) => {
+                let message_type = obs_req.get_message_type();
+
+                let type_which = message_type.which().wrapped(ErrorKind::CommunicationSerialize)?;
+
+                let observer_msg = match type_which {
+                    messages_capnp::observer_message::message_type::ObserverRegister(()) => {
+                        Ok(ObserverMessage::ObserverRegister)
+                    }
+                    messages_capnp::observer_message::message_type::ObserverUnregister(()) => {
+                        Ok(ObserverMessage::ObserverUnregister)
+                    }
+                    messages_capnp::observer_message::message_type::ObserverRegisterResponse(result) => {
+                        Ok(ObserverMessage::ObserverRegisterResponse(result))
+                    }
+                    messages_capnp::observer_message::message_type::ObservedValue(Ok(obs_req)) => {
+                        let which = obs_req.get_value().which().wrapped(ErrorKind::CommunicationSerialize)?;
+
+                        let observed_value = match which {
+                            messages_capnp::observed_value::value::CheckpointStart(start) => {
+                                Ok(ObserveEventKind::CheckpointStart(start.into()))
+                            }
+                            messages_capnp::observed_value::value::CheckpointEnd(end) => {
+                                Ok(ObserveEventKind::CheckpointEnd(end.into()))
+                            }
+                            messages_capnp::observed_value::value::Consensus(seq) => {
+                                Ok(ObserveEventKind::Consensus(seq.into()))
+                            }
+                            messages_capnp::observed_value::value::NormalPhase(Ok(phase)) => {
+                                let view = phase.get_view().unwrap();
+
+                                let view_seq = SeqNo(view.get_view_num());
+                                let n: usize = view.get_n();
+                                let f: usize = view.get_f();
+
+                                let seq_num: SeqNo = phase.get_seq_num().into();
+
+                                let view_info = ViewInfo::new(view_seq, n, f).unwrap();
+
+                                Ok(ObserveEventKind::NormalPhase((view_info, seq_num)))
+                            }
+                            messages_capnp::observed_value::value::NormalPhase(Err(err)) => {
+                                Err(format!("{:?}", err)).wrapped(ErrorKind::CommunicationSerialize)
+                            }
+                            messages_capnp::observed_value::value::ViewChange(()) => {
+                                Ok(ObserveEventKind::ViewChangePhase)
+                            }
+                            messages_capnp::observed_value::value::CollabStateTransfer(()) => {
+                                Ok(ObserveEventKind::CollabStateTransfer)
+                            }
+                            messages_capnp::observed_value::value::Prepare(seq) => {
+                                Ok(ObserveEventKind::Prepare(seq.into()))
+                            }
+                            messages_capnp::observed_value::value::Commit(seq) => {
+                                Ok(ObserveEventKind::Commit(seq.into()))
+                            }
+                            messages_capnp::observed_value::value::Ready(seq) => {
+                                Ok(ObserveEventKind::Ready(seq.into()))
+                            }
+                            messages_capnp::observed_value::value::Executed(seq) => {
+                                Ok(ObserveEventKind::Executed(seq.into()))
+                            }
+                        }?;
+
+                        Ok(ObserverMessage::ObservedValue(observed_value))
+                    }
+                    messages_capnp::observer_message::message_type::ObservedValue(Err(err)) => {
+                        Err(format!("{:?}", err)).wrapped(ErrorKind::CommunicationSerialize)
+                    }
+                }?;
+
+                Ok(SystemMessage::ObserverMessage(observer_msg))
+            }
+            messages_capnp::system::Which::ObserverMessage(Err(err)) => {
+                Err(format!("{:?}", err).as_str()).wrapped(ErrorKind::CommunicationSerialize)
             }
         }
     }

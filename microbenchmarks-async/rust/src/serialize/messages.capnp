@@ -61,14 +61,23 @@ struct ObservedValue {
         collabStateTransfer @5 :Void;
         prepare             @6 :UInt32;
         commit              @7 :UInt32;
+        ready               @8 :UInt32;
+        executed            @9 :UInt32;
     }
 
 }
 
 struct NormalPhase {
 
-    view   @0 :UInt32;
+    view   @0 :ViewInfo;
     seqNum @1 :UInt32;
-    leader @2 :UInt32;
+
+}
+
+struct ViewInfo {
+
+    viewNum    @0 :UInt32;
+    n          @1 :UInt32;
+    f          @2 :UInt32;
 
 }
