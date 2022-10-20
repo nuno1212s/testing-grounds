@@ -15,10 +15,12 @@ use febft::bft::executable::{
 
 use chrono::DateTime;
 use chrono::offset::Utc;
+use febft::bft::communication::NodeId;
 
 use crate::serialize::MicrobenchmarkData;
 
 pub struct Microbenchmark {
+    id: NodeId,
     max_tp: f32,
     max_tp_time: DateTime<Utc>,
     iterations: usize,
@@ -27,7 +29,7 @@ pub struct Microbenchmark {
 }
 
 impl Microbenchmark {
-    pub fn new() -> Self {
+    pub fn new(node: NodeId) -> Self {
         let reply = Arc::new((0..)
             .into_iter()
             .take(MicrobenchmarkData::REPLY_SIZE)
@@ -35,11 +37,12 @@ impl Microbenchmark {
             .collect());
 
         Self {
+            id: node,
             reply,
             max_tp: -1.0,
             max_tp_time: Utc::now(),
             iterations: 0,
-            measurements: Measurements::default(),
+            measurements: Measurements::new(node),
         }
     }
 }
@@ -102,7 +105,7 @@ impl Service for Microbenchmark {
                 self.max_tp = tp;
             }
 
-            println!("Throughput = {} operations/sec (Maximum observed: {} ops/sec)", tp, self.max_tp);
+            println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)", self.id, tp, self.max_tp);
 
             self.measurements.total_latency.log_latency("Total");
             self.measurements.consensus_latency.log_latency("Consensus");

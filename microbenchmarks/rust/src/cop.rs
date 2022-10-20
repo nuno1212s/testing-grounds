@@ -98,6 +98,10 @@ async fn async_main(id: NodeId) {
         println!("Bootstrapping replica #{}", u32::from(id));
         let replica = fut.await.unwrap();
         println!("Running replica #{}", u32::from(id));
+
+        //Here we want to launch a statistics thread for each replica since they are on different machines
+        crate::os_statistics::start_statistics_thread(id);
+
         replica
     };
 
@@ -248,7 +252,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         ramp_up -= 100;
     }
 
-    let mut st = BenchmarkHelper::new(MicrobenchmarkData::OPS_NUMBER/2);
+    let mut st = BenchmarkHelper::new(NodeId::from(id), MicrobenchmarkData::OPS_NUMBER/2);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER/2);
 

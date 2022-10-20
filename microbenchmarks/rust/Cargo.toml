@@ -18,11 +18,12 @@ konst = "0.2"
 nolock = "0.3"
 chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
+mprober-lib = "0.1.7"
 
 [dependencies.febft]
-#path = "../../../febft"
-git = "https://github.com/febft/febft"
-rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
+path = "../../../febft"
+#git = "https://github.com/febft/febft"
+#rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
 default-features = false
 features = [
     "expose_impl",
