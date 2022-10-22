@@ -90,7 +90,10 @@ async fn async_main() {
             println!("Bootstrapping replica #{}", u32::from(id));
             let mut replica = fut.await.unwrap();
             println!("Running replica #{}", u32::from(id));
-            replica.run().await.unwrap();
+
+            std::thread::spawn(move || {
+                replica.run().unwrap();
+            });
         });
     }
 

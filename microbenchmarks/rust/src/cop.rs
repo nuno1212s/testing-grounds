@@ -105,8 +105,9 @@ async fn async_main(id: NodeId) {
         replica
     };
 
+    
     // run forever
-    replica.run().await.unwrap();
+    replica.run().unwrap();
 }
 
 async fn client_async_main() {
