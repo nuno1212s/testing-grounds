@@ -161,6 +161,7 @@ async fn client_async_main() {
             tx.send(client).await.unwrap();
         });
     }
+
     drop((secret_keys, public_keys, replicas_config));
 
     let (mut queue, queue_tx) = async_queue();
@@ -170,6 +171,10 @@ async fn client_async_main() {
     for _i in 0..clients_config.len() {
         clients.push(rx.recv().await.unwrap());
     }
+
+    //Here we want to launch a statistics thread for each replica since they are on different machines
+    crate::os_statistics::start_statistics_thread(NodeId::from(1000u32));
+
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
