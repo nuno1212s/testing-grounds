@@ -28,9 +28,11 @@ default-features = false
 features = [
     "expose_impl",
     "async_runtime_tokio",
-    "threadpool_crossbeam",
+    "threadpool_rayon",
     "socket_tokio_tcp",
-    "channel_futures_mpsc",
+    "channel_custom_dump",
+    "channel_custom_dump_lfb",
+    #"channel_futures_mpsc",
     "crypto_signature_ring_ed25519",
     "crypto_hash_blake3_blake3",
     "collections_randomstate_fxhash"
