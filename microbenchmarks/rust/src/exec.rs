@@ -73,14 +73,14 @@ impl Service for Microbenchmark {
     ) -> UpdateBatchReplies<Weak<Vec<u8>>> {
         let mut reply_batch = UpdateBatchReplies::with_capacity(batch.len());
 
+        let batch_len = batch.len();
+
         for update in batch.into_inner() {
             let (peer_id, sess, opid, _req) = update.into_inner();
             let reply = Arc::downgrade(&self.reply);
             reply_batch.add(peer_id, sess, opid, reply);
         }
 
-        // increase iter count
-        self.iterations += 1;
 
         meta.execution_time = Utc::now();
 
@@ -93,30 +93,35 @@ impl Service for Microbenchmark {
         (meta.commit_sent_time, meta.prepare_sent_time).store(&mut self.measurements.prepare_latency);
         (meta.consensus_decision_time, meta.commit_sent_time).store(&mut self.measurements.commit_latency);
 
-        if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
-            println!("--- Measurements after {} ops ({} samples) ---", self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
-
-            let diff = Utc::now()
-                .signed_duration_since(self.max_tp_time)
-                .num_milliseconds();
-            let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0) / (diff as f32);
-
-            if tp > self.max_tp {
-                self.max_tp = tp;
+        for _ in 0..batch_len {
+            // increase iter count
+            self.iterations += 1;
+            
+            if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
+                println!("--- Measurements after {} ops ({} samples) ---", self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
+    
+                let diff = Utc::now()
+                    .signed_duration_since(self.max_tp_time)
+                    .num_milliseconds();
+                let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0) / (diff as f32);
+    
+                if tp > self.max_tp {
+                    self.max_tp = tp;
+                }
+    
+                println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)", self.id, tp, self.max_tp);
+    
+                self.measurements.total_latency.log_latency("Total");
+                self.measurements.consensus_latency.log_latency("Consensus");
+                self.measurements.pre_cons_latency.log_latency("Pre-consensus");
+                self.measurements.pos_cons_latency.log_latency("Pos-consensus");
+                self.measurements.pre_prepare_latency.log_latency("Propose");
+                self.measurements.prepare_latency.log_latency("Write");
+                self.measurements.commit_latency.log_latency("Accept");
+                self.measurements.batch_size.log_batch();
+    
+                self.max_tp_time = Utc::now();
             }
-
-            println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)", self.id, tp, self.max_tp);
-
-            self.measurements.total_latency.log_latency("Total");
-            self.measurements.consensus_latency.log_latency("Consensus");
-            self.measurements.pre_cons_latency.log_latency("Pre-consensus");
-            self.measurements.pos_cons_latency.log_latency("Pos-consensus");
-            self.measurements.pre_prepare_latency.log_latency("Propose");
-            self.measurements.prepare_latency.log_latency("Write");
-            self.measurements.commit_latency.log_latency("Accept");
-            self.measurements.batch_size.log_batch();
-
-            self.max_tp_time = Utc::now();
         }
 
         reply_batch
