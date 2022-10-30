@@ -91,8 +91,8 @@ async fn async_main() {
             let mut replica = fut.await.unwrap();
             println!("Running replica #{}", u32::from(id));
 
-            std::thread::spawn(move || {
-                replica.run().unwrap();
+            rt::spawn(async move {
+                replica.run().await.unwrap();
             });
         });
     }

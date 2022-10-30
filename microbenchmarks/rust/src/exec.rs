@@ -85,7 +85,8 @@ impl Service for Microbenchmark {
         meta.execution_time = Utc::now();
 
         // take measurements
-        meta.batch_size.store(&mut self.measurements.batch_size);
+        batch_len.store(&mut self.measurements.batch_size);
+        //println!("Batch size is {}", batch_len );
         (meta.consensus_decision_time, meta.consensus_start_time).store(&mut self.measurements.consensus_latency);
         (meta.consensus_start_time, meta.reception_time).store(&mut self.measurements.pre_cons_latency);
         (meta.execution_time, meta.consensus_decision_time).store(&mut self.measurements.pos_cons_latency);
@@ -95,8 +96,9 @@ impl Service for Microbenchmark {
 
         for _ in 0..batch_len {
             // increase iter count
+
             self.iterations += 1;
-            
+
             if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
                 println!("--- Measurements after {} ops ({} samples) ---", self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
     

@@ -125,7 +125,6 @@ async fn node_config(
         addrs,
         client_config,
         server_config,
-        batch_size,
         first_cli: NodeId::from(1000u32),
     }
 }
