@@ -35,8 +35,8 @@ pub fn main() {
         .unwrap_or(false);
 
     let conf = InitConfig {
-        threadpool_threads: if is_client { 4 } else { 4 },
-        async_threads: if is_client { 4 } else { 4 },
+        threadpool_threads: 5,
+        async_threads: num_cpus::get() / 1,
     };
 
     let _guard = unsafe { init(conf).unwrap() };

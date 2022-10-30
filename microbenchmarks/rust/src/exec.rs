@@ -1,4 +1,3 @@
-use std::default::Default;
 use std::sync::{Arc, Weak};
 
 use chrono::DateTime;
@@ -11,11 +10,7 @@ use febft::bft::benchmarks::{
 };
 use febft::bft::communication::NodeId;
 use febft::bft::error::*;
-use febft::bft::executable::{
-    Service,
-    UpdateBatch,
-    UpdateBatchReplies,
-};
+use febft::bft::executable::{Service, UpdateBatch, BatchReplies, State, Request, Reply};
 
 use crate::serialize::MicrobenchmarkData;
 
@@ -63,6 +58,10 @@ impl Service for Microbenchmark {
             .collect())
     }
 
+    fn unordered_execution(&self, state: &State<Self>, request: Request<Self>) -> Reply<Self> {
+        todo!()
+    }
+
     fn update(&mut self, _s: &mut Vec<u8>, _r: Weak<Vec<u8>>) -> Weak<Vec<u8>> {
         unimplemented!()
     }
@@ -72,10 +71,10 @@ impl Service for Microbenchmark {
         _state: &mut Vec<u8>,
         batch: UpdateBatch<Weak<Vec<u8>>>,
         mut meta: BatchMeta,
-    ) -> UpdateBatchReplies<Weak<Vec<u8>>> {
+    ) -> BatchReplies<Weak<Vec<u8>>> {
         let batch_len = batch.len();
         
-        let mut reply_batch = UpdateBatchReplies::with_capacity(batch.len());
+        let mut reply_batch = BatchReplies::with_capacity(batch.len());
 
         for update in batch.into_inner() {
             let (peer_id, sess, opid, _req) = update.into_inner();

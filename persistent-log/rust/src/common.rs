@@ -22,6 +22,7 @@ use febft::bft::core::client::{
     Client,
 };
 use febft::bft::core::client::observing::ObserverCallback;
+use febft::bft::core::client::observing_client::ObserverCallback;
 use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
@@ -48,7 +49,7 @@ macro_rules! addr {
 pub struct ObserverCall;
 
 impl ObserverCallback for ObserverCall {
-    fn handle_event(&self, event: ObserveEventKind) {
+    fn handle_event(&self, event: ObserveEventKind, _: usize) {
         match event {
             ObserveEventKind::CheckpointStart(start_cp) => {
                 println!("Received checkpoint start with seq {:?}", start_cp)
@@ -74,6 +75,8 @@ impl ObserverCallback for ObserverCall {
             ObserveEventKind::Commit(seq) => {
                 println!("Received commit stage with seq {:?}", seq)
             }
+            ObserveEventKind::Ready(_) => {}
+            ObserveEventKind::Executed(_) => {}
         }
     }
 }

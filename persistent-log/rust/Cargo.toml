@@ -1,7 +1,6 @@
 [package]
 name = "microbenchmarks-async"
 version = "0.1.0"
-authors = ["Nuno Neto <up201703898@fc.up.pt>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
