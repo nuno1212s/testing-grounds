@@ -392,14 +392,16 @@ impl MicrobenchmarkData {
 
     fn serialize_request_message_capnp(m: &RequestMessage<<Self as SharedData>::Request>, request: &mut messages_capnp::request::Builder) -> Result<()> {
 
+        /* 
         let operation = match m.operation().upgrade() {
             Some(p) => p,
             _ => return Err("No operation available").wrapped(ErrorKind::CommunicationSerialize),
         };
+        */
 
         request.set_operation_id(m.sequence_number().into());
         request.set_session_id(m.session_id().into());
-        request.set_data(&*operation);
+        request.set_data(&Self::REQUEST);
 
         Ok(())
     }
