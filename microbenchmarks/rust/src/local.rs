@@ -21,6 +21,7 @@ use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 use febft::bft::communication::{channel, PeerAddr};
 use febft::bft::communication::NodeId;
 use febft::bft::core::client::Client;
+use febft::bft::core::client::ordered_client::Ordered;
 use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
@@ -37,6 +38,7 @@ pub fn main() {
     let conf = InitConfig {
         threadpool_threads: 5,
         async_threads: num_cpus::get() / 1,
+        id: None
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -301,7 +303,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         }
 
         let last_send_instant = Utc::now();
-        rt::block_on(client.update(Arc::downgrade(&request)));
+        rt::block_on(client.update::<Ordered>(Arc::downgrade(&request)));
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
             .num_nanoseconds()
@@ -347,7 +349,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         }
 
         let last_send_instant = Utc::now();
-        rt::block_on(client.update(Arc::downgrade(&request)));
+        rt::block_on(client.update::<Ordered>(Arc::downgrade(&request)));
         let exec_time = Utc::now();
         let latency = exec_time
             .signed_duration_since(last_send_instant)

@@ -20,6 +20,7 @@ use febft::bft::core::client::{
     self,
     Client,
 };
+use febft::bft::core::client::unordered_client::UnorderedClientMode;
 use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
@@ -162,6 +163,7 @@ pub async fn setup_client(
 ) -> Result<Client<MicrobenchmarkData>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
+        unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
     Client::bootstrap(conf).await

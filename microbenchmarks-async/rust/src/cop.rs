@@ -29,6 +29,7 @@ use febft::bft::crypto::signature::{
     PublicKey,
 };
 use febft::bft::benchmarks::{ CommStats};
+use febft::bft::core::client::ordered_client::Ordered;
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -38,14 +39,6 @@ pub fn main() {
     let threadpool_threads = parse_u32(std::env::var("THREADPOOL_THREADS")
         .unwrap_or(String::from("2")).as_str()).unwrap();
 
-    let conf = InitConfig {
-        //If we are the client, we want to have many threads to send stuff to replicas
-        threadpool_threads: threadpool_threads as usize,
-        async_threads: if is_client { 2 } else { 2 },
-        //If we are the client, we don't want any threads to send to other clients as that will never happen
-    };
-
-    let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
         let replica_id: u32 = std::env::var("ID")
             .iter()
@@ -53,8 +46,30 @@ pub fn main() {
             .next()
             .unwrap();
 
+
+        let conf = InitConfig {
+            //If we are the client, we want to have many threads to send stuff to replicas
+            threadpool_threads: threadpool_threads as usize,
+            async_threads: if is_client { 2 } else { 2 },
+            //If we are the client, we don't want any threads to send to other clients as that will never happen
+            id: Some(replica_id.to_string())
+        };
+
+        let _guard = unsafe { init(conf).unwrap() };
+
         main_(NodeId::from(replica_id));
     } else {
+
+        let conf = InitConfig {
+            //If we are the client, we want to have many threads to send stuff to replicas
+            threadpool_threads: threadpool_threads as usize,
+            async_threads: if is_client { 2 } else { 2 },
+            //If we are the client, we don't want any threads to send to other clients as that will never happen
+            id: None
+        };
+
+        let _guard = unsafe { init(conf).unwrap() };
+
         rt::block_on(client_async_main());
     }
 }
@@ -313,7 +328,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let q = q.clone();
 
-        client.clone().update_callback(Arc::downgrade(&request), Box::new(move |reply| {
+        client.clone().update_callback::<Ordered>(Arc::downgrade(&request), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
@@ -372,7 +387,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let sem_clone = semaphore.clone();
 
-        client.clone().update_callback(Arc::downgrade(&request),
+        client.clone().update_callback::<Ordered>(Arc::downgrade(&request),
                                Box::new(move |reply| {
 
             //Release another request for this client

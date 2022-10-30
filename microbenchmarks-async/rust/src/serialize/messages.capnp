@@ -5,10 +5,11 @@ $Rust.parentModule("serialize");
 
 struct System {
     union {
-        request   @0 :Request;
-        reply     @1 :Reply;
-        consensus @2 :Consensus;
+        request          @0 :Request;
+        reply            @1 :Reply;
+        consensus        @2 :Consensus;
         observerMessage  @3 :ObserverMessage;
+        fwdConsensus     @4 :FwdConsensus;
     }
 }
 
@@ -22,6 +23,11 @@ struct Reply {
     sessionId   @0 :UInt32;
     operationId @1 :UInt32;
     data        @2 :Data;
+}
+
+struct FwdConsensus {
+    header      @0 :Data;
+    consensus   @1 :Consensus;
 }
 
 struct Consensus {
@@ -38,6 +44,7 @@ struct ForwardedRequest {
     header  @0 :Data;
     request @1 :Request;
 }
+
 
 struct ObserverMessage {
 

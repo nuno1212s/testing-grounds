@@ -28,30 +28,45 @@ use febft::bft::crypto::signature::{
     PublicKey,
 };
 use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
+use febft::bft::core::client::ordered_client::Ordered;
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
         .unwrap_or(false);
 
-    let conf = InitConfig {
-        //Divide the logical cores into the thread pool and the async threadpool.
-        //This should leave enough room for the threads that each replica requires to constantly
-        //Have (which we want to avoid context switching on)
-        threadpool_threads: if is_client { num_cpus::get() / 2 } else { 10 },
-        async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
-    };
-
-    let _guard = unsafe { init(conf).unwrap() };
     if !is_client {
+
         let replica_id: u32 = std::env::var("ID")
             .iter()
             .flat_map(|id| id.parse())
             .next()
             .unwrap();
 
+        let conf = InitConfig {
+            //Divide the logical cores into the thread pool and the async threadpool.
+            //This should leave enough room for the threads that each replica requires to constantly
+            //Have (which we want to avoid context switching on)
+            threadpool_threads: if is_client { num_cpus::get() / 2 } else { 10 },
+            async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
+            id: Some(replica_id.to_string())
+        };
+
+        let _guard = unsafe { init(conf).unwrap() };
+
         main_(NodeId::from(replica_id));
     } else {
+        let conf = InitConfig {
+            //Divide the logical cores into the thread pool and the async threadpool.
+            //This should leave enough room for the threads that each replica requires to constantly
+            //Have (which we want to avoid context switching on)
+            threadpool_threads: if is_client { num_cpus::get() / 2 } else { 10 },
+            async_threads: if is_client { num_cpus::get() / 2 } else { 2 },
+            id: None
+        };
+
+        let _guard = unsafe { init(conf).unwrap() };
+
         rt::block_on(client_async_main());
     }
 }
@@ -288,7 +303,11 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
-        client.update(Arc::downgrade(&request)).await;
+
+        if let Err(error) = client.update::<Ordered>(Arc::downgrade(&request)).await {
+            println!("Failed to send client update {:?}", error);
+        }
+
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
             .num_nanoseconds()
@@ -332,7 +351,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
-        client.update(Arc::downgrade(&request)).await;
+        client.update::<Ordered>(Arc::downgrade(&request)).await;
         let exec_time = Utc::now();
         let latency = exec_time
             .signed_duration_since(last_send_instant)

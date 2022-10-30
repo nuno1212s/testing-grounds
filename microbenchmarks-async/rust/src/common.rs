@@ -21,7 +21,8 @@ use febft::bft::core::client::{
     self,
     Client,
 };
-use febft::bft::core::client::observing::ObserverCallback;
+use febft::bft::core::client::observing_client::ObserverCallback;
+use febft::bft::core::client::unordered_client::UnorderedClientMode;
 use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
@@ -48,7 +49,7 @@ macro_rules! addr {
 pub struct ObserverCall;
 
 impl ObserverCallback for ObserverCall {
-    fn handle_event(&self, event: ObserveEventKind) {
+    fn handle_event(&self, event: ObserveEventKind, n: usize) {
         match event {
             ObserveEventKind::CheckpointStart(start_cp) => {
                 println!("Received checkpoint start with seq {:?}", start_cp)
@@ -74,6 +75,8 @@ impl ObserverCallback for ObserverCall {
             ObserveEventKind::Commit(seq) => {
                 println!("Received commit stage with seq {:?}", seq)
             }
+            ObserveEventKind::Ready(_) => {}
+            ObserveEventKind::Executed(_) => {}
         }
     }
 }
@@ -139,8 +142,6 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
     Some(ConfigEntry { id, rep_portno, hostname, ipaddr, portno })
 }
 
-const DB_PATH: &str = "PERSISTENT_DB_{:?}";
-
 async fn node_config(
     n: usize,
     id: NodeId,
@@ -150,7 +151,7 @@ async fn node_config(
     comm_stats: Option<Arc<CommStats>>,
 ) -> NodeConfig {
 
-    let db_path = format!(DB_PATH, id);
+    let db_path = format!("PERSISTENT_DB_{:?}", id);
 
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
@@ -185,7 +186,7 @@ async fn node_config(
         batch_timeout_micros: batch_timeout as u64,
         batch_sleep_micros: batch_sleep as u64,
         comm_stats,
-        db_path: &*db_path
+        db_path
     }
 }
 
@@ -199,6 +200,7 @@ pub async fn setup_client(
 ) -> Result<Client<MicrobenchmarkData>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
+        unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
     Client::bootstrap(conf).await
