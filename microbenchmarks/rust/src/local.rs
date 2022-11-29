@@ -36,7 +36,7 @@ pub fn main() {
 
     let conf = InitConfig {
         threadpool_threads: if is_client { 4 } else { 4 },
-        async_threads: if is_client { 4 } else { 4 },
+        async_threads: if is_client { 8 } else { 4 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };

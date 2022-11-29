@@ -39,7 +39,7 @@ pub fn main() {
         //This should leave enough room for the threads that each replica requires to constantly
         //Have (which we want to avoid context switching on)
         threadpool_threads: if is_client { 4 } else { 4 },
-        async_threads: if is_client { 4 } else { 4 },
+        async_threads: if is_client { 24 } else { 4 },
     };
 
     let _guard = unsafe { init(conf).unwrap() };
@@ -111,9 +111,9 @@ fn main_(id: NodeId) {
 
         let first_cli = NodeId::from(1000u32);
 
-        let comm_stats = Arc::new(CommStats::new(id,
-                                                 first_cli,
-                                                 10000));
+        // let comm_stats = Arc::new(CommStats::new(id,
+        //                                          first_cli,
+        //                                          20));
 
         let fut = setup_replica(
             replicas_config.len(),
@@ -121,7 +121,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats),
+            None,
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -168,11 +168,11 @@ async fn client_async_main() {
         }
     }
 
-    let comm_stats = Arc::new(CommStats::new(
-        NodeId::from(first_cli),
-        NodeId::from(first_cli),
-        100000
-    ));
+    // let comm_stats = Arc::new(CommStats::new(
+    //     NodeId::from(first_cli),
+    //     NodeId::from(first_cli),
+    //     1000
+    // ));
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
@@ -214,7 +214,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats.clone()),
+            None,
         );
 
         let mut tx = tx.clone();
@@ -225,6 +225,7 @@ async fn client_async_main() {
             tx.send(client).await.unwrap();
         });
     }
+
     drop((secret_keys, public_keys, replicas_config));
 
     let (mut queue, queue_tx) = async_queue();
@@ -238,10 +239,16 @@ async fn client_async_main() {
     //Start the OS resource monitoring thread
     crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
+    let request = Arc::new({
+        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        OsRng.fill_bytes(&mut r);
+        r
+    });
+
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
-        let h = rt::spawn(run_client(client, queue_tx));
+        let h = rt::spawn(run_client(client, queue_tx, request.clone()));
         handles.push(h);
     }
     drop(clients_config);
@@ -267,14 +274,8 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>, request: Arc<Vec<u8>>) {
     let mut ramp_up: i32 = 1000;
-
-    let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        OsRng.fill_bytes(&mut r);
-        r
-    });
 
     let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
 
