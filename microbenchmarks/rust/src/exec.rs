@@ -100,7 +100,10 @@ impl Service for Microbenchmark {
             self.iterations += 1;
 
             if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
-                println!("--- Measurements after {} ops ({} samples) ---", self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
+                println!("{:?} // {} // --- Measurements after {} ops ({} samples) ---",
+                    self.id,
+                    Utc::now().timestamp_millis(),
+                    self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
     
                 let diff = Utc::now()
                     .signed_duration_since(self.max_tp_time)
@@ -110,8 +113,9 @@ impl Service for Microbenchmark {
                 if tp > self.max_tp {
                     self.max_tp = tp;
                 }
+
     
-                println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)", self.id, tp, self.max_tp);
+                println!("{:?} // {} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)", self.id, Utc::now().timestamp_millis(), tp, self.max_tp);
     
                 self.measurements.total_latency.log_latency("Total");
                 self.measurements.consensus_latency.log_latency("Consensus");
