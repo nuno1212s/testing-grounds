@@ -10,4 +10,4 @@ fi
 
 ulimit -n 100000
 
-rm -rf "$RESULT_FOLDER" && mkdir -p "$RESULT_FOLDER" && ./run "$TO_RUN" | tee "$RESULT_FOLDER"/log.txt
+rm -rf "${RESULT_FOLDER}" && mkdir -p "${RESULT_FOLDER}" && cp env "${RESULT_FOLDER}/env" && ./run "$TO_RUN" | tee "${RESULT_FOLDER}/log.txt"

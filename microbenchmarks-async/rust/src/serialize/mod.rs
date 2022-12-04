@@ -54,6 +54,12 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
+    pub const MEASUREMENT_TIME_INTERVAL: usize = {
+        let result = parse_usize(env!("MEASUREMENT_TIME_INTERVAL"));
+
+        unwrap_ctx!(result)
+    };
+
     pub const OPS_NUMBER: usize = {
         let result = parse_usize(env!("OPS_NUMBER"));
         unwrap_ctx!(result)

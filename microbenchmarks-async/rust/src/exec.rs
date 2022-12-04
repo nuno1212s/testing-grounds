@@ -27,6 +27,8 @@ pub struct Microbenchmark {
     iterations: usize,
     reply: Arc<Vec<u8>>,
     measurements: Measurements,
+    operations_done_since_last_stat: u64,
+    last_stat_time: u128
 }
 
 impl Microbenchmark {
@@ -42,6 +44,8 @@ impl Microbenchmark {
             reply,
             max_tp: -1.0,
             batch_count: 0.0,
+            operations_done_since_last_stat: 0,
+            last_stat_time: Utc::now().timestamp_millis() as u128,
             max_tp_time: Utc::now(),
             iterations: 0,
             measurements: Measurements::new(id),
@@ -86,6 +90,8 @@ impl Service for Microbenchmark {
         meta.execution_time = Utc::now();
 
         self.batch_count += 1.0;
+        // self.operations_done_since_last_stat += batch_len;
+        // self.iterations += batch_len;
 
         // take measurements
         meta.batch_size.store(&mut self.measurements.batch_size);
@@ -99,6 +105,20 @@ impl Service for Microbenchmark {
         (meta.done_propose, meta.started_propose).store(&mut self.measurements.propose_time_latency);
         (meta.commit_sent_time, meta.first_prepare_received).store(&mut self.measurements.prepare_time_taken);
         (meta.consensus_decision_time, meta.first_commit_received).store(&mut self.measurements.commit_time_taken);
+
+        // let current_time = Utc::now().timestamp_millis() as u128;
+
+        // if self.last_stat_time + MicrobenchmarkData::MEASUREMENT_TIME_INTERVAL > current_time {
+
+        //     let time_passed = current_time - self.last_stat_time;
+
+        //     if time_passed / MicrobenchmarkData::MEASUREMENT_TIME_INTERVAL >= 2 {
+
+        //         //We have missed various measurements, so we have to make it up
+
+
+        //     }
+        // }
 
         for _ in 0..batch_len {
             // increase iter count
