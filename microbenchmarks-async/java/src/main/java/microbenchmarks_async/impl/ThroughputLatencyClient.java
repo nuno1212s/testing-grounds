@@ -97,7 +97,7 @@ public class ThroughputLatencyClient {
             System.exit(0);
         }
 
-        Client[] clients = new Client[client_count * nrOps];
+        Client[] clients = new Client[client_count];
 
         int id = 0;
 
