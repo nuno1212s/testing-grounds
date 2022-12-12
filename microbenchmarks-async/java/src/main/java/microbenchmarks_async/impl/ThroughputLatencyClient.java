@@ -359,8 +359,8 @@ public class ThroughputLatencyClient {
                         Thread.sleep(interval);
                     } else if (this.rampup > 0) {
                         Thread.sleep(this.rampup);
+                        this.rampup -= 100;
                     }
-                    this.rampup -= 100;
 
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
@@ -368,6 +368,17 @@ public class ThroughputLatencyClient {
 
                 if (verbose && (req % 1000 == 0)) System.out.println(this.id + " // " + req + " operations sent!");
             }
+
+            System.out.println(this.id + " // Waiting for operations to complete.");
+            for (int i = 0; i < concurrentRqs; i++) {
+                try {
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            System.out.println(this.id + " // Completed all operations.");
 
             try {
                 //Wait for all requests to finish

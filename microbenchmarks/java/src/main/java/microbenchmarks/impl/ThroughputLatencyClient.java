@@ -193,6 +193,8 @@ public class ThroughputLatencyClient {
         }
 
         System.out.println("All clients done.");
+
+        System.exit(0);
     }
 
     static class Client extends Thread {
