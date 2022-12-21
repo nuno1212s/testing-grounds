@@ -14,14 +14,7 @@ use konst::{
 };
 
 use febft::bft::error::*;
-use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
-use febft::bft::communication::message::{Header, ReplyMessage, StoredMessage, SystemMessage, RequestMessage, ConsensusMessage, ConsensusMessageKind, ObserverMessage, ObserveEventKind, FwdConsensusMessage};
-use febft::bft::core::server::ViewInfo;
-use febft::bft::ordering::{
-    SeqNo,
-    Orderable,
-};
 
 pub struct MicrobenchmarkData;
 
@@ -69,11 +62,11 @@ impl SharedData for MicrobenchmarkData {
     type Request = Weak<Vec<u8>>;
     type Reply = Weak<Vec<u8>>;
 
-    fn serialize_state<W>(w: W, state: &Self::State) -> Result<()> where W: Write {
+    fn serialize_state<W>(_w: W, _state: &Self::State) -> Result<()> where W: Write {
         Ok(())
     }
 
-    fn deserialize_state<R>(r: R) -> Result<Self::State> where R: Read {
+    fn deserialize_state<R>(_r: R) -> Result<Self::State> where R: Read {
         Ok((0..).into_iter()
             .take(MicrobenchmarkData::STATE_SIZE)
             .map(|x| (x & 0xff) as u8)

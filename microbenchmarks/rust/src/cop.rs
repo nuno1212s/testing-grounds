@@ -144,7 +144,7 @@ fn main_(id: NodeId) {
         println!("Running replica #{}", u32::from(id));
 
         //Here we want to launch a statistics thread for each replica since they are on different machines
-        crate::os_statistics::start_statistics_thread(id);
+        //crate::os_statistics::start_statistics_thread(id);
 
         replica
     };
@@ -251,7 +251,7 @@ async fn client_async_main() {
     }
 
     //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(first_cli));
+    //crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
     let mut handles = Vec::with_capacity(clients_config.len());
     for client in clients {
