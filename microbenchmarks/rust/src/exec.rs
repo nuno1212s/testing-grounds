@@ -1,10 +1,7 @@
 use std::sync::{Arc, Weak};
-
-use chrono::DateTime;
-use chrono::offset::Utc;
+use chrono::{DateTime, Utc};
 
 use febft::bft::benchmarks::{
-    BatchMeta,
     BenchmarkHelperStore,
     Measurements,
 };
@@ -69,12 +66,13 @@ impl Service for Microbenchmark {
     fn update_batch(
         &mut self,
         _state: &mut Vec<u8>,
-        batch: UpdateBatch<Weak<Vec<u8>>>,
-        mut meta: BatchMeta,
+        mut batch: UpdateBatch<Weak<Vec<u8>>>,
     ) -> BatchReplies<Weak<Vec<u8>>> {
         let batch_len = batch.len();
         
         let mut reply_batch = BatchReplies::with_capacity(batch.len());
+
+        let meta = batch.take_meta();
 
         for update in batch.into_inner() {
             let (peer_id, sess, opid, _req) = update.into_inner();
@@ -84,20 +82,22 @@ impl Service for Microbenchmark {
 
         self.batch_count += 1.0;
 
-        meta.execution_time = Utc::now();
+        if let Some(mut meta) = meta {
+            meta.execution_time = Utc::now();
 
-        // take measurements
-        meta.batch_size.store(&mut self.measurements.batch_size);
-        (meta.consensus_decision_time, meta.consensus_start_time).store(&mut self.measurements.consensus_latency);
-        (meta.reception_time, meta.consensus_start_time).store(&mut self.measurements.pre_cons_latency);
-        (meta.execution_time, meta.consensus_decision_time).store(&mut self.measurements.pos_cons_latency);
-        (meta.prepare_sent_time, meta.consensus_start_time).store(&mut self.measurements.pre_prepare_latency);
-        (meta.commit_sent_time, meta.prepare_sent_time).store(&mut self.measurements.prepare_latency);
-        (meta.consensus_decision_time, meta.commit_sent_time).store(&mut self.measurements.commit_latency);
-        (meta.prepare_sent_time, meta.pre_prepare_received_time).store(&mut self.measurements.prepare_msg_latency);
-        (meta.done_propose, meta.started_propose).store(&mut self.measurements.propose_time_latency);
-        (meta.commit_sent_time, meta.first_prepare_received).store(&mut self.measurements.prepare_time_taken);
-        (meta.consensus_decision_time, meta.first_commit_received).store(&mut self.measurements.commit_time_taken);
+            // take measurements
+            meta.batch_size.store(&mut self.measurements.batch_size);
+            (meta.consensus_decision_time, meta.consensus_start_time).store(&mut self.measurements.consensus_latency);
+            (meta.reception_time, meta.consensus_start_time).store(&mut self.measurements.pre_cons_latency);
+            (meta.execution_time, meta.consensus_decision_time).store(&mut self.measurements.pos_cons_latency);
+            (meta.prepare_sent_time, meta.consensus_start_time).store(&mut self.measurements.pre_prepare_latency);
+            (meta.commit_sent_time, meta.prepare_sent_time).store(&mut self.measurements.prepare_latency);
+            (meta.consensus_decision_time, meta.commit_sent_time).store(&mut self.measurements.commit_latency);
+            (meta.prepare_sent_time, meta.pre_prepare_received_time).store(&mut self.measurements.prepare_msg_latency);
+            (meta.done_propose, meta.started_propose).store(&mut self.measurements.propose_time_latency);
+            (meta.commit_sent_time, meta.first_prepare_received).store(&mut self.measurements.prepare_time_taken);
+            (meta.consensus_decision_time, meta.first_commit_received).store(&mut self.measurements.commit_time_taken);
+        }
 
         for _ in 0..batch_len {
             // increase iter count
