@@ -1,4 +1,4 @@
-@0x94a43df6c359e805;
+@0x98f7e6f543a6619b;
 
 using Rust = import "rust.capnp";
 $Rust.parentModule("serialize");

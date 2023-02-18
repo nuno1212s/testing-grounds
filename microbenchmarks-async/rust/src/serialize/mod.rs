@@ -140,5 +140,5 @@ impl SharedData for MicrobenchmarkData {
 
 mod messages_capnp {
     #![allow(unused)]
-    include!(concat!(env!("OUT_DIR"), "/src/serialize/messages_capnp.rs"));
+    include!(concat!(env!("OUT_DIR"), "/messages_capnp.rs"));
 }

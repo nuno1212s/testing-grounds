@@ -1,0 +1,42 @@
+#!/bin/sh
+
+main() {
+    #generate_conf
+    compile
+    exec_microbenchmarks
+}
+
+generate_conf() {
+    if [ $LOCAL -eq 1 ]; then
+        ./generate_conf_local || exit 1
+    else
+        ./generate_conf_cop || exit 1
+    fi
+
+    if [ ! -f config/default/config.toml ]; then
+        echo "Error: Missing config/default/config.toml!" >&2
+        exit 1
+    fi
+}
+
+compile() {
+    [ $COMPILE -eq 1 ] && ./compile
+}
+
+exec_microbenchmarks() {
+    if [ $LOCAL -eq 1 ]; then
+      CONFIG="config/local-config"
+    else
+      CONFIG="config/cop-config"
+    fi
+
+    if [ $CLIENT -eq 1 ]; then
+      CLIENT_ARG="--client"
+    else
+      CLIENT_ARG=""
+    fi
+
+    exec ./target/release/themis-microbenchmark-async $ID --config $CONFIG $CLIENT_ARG
+}
+
+main
