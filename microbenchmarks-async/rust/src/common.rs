@@ -16,7 +16,6 @@ use febft::bft::benchmarks::CommStats;
 
 use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
 use febft::bft::communication::message::ObserveEventKind;
-use febft::bft::consensus::log::persistent::{NoPersistentLog, OptimisticPersistentLog};
 use febft::bft::core::client::{
     self,
     Client,
@@ -32,6 +31,7 @@ use febft::bft::crypto::signature::{
     PublicKey,
 };
 use febft::bft::error::*;
+use febft::bft::msg_log::persistent::NoPersistentLog;
 use febft::bft::ordering::{Orderable, SeqNo};
 use febft::bft::threadpool;
 
@@ -213,7 +213,7 @@ pub async fn setup_replica(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Replica<Microbenchmark, NoPersistentLog>> {
+) -> Result<Replica<Microbenchmark>> {
     let node_id = id.clone();
 
     let (node, global_batch_size, global_batch_timeout) = {
@@ -223,7 +223,7 @@ pub async fn setup_replica(
         futures::join!(n, b, timeout)
     };
 
-    let conf = ReplicaConfig {
+    let conf = ReplicaConfig::<Microbenchmark, NoPersistentLog> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
