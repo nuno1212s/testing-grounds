@@ -8,7 +8,7 @@ use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use konst::primitive::parse_u32;
+use konst::primitive::{parse_u32, parse_usize};
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -36,7 +36,9 @@ pub fn main() {
         .map(|x| x == "1")
         .unwrap_or(false);
 
-    let threadpool_threads = parse_u32(std::env::var("THREADPOOL_THREADS")
+    let threadpool_threads = parse_usize(std::env::var("THREADPOOL_THREADS")
+        .unwrap_or(String::from("2")).as_str()).unwrap();
+    let async_threads = parse_usize(std::env::var("ASYNC_THREADS")
         .unwrap_or(String::from("2")).as_str()).unwrap();
 
     if !is_client {
@@ -46,11 +48,10 @@ pub fn main() {
             .next()
             .unwrap();
 
-
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
-            threadpool_threads: threadpool_threads as usize,
-            async_threads: if is_client { 2 } else { 2 },
+            threadpool_threads,
+            async_threads,
             //If we are the client, we don't want any threads to send to other clients as that will never happen
             id: Some(replica_id.to_string())
         };
@@ -62,8 +63,8 @@ pub fn main() {
 
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
-            threadpool_threads: threadpool_threads as usize,
-            async_threads: if is_client { 2 } else { 2 },
+            threadpool_threads,
+            async_threads,
             //If we are the client, we don't want any threads to send to other clients as that will never happen
             id: None
         };
@@ -130,7 +131,7 @@ fn main_(id: NodeId) {
 
         let comm_stats = Arc::new(CommStats::new(id,
                                                  first_cli,
-                                                 100000));
+                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL));
 
         let sk = secret_keys.remove(id.into()).unwrap();
 
@@ -173,7 +174,7 @@ async fn client_async_main() {
     }
 
     //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
+    //crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
@@ -193,7 +194,7 @@ async fn client_async_main() {
 
     let comm_stats = Arc::new(CommStats::new(NodeId::from(local_first_cli),
                                              NodeId::from(first_cli),
-                                             100000));
+                                             MicrobenchmarkData::MEASUREMENT_INTERVAL));
 
     for client in &clients_config {
         let id = NodeId::from(client.id);

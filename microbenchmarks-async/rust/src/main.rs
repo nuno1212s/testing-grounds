@@ -6,9 +6,6 @@ mod local;
 mod common;
 mod os_statistics;
 
-#[global_allocator]
-static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 fn main() {
     let is_local = std::env::var("LOCAL")
         .map(|x| x == "1")

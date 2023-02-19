@@ -85,6 +85,7 @@ regenerate() {
 
 main() {
     updatecwd
+
     regenerate
 }
 
