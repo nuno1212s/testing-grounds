@@ -87,7 +87,7 @@ impl SharedData for MicrobenchmarkData {
         if let Some(request) = request_content {
             rq_msg.set_data(&*request);
         } else {
-            panic!("Failed to get message to send");
+            rq_msg.set_data(&MicrobenchmarkData::REQUEST);
         }
 
         capnp::serialize::write_message(w, &root)
