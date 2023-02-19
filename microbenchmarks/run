@@ -17,6 +17,7 @@ die() {
 import_env() {
     unset _JAVA_OPTIONS
     . ./env 2>/dev/null || die Error: No environment file found: env
+    . ./env_id 2> /dev/null || die Error: No ID env file found: env_id
     case $1 in
         stop|compile)
             if [ -f $BACKEND/$1 ]; then
@@ -42,7 +43,8 @@ import_env() {
 check_env() {
     _NEED_ENV="LOCAL NUM_CLIENTS NUM_REPLICAS BATCH_SIZE ID BACKEND VERBOSE \
         OPS_NUMBER MEASUREMENT_INTERVAL STATE_SIZE REPLY_SIZE REQUEST_SIZE \
-        REQUEST_SLEEP_MILLIS UPDATE_MAX_FDS COMPILE"
+        REQUEST_SLEEP_MILLIS UPDATE_MAX_FDS COMPILE FILL_BATCH CLIENTS_PER_POOL \
+        BATCH_TIMEOUT_MICROS BATCH_SLEEP_MICROS"
 
     for var in $_NEED_ENV; do
         if [ -z $(eval "echo \$$var") ]; then

@@ -14,21 +14,7 @@ use konst::{
 };
 
 use febft::bft::error::*;
-use febft::bft::crypto::hash::Digest;
 use febft::bft::communication::serialize::SharedData;
-use febft::bft::communication::message::{
-    Header,
-    ReplyMessage,
-    StoredMessage,
-    SystemMessage,
-    RequestMessage,
-    ConsensusMessage,
-    ConsensusMessageKind,
-};
-use febft::bft::ordering::{
-    SeqNo,
-    Orderable,
-};
 
 pub struct MicrobenchmarkData;
 
@@ -76,202 +62,79 @@ impl SharedData for MicrobenchmarkData {
     type Request = Weak<Vec<u8>>;
     type Reply = Weak<Vec<u8>>;
 
-    fn serialize_state<W>(_w: W, _s: &Self::State) -> Result<()>
-    where
-        W: Write
-    {
+    fn serialize_state<W>(_w: W, _state: &Self::State) -> Result<()> where W: Write {
         Ok(())
     }
 
-    fn deserialize_state<R>(_r: R) -> Result<Vec<u8>>
-    where
-        R: Read
-    {
-        Ok((0..)
-            .into_iter()
+    fn deserialize_state<R>(_r: R) -> Result<Self::State> where R: Read {
+        Ok((0..).into_iter()
             .take(MicrobenchmarkData::STATE_SIZE)
             .map(|x| (x & 0xff) as u8)
             .collect())
     }
 
-    fn serialize_message<W>(w: W, m: &SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>) -> Result<()>
-    where
-        W: Write
-    {
+    fn serialize_request<W>(w: W, request: &Self::Request) -> Result<()> where W: Write {
         let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
-        let sys_msg: messages_capnp::system::Builder = root.init_root();
-        match m {
-            SystemMessage::Request(m) => {
-                let mut request = sys_msg.init_request();
-                let operation = match m.operation().upgrade() {
-                    Some(p) => p,
-                    _ => return Err("No operation available").wrapped(ErrorKind::CommunicationSerialize),
-                };
 
-                request.set_operation_id(m.sequence_number().into());
-                request.set_session_id(m.session_id().into());
-                request.set_data(&*operation);
-            },
-            SystemMessage::Reply(m) => {
-                let mut reply = sys_msg.init_reply();
-                let payload = match m.payload().upgrade() {
-                    Some(p) => p,
-                    _ => return Err("No payload available").wrapped(ErrorKind::CommunicationSerialize),
-                };
-                reply.set_digest(m.digest().as_ref());
-                reply.set_data(&*payload);
-            },
-            SystemMessage::Consensus(m) => {
-                let mut consensus = sys_msg.init_consensus();
-                consensus.set_seq_no(m.sequence_number().into());
-                consensus.set_view(m.view().into());
-                match m.kind() {
-                    ConsensusMessageKind::PrePrepare(requests) => {
-                        let mut header = [0; Header::LENGTH];
-                        let mut pre_prepare_requests = consensus.init_pre_prepare(requests.len() as u32);
+        let mut rq_msg: messages_capnp::benchmark_request::Builder = root.init_root();
 
-                        for (i, stored) in requests.iter().enumerate() {
-                            let mut forwarded = pre_prepare_requests.reborrow().get(i as u32);
+        let request_content = request.upgrade();
 
-                            // set header
-                            {
-                                stored.header().serialize_into(&mut header[..]).unwrap();
-                                forwarded.set_header(&header[..]);
-                            }
-
-                            // set request
-                            {
-                                let mut request = forwarded.init_request();
-
-                                request.set_operation_id(stored.message().sequence_number().into());
-                                request.set_session_id(stored.message().session_id().into());
-                                request.set_data(&Self::REQUEST);
-                            }
-                        }
-                    },
-                    ConsensusMessageKind::Prepare(digest) => consensus.set_prepare(digest.as_ref()),
-                    ConsensusMessageKind::Commit(digest) => consensus.set_commit(digest.as_ref()),
-                }
-            },
-            _ => return Err("Unsupported system message").wrapped(ErrorKind::CommunicationSerialize),
+        if let Some(request) = request_content {
+            rq_msg.set_data(&*request);
+        } else {
+            panic!("Failed to get message to send");
         }
+
         capnp::serialize::write_message(w, &root)
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize using capnp")
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize request")
     }
 
-    fn deserialize_message<R>(r: R) -> Result<SystemMessage<Vec<u8>, Weak<Vec<u8>>, Weak<Vec<u8>>>>
-    where
-        R: Read
-    {
-        let reader = capnp::serialize::read_message(r, Default::default())
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get capnp reader")?;
-        let sys_msg: messages_capnp::system::Reader = reader
-            .get_root()
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message root")?;
-        let sys_msg_which = sys_msg
-            .which()
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get system message kind")?;
+    fn deserialize_request<R>(r: R) -> Result<Self::Request> where R: Read {
 
-        match sys_msg_which {
-            messages_capnp::system::Which::Reply(Ok(reply)) => {
-                let digest_reader = reply
-                    .get_digest()
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get digest")?;
-                let digest = Digest::from_bytes(digest_reader)
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                let _data = reply
-                    .get_data()
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?
-                    .to_owned();
+        let reader = capnp::serialize::read_message(r, Default::default()).wrapped_msg(ErrorKind::CommunicationSerialize,
+        "Failed to read message")?;
 
-                Ok(SystemMessage::Reply(ReplyMessage::new(digest, Weak::new())))
-            },
-            messages_capnp::system::Which::Reply(_) => {
-                Err("Failed to read reply message")
-                    .wrapped(ErrorKind::CommunicationSerialize)
-            },
-            messages_capnp::system::Which::Request(Ok(request)) => {
-                let session_id: SeqNo = request.get_session_id().into();
-                let operation_id: SeqNo = request.get_operation_id().into();
-                let _data = request
-                    .get_data()
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
+        let request_msg : messages_capnp::benchmark_request::Reader = reader.get_root()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to read request message")?;
 
-                Ok(SystemMessage::Request(RequestMessage::new(session_id, operation_id, Weak::new())))
-            },
-            messages_capnp::system::Which::Request(_) => {
-                Err("Failed to read request message")
-                    .wrapped(ErrorKind::CommunicationSerialize)
-            },
-            messages_capnp::system::Which::Consensus(Ok(consensus)) => {
-                let seq: SeqNo = consensus
-                    .reborrow()
-                    .get_seq_no()
-                    .into();
-                let view: SeqNo = consensus
-                    .reborrow()
-                    .get_view()
-                    .into();
-                let message_kind = consensus
-                    .which()
-                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get consensus message kind")?;
+        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from request message?");
 
-                let kind = match message_kind {
-                    messages_capnp::consensus::Which::PrePrepare(Ok(requests_reader)) => {
-                        let mut requests = Vec::new();
+        Ok(Weak::new())
+    }
 
-                        for forwarded in requests_reader.iter() {
-                            let header = {
-                                let raw_header = forwarded
-                                    .get_header()
-                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request header")?;
+    fn serialize_reply<W>(w: W, reply: &Self::Reply) -> Result<()> where W: Write {
+        let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
 
-                                Header::deserialize_from(raw_header).unwrap()
-                            };
-                            let message = {
-                                let request = forwarded
-                                    .get_request()
-                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get request message")?;
+        let mut rq_msg: messages_capnp::benchmark_reply::Builder = root.init_root();
 
-                                let session_id: SeqNo = request.get_session_id().into();
-                                let operation_id: SeqNo = request.get_operation_id().into();
+        let reply_content = reply.upgrade();
 
-                                let _data = request
-                                    .get_data()
-                                    .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data")?;
-
-                                RequestMessage::new(session_id, operation_id, Weak::new())
-                            };
-
-                            requests.push(StoredMessage::new(header, message));
-                        }
-
-                        ConsensusMessageKind::PrePrepare(requests)
-                    },
-                    messages_capnp::consensus::Which::Prepare(Ok(digest)) => {
-                        let digest = Digest::from_bytes(digest)
-                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                        ConsensusMessageKind::Prepare(digest)
-                    },
-                    messages_capnp::consensus::Which::Commit(Ok(digest)) => {
-                        let digest = Digest::from_bytes(digest)
-                            .wrapped_msg(ErrorKind::CommunicationSerialize, "Invalid digest")?;
-                        ConsensusMessageKind::Commit(digest)
-                    },
-                    _ => return Err("Failed to read consensus message kind").wrapped(ErrorKind::CommunicationSerialize),
-                };
-
-                Ok(SystemMessage::Consensus(ConsensusMessage::new(seq, view, kind)))
-            },
-            messages_capnp::system::Which::Consensus(_) => {
-                Err("Failed to read consensus message")
-                    .wrapped(ErrorKind::CommunicationSerialize)
-            },
+        if let Some(reply) = reply_content {
+            rq_msg.set_data(&*reply);
+        } else {
+            panic!("Failed to get message to send");
         }
+
+        capnp::serialize::write_message(w, &root)
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize reply")
+    }
+
+    fn deserialize_reply<R>(r: R) -> Result<Self::Reply> where R: Read {
+
+        let reader = capnp::serialize::read_message(r, Default::default()).wrapped_msg(ErrorKind::CommunicationSerialize,
+                                                                                       "Failed to read message")?;
+
+        let request_msg : messages_capnp::benchmark_reply::Reader = reader.get_root()
+            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to read reply message")?;
+
+        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from reply message?");
+
+        Ok(Weak::new())
     }
 }
 
 mod messages_capnp {
     #![allow(unused)]
-    include!(concat!(env!("OUT_DIR"), "/src/serialize/messages_capnp.rs"));
+    include!(concat!(env!("OUT_DIR"), "/messages_capnp.rs"));
 }

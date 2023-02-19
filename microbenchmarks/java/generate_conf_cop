@@ -16,10 +16,10 @@ regen_hosts_file() {
     rm -f hosts.config
     for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
         host=$(expr $id % 4)
-        host=$(expr 16 + $host)
+        host=$(expr 24 + $host)
         port_1=$(expr 11000 + $(expr $id \* 10))
         port_2=$(expr $(expr 11000 + $(expr $id \* 10)) + 1)
-        echo $id 192.168.70.$host $port_1 $port_2 >> hosts.config
+        echo $id 192.168.85.$host $port_1 $port_2 >> hosts.config
     done
 }
 
@@ -218,9 +218,9 @@ system.ssltls.protocol_version = TLSv1.2
 ## ECDSA
 system.ssltls.key_store_file=EC_KeyPair_256.pkcs12
 #system.ssltls.key_store_file=EC_KeyPair_384.pkcs12
-system.ssltls.enabled_ciphers = TLS_ECDHE_ECDSA_WITH_NULL_SHA,
+#system.ssltls.enabled_ciphers = TLS_ECDHE_ECDSA_WITH_NULL_SHA,
 # With cipher (recommended).
-#system.ssltls.enabled_ciphers = TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+system.ssltls.enabled_ciphers = TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 
 ## NOTE: it is mandatory to use the specific keyPair file regarding the algorithm, see below.  
 ## TLS_ECDHE_ECDSA_WITH_*, // used with EC keyStore (EC_KeyPair_*.pkcs12).

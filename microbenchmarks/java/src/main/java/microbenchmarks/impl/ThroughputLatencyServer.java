@@ -21,6 +21,8 @@ import bftsmart.tom.server.defaultservices.CommandsInfo;
 import bftsmart.tom.server.defaultservices.DefaultRecoverable;
 import bftsmart.tom.util.Storage;
 import bftsmart.tom.util.TOMUtil;
+import microbenchmarks.benchmarks.OSStatistics;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -46,7 +48,9 @@ import java.util.logging.Logger;
  * Simple server that just acknowledge the reception of a request.
  */
 public final class ThroughputLatencyServer extends DefaultRecoverable{
-    
+
+    private int id;
+
     private int interval;
     private byte[] reply;
     private float maxTp = -1;
@@ -75,6 +79,7 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
 
     public ThroughputLatencyServer(int id, int interval, int replySize, int stateSize, boolean context,  int signed, int write) {
 
+        this.id = id;
         this.interval = interval;
         this.context = context;
         this.signed = signed;
@@ -98,28 +103,25 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         acceptLatency = new Storage(interval);
         
         batchSize = new Storage(interval);
-        
+
+
         if (write > 0) {
-            
+
             try {
-                final File f = File.createTempFile("bft-"+id+"-", Long.toString(System.nanoTime()));
+                final File f = File.createTempFile("bft-" + id + "-", Long.toString(System.nanoTime()));
                 randomAccessFile = new RandomAccessFile(f, (write > 1 ? "rwd" : "rw"));
                 channel = randomAccessFile.getChannel();
-                
-                Runtime.getRuntime().addShutdownHook(new Thread() {
-                    
-                    @Override
-                    public void run() {
-                        
-                        f.delete();
-                    }
-                });
+
+                Runtime.getRuntime().addShutdownHook(new Thread(f::delete));
             } catch (IOException ex) {
                 ex.printStackTrace();
                 System.exit(0);
             }
         }
+
+        System.out.println("Starting replica...");
         replica = new ServiceReplica(id, this, this);
+        System.out.println("Started replica.");
     }
     
     @Override
@@ -275,31 +277,33 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         float tp = -1;
         if(iterations % interval == 0) {
             if (context) System.out.println("--- (Context)  iterations: "+ iterations + " // regency: " + msgCtx.getRegency() + " // consensus: " + msgCtx.getConsensusId() + " ---");
-            
-            System.out.println("--- Measurements after "+ iterations+" ops ("+interval+" samples) ---");
+
+            long currentTime = System.currentTimeMillis();
+
+            System.out.println("NodeId(" + id + ") // " + "--- Measurements after "+ iterations+" ops ("+interval+" samples) ---");
             
             tp = (float)(interval*1000/(float)(System.currentTimeMillis()-throughputMeasurementStartTime));
             
             if (tp > maxTp) maxTp = tp;
-            
-            System.out.println("Throughput = " + tp +" operations/sec (Maximum observed: " + maxTp + " ops/sec)");            
-            
-            System.out.println("Total latency = " + totalLatency.getAverage(false) / 1000 + " (+/- "+ (long)totalLatency.getDP(false) / 1000 +") us ");
+
+            System.out.println("NodeId(" + id + ") // " + "Throughput = " + tp +" operations/sec (Maximum observed: " + maxTp + " ops/sec)");
+
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Total latency = " + totalLatency.getAverage(false) / 1000 + " (+/- "+ (long)totalLatency.getDP(false) / 1000 +") us ");
             totalLatency.reset();
-            System.out.println("Consensus latency = " + consensusLatency.getAverage(false) / 1000 + " (+/- "+ (long)consensusLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Consensus latency = " + consensusLatency.getAverage(false) / 1000 + " (+/- "+ (long)consensusLatency.getDP(false) / 1000 +") us ");
             consensusLatency.reset();
-            System.out.println("Pre-consensus latency = " + preConsLatency.getAverage(false) / 1000 + " (+/- "+ (long)preConsLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Pre-consensus latency = " + preConsLatency.getAverage(false) / 1000 + " (+/- "+ (long)preConsLatency.getDP(false) / 1000 +") us ");
             preConsLatency.reset();
-            System.out.println("Pos-consensus latency = " + posConsLatency.getAverage(false) / 1000 + " (+/- "+ (long)posConsLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Pos-consensus latency = " + posConsLatency.getAverage(false) / 1000 + " (+/- "+ (long)posConsLatency.getDP(false) / 1000 +") us ");
             posConsLatency.reset();
-            System.out.println("Propose latency = " + proposeLatency.getAverage(false) / 1000 + " (+/- "+ (long)proposeLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Propose latency = " + proposeLatency.getAverage(false) / 1000 + " (+/- "+ (long)proposeLatency.getDP(false) / 1000 +") us ");
             proposeLatency.reset();
-            System.out.println("Write latency = " + writeLatency.getAverage(false) / 1000 + " (+/- "+ (long)writeLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Write latency = " + writeLatency.getAverage(false) / 1000 + " (+/- "+ (long)writeLatency.getDP(false) / 1000 +") us ");
             writeLatency.reset();
-            System.out.println("Accept latency = " + acceptLatency.getAverage(false) / 1000 + " (+/- "+ (long)acceptLatency.getDP(false) / 1000 +") us ");
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Accept latency = " + acceptLatency.getAverage(false) / 1000 + " (+/- "+ (long)acceptLatency.getDP(false) / 1000 +") us ");
             acceptLatency.reset();
-            
-            System.out.println("Batch average size = " + batchSize.getAverage(false) + " (+/- "+ (long)batchSize.getDP(false) +") requests");
+
+            System.out.println("NodeId(" + id + ") // " + currentTime + " // "  + "Batch average size = " + batchSize.getAverage(false) + " (+/- "+ (long)batchSize.getDP(false) +") requests");
             batchSize.reset();
             
             throughputMeasurementStartTime = System.currentTimeMillis();
@@ -310,7 +314,7 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
 
     public static void main(String[] args){
         if(args.length < 6) {
-            System.out.println("Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]");
+            System.out.println("Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> <path_to_os (or \"null\" for no os stats)> [rwd | rw]");
             System.exit(-1);
         }
 
@@ -320,8 +324,15 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         int stateSize = Integer.parseInt(args[3]);
         boolean context = Boolean.parseBoolean(args[4]);
         String signed = args[5];
-        String write = args.length > 6 ? args[6] : "";
-        
+        String path = args[6];
+        String write = args.length > 7 ? args[7] : "";
+
+        if (path.equalsIgnoreCase("null")) {
+            path = null;
+        }
+
+        System.out.println("Starting server " + processId);
+
         int s = 0;
         
         if (!signed.equalsIgnoreCase("nosig")) s++;
@@ -332,13 +343,25 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
             System.out.println("Option 'ecdsa' requires SunEC provider to be available.");
             System.exit(0);
         }
-        
+
         int w = 0;
         
         if (!write.equalsIgnoreCase("")) w++;
         if (write.equalsIgnoreCase("rwd")) w++;
 
-        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);        
+        System.out.println("Init");
+
+        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);
+
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(processId, path);
+
+            statistics.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
+        }
     }
 
     @Override
