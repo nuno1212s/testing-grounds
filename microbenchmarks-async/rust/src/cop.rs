@@ -304,7 +304,6 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
     let request = Arc::new({
         let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        OsRng.fill_bytes(&mut r);
         r
     });
 
