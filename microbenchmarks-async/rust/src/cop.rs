@@ -370,7 +370,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
-    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
+    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
 
     //let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 

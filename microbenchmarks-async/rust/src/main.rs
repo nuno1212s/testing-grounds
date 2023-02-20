@@ -5,6 +5,7 @@ mod cop;
 mod local;
 mod common;
 mod os_statistics;
+mod bench;
 
 fn main() {
     let is_local = std::env::var("LOCAL")
