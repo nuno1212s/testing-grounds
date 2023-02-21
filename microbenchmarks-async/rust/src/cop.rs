@@ -129,9 +129,11 @@ fn main_(id: NodeId) {
             addrs
         };
 
-        let comm_stats = Arc::new(CommStats::new(id,
+        /* let comm_stats = Some(Arc::new(CommStats::new(id,
                                                  first_cli,
-                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL));
+                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL))); */
+
+        let comm_stats = None;
 
         let sk = secret_keys.remove(id.into()).unwrap();
 
@@ -141,7 +143,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats)
+            comm_stats
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -149,7 +151,7 @@ fn main_(id: NodeId) {
         println!("Running replica #{}", u32::from(id));
 
         //Here we want to launch a statistics thread for each replica since they are on different machines
-        //crate::os_statistics::start_statistics_thread(id);
+        crate::os_statistics::start_statistics_thread(id);
 
         replica
     };
@@ -173,9 +175,6 @@ async fn client_async_main() {
         }
     }
 
-    //Start the OS resource monitoring thread
-    //crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
-
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
         .enumerate()
@@ -192,9 +191,11 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    let comm_stats = Arc::new(CommStats::new(NodeId::from(local_first_cli),
+    /* let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(local_first_cli),
                                              NodeId::from(first_cli),
-                                             MicrobenchmarkData::MEASUREMENT_INTERVAL));
+                                             MicrobenchmarkData::MEASUREMENT_INTERVAL))); */
+
+    let comm_stats = None;
 
     for client in &clients_config {
         let id = NodeId::from(client.id);
@@ -231,7 +232,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            Some(comm_stats.clone())
+            comm_stats.clone()
         );
 
         let mut tx = tx.clone();
@@ -273,7 +274,10 @@ async fn client_async_main() {
     }
 
     drop(clients_config);
-
+    
+    //Start the OS resource monitoring thread
+    crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
+    
     for h in handles {
         let _ = h.join();
     }

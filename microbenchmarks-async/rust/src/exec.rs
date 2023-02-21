@@ -149,6 +149,7 @@ impl Service for Microbenchmark {
 
                 self.max_tp_time = Utc::now();
             }
+
         }
 
         reply_batch
