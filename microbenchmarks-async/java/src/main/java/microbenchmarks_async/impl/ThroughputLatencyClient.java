@@ -48,7 +48,7 @@ public class ThroughputLatencyClient {
         latencies = new LinkedBlockingQueue<>();
         writerThreadFlag = new AtomicBoolean(false);
 
-        writerThread = new Thread(() -> {
+        /*writerThread = new Thread(() -> {
             FileWriter f = null;
 
             try {
@@ -70,7 +70,7 @@ public class ThroughputLatencyClient {
                     e.printStackTrace();
                 }
             }
-        });
+        });*/
 
         int client_count = Integer.parseInt(args[1]);
         int nrOps = Integer.parseInt(args[2]);
@@ -87,6 +87,13 @@ public class ThroughputLatencyClient {
             path = args[9];
         }
 
+        System.out.printf(
+                "Starting with clients: %d\n" +
+                        "Nr ops: %d\n" +
+                        "Req size: %d\n" +
+                        "Concurrent Reqs: %d\n"
+                , client_count, nrOps, requestSize, concurrentRqs);
+
         int s = 0;
         if (!sign.equalsIgnoreCase("nosig")) s++;
         if (sign.equalsIgnoreCase("ecdsa")) s++;
@@ -97,9 +104,7 @@ public class ThroughputLatencyClient {
             System.exit(0);
         }
 
-        Client[] clients = new Client[client_count * nrOps];
-
-        int id = 0;
+        Client[] clients = new Client[client_count];
 
         for (int cli = 0; cli < client_count; cli++) {
             try {
@@ -109,16 +114,16 @@ public class ThroughputLatencyClient {
                 ex.printStackTrace();
             }
 
-            System.out.println("Launching client " + (initId + id));
+            System.out.println("Launching client " + (initId + cli));
 
-            clients[id] = new ThroughputLatencyClient.Client(initId + id, nrOps, requestSize, interval,
+            clients[cli] = new ThroughputLatencyClient.Client(initId + cli, nrOps, requestSize, interval,
                     concurrentRqs, readOnly, verbose, s);
-
-            id++;
         }
 
+        OSStatistics statistics = null;
+
         if (path != null) {
-            OSStatistics statistics = new OSStatistics(initId, path);
+            statistics = new OSStatistics(initId, path);
 
             statistics.start();
 
@@ -134,25 +139,40 @@ public class ThroughputLatencyClient {
         for (Client client : clients) {
             futures.add(execs.submit(client));
         }
+
+        System.out.println("Waiting for clients...");
+
         // wait for tasks completion
         for (Future<?> currTask : futures) {
             try {
                 currTask.get();
-            } catch (InterruptedException | ExecutionException ex) {
+
+                System.out.println("Received one client.");
+            } catch (InterruptedException ex) {
                 ex.printStackTrace();
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
             }
         }
 
+        System.out.println("Shutting down pool.");
+
         execs.shutdown();
 
-        try {
+        /*try {
             writerThreadFlag.set(true);
             writerThread.join();
         } catch (InterruptedException e) {
             // ignore
-        }
+        }*/
 
         System.out.println("All clients done.");
+
+        if (statistics != null) {
+            statistics.cancel();
+        }
+
+        Runtime.getRuntime().exit(0);
     }
 
 
@@ -169,6 +189,8 @@ public class ThroughputLatencyClient {
         AsynchServiceProxy proxy;
         byte[] request;
         int rampup = 1000;
+        ReplyListener replyListener;
+        Semaphore semaphore;
 
         public Client(int id, int numberOfOps, int requestSize, int interval, int concurrent_rqs, boolean readOnly, boolean verbose, int sign) {
             super("Client " + id);
@@ -182,6 +204,28 @@ public class ThroughputLatencyClient {
             this.verbose = verbose;
             this.proxy = new AsynchServiceProxy(id);
             this.request = new byte[this.requestSize];
+            this.semaphore = new Semaphore(concurrent_rqs);
+
+            this.replyListener = new ReplyListener() {
+                @Override
+                public void reset() {
+                    //Do nothing
+                }
+
+                @Override
+                public void replyReceived(RequestContext context, TOMMessage reply) {
+                                                         /*long latency = System.nanoTime() - last_send_instant;
+
+                                                         try {
+                                                             if (reply != null) this.latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
+                                                         } catch (InterruptedException ex) {
+                                                             ex.printStackTrace();
+                                                         }*/
+
+                    //Release another request so the client can go back to making more requests
+                    semaphore.release();
+                }
+            };
 
             Random rand = new Random(System.nanoTime() + this.id);
             rand.nextBytes(request);
@@ -236,13 +280,11 @@ public class ThroughputLatencyClient {
 
             int req = 0;
 
-            Semaphore semaphore = new Semaphore(concurrentRqs);
-
             for (int i = 0; i < numberOfOps / 2; i++, req++) {
                 try {
                     //Attempt to acquire the semaphore.
                     //This should only be possible if there are no more than concurrentRqs currently awaiting response
-                    semaphore.acquire();
+                    this.semaphore.acquire();
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -250,27 +292,6 @@ public class ThroughputLatencyClient {
                 if (verbose) System.out.print("Sending req " + req + "...");
 
                 long last_send_instant = System.nanoTime();
-
-                ReplyListener replyListener = new ReplyListener() {
-                    @Override
-                    public void reset() {
-                        //Do nothing
-                    }
-
-                    @Override
-                    public void replyReceived(RequestContext context, TOMMessage reply) {
-                        long latency = System.nanoTime() - last_send_instant;
-
-                        try {
-                            if (reply != null) latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-
-                        //Release another request so the client can go back to making more requests
-                        semaphore.release();
-                    }
-                };
 
                 TOMMessageType type;
 
@@ -280,7 +301,7 @@ public class ThroughputLatencyClient {
                     type = TOMMessageType.ORDERED_REQUEST;
                 }
 
-                proxy.invokeAsynchRequest(request, replyListener, type);
+                proxy.invokeAsynchRequest(request, this.replyListener, type);
 
                 if (verbose) System.out.println(" sent!");
 
@@ -309,7 +330,7 @@ public class ThroughputLatencyClient {
             for (int i = 0; i < numberOfOps / 2; i++, req++) {
 
                 try {
-                    semaphore.acquire();
+                    this.semaphore.acquire();
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -317,29 +338,6 @@ public class ThroughputLatencyClient {
                 if (verbose) System.out.print(this.id + " // Sending req " + req + "...");
 
                 long last_send_instant = System.nanoTime();
-
-                ReplyListener replyListener = new ReplyListener() {
-                    @Override
-                    public void reset() {
-                        //Do nothing
-                    }
-
-                    @Override
-                    public void replyReceived(RequestContext context, TOMMessage reply) {
-                        long latency = System.nanoTime() - last_send_instant;
-
-                        try {
-                            if (reply != null) latencies.put(id + "\t" + System.currentTimeMillis() + "\t" + latency + "\n");
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-
-                        st.store(latency);
-
-                        //Release another request so the client can make it again
-                        semaphore.release();
-                    }
-                };
 
                 TOMMessageType type;
 
@@ -349,7 +347,7 @@ public class ThroughputLatencyClient {
                     type = TOMMessageType.ORDERED_REQUEST;
                 }
 
-                proxy.invokeAsynchRequest(request, replyListener, type);
+                proxy.invokeAsynchRequest(request, this.replyListener, type);
 
                 try {
 
@@ -370,9 +368,10 @@ public class ThroughputLatencyClient {
             }
 
             System.out.println(this.id + " // Waiting for operations to complete.");
+
             for (int i = 0; i < concurrentRqs; i++) {
                 try {
-                    semaphore.acquire();
+                    this.semaphore.acquire();
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -380,12 +379,7 @@ public class ThroughputLatencyClient {
 
             System.out.println(this.id + " // Completed all operations.");
 
-            try {
-                //Wait for all requests to finish
-                semaphore.acquire(concurrentRqs);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            System.out.println(this.id + " // Statistics observed: ");
 
             if (id == initId) {
                 System.out.println(this.id + " // Average time for " + numberOfOps / 2 + " executions (-10%) = " + st.getAverage(true) / 1000 + " us ");
