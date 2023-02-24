@@ -174,6 +174,8 @@ public class ThroughputLatencyClient {
         exec.shutdown();
 
         System.out.println("All clients done.");
+
+        Runtime.getRuntime().exit(0);
     }
 
     static class Client extends Thread {
