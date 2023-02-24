@@ -1,0 +1,21 @@
+#!/bin/sh
+
+main() {
+    regen_config_folder "$1"
+    regen_hosts_file
+}
+
+regen_config_folder() {
+    rm -rf config
+    cp -r "$1" config
+    cd config || exit 0
+}
+
+regen_hosts_file() {
+    rm -f hosts.config
+    for id in `seq 0 $(expr $NUM_REPLICAS - 1)`; do
+        echo $id 127.0.0.1 $(expr 11000 + $(expr $id \* 10)) $(expr $(expr 11000 + $(expr $id \* 10)) + 1) >> hosts.config
+    done
+}
+
+main "$@"

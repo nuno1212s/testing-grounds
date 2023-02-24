@@ -1,0 +1,14 @@
+#!/bin/sh
+
+gradle_wrapper() {
+    if [ -n "$JAVA_HOME" ]; then
+        ./gradlew $@
+    else
+        ./gradlew $@
+    fi
+}
+
+gradle_wrapper localDeploy
+retcode=$?
+gradle_wrapper --stop
+exit $retcode
