@@ -115,6 +115,8 @@ public class ThroughputLatencyClient {
         boolean readOnly = Boolean.parseBoolean(args[5]);
         boolean verbose = Boolean.parseBoolean(args[6]);
         String sign = args[7];
+
+        String path = args[8];
         
         int s = 0;
         if (!sign.equalsIgnoreCase("nosig")) s++;
@@ -146,6 +148,17 @@ public class ThroughputLatencyClient {
         for (Client c : clients) {
             tasks.add(exec.submit(c));
         }
+
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(initId, path);
+
+            statistics.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
+        }
+
         
         // wait for tasks completion
         for (Future<?> currTask : tasks) {

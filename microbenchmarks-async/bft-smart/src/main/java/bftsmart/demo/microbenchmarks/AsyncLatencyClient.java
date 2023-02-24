@@ -68,6 +68,12 @@ public class AsyncLatencyClient {
         boolean readOnly = Boolean.parseBoolean(args[6]);
         boolean verbose = Boolean.parseBoolean(args[7]);
         String sign = args[8];
+
+        String path = null;
+
+        if (args.length >= 10) {
+            path = args[9];
+        }
         
         int s = 0;
         if (!sign.equalsIgnoreCase("nosig")) s++;
@@ -97,6 +103,16 @@ public class AsyncLatencyClient {
         
         for (Client c : clients) {
             tasks.add(exec.submit(c));
+        }
+
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(initId, path);
+
+            statistics.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
         }
         
         // wait for tasks completion

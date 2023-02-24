@@ -16,11 +16,13 @@ limitations under the License.
 package bftsmart.tom.util;
 
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class Storage {
     
     
     private long[] values;
-    private int count = 0;
+    private AtomicInteger count = new AtomicInteger(0);
     
     
     /** Creates a new instance of Storage */
@@ -29,27 +31,29 @@ public class Storage {
     }
     
     public int getCount(){
-        return count;
+        return count.get();
     }
 
     public void reset(){
-        count=0;
+        count.set(0);
     }
     
     public void store(long value){
+        int count = this.count.getAndIncrement();
+
         if(count < values.length){
-            values[count++] = value;
+            values[count] = value;
         }
     }
     
     public double getAverage(boolean limit){
-        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count);
+        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count.get());
 
         return computeAverage(values,limit);
     }
     
     public double getDP(boolean limit){
-        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count);
+        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count.get());
 
         return computeDP(values,limit);
     }
@@ -59,7 +63,7 @@ public class Storage {
     }
     
     public long getMax(boolean limit){
-        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count);
+        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count.get());
         return computeMax(values,limit);
     }
     
@@ -116,7 +120,7 @@ public class Storage {
     
     public long getPercentile(double percentile) {
         
-        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count);
+        long[] values = java.util.Arrays.copyOfRange(this.values, 0, count.get());
         java.util.Arrays.sort(values);
         
         int index = (int) (percentile * values.length);

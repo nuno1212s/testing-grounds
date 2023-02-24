@@ -309,7 +309,7 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
     }
 
     public static void main(String[] args){
-        if(args.length < 6) {
+        if(args.length < 7) {
             System.out.println("Usage: ... ThroughputLatencyServer <processId> <measurement interval> <reply size> <state size> <context?> <nosig | default | ecdsa> [rwd | rw]");
             System.exit(-1);
         }
@@ -320,7 +320,13 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         int stateSize = Integer.parseInt(args[3]);
         boolean context = Boolean.parseBoolean(args[4]);
         String signed = args[5];
-        String write = args.length > 6 ? args[6] : "";
+        String path = args[6];
+
+        if (path.equalsIgnoreCase("null")) {
+            path = null;
+        }
+
+        String write = args.length > 7 ? args[7] : "";
         
         int s = 0;
         
@@ -338,7 +344,17 @@ public final class ThroughputLatencyServer extends DefaultRecoverable{
         if (!write.equalsIgnoreCase("")) w++;
         if (write.equalsIgnoreCase("rwd")) w++;
 
-        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);        
+        new ThroughputLatencyServer(processId,interval,replySize, stateSize, context, s, w);
+
+        if (path != null) {
+            OSStatistics statistics = new OSStatistics(processId, path);
+
+            statistics.start();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(statistics::cancel));
+        } else {
+            System.out.println("Could not start OS Statistics, no path was provided");
+        }
     }
 
     @Override
