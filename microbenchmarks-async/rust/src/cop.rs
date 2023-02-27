@@ -1,3 +1,4 @@
+use std::env;
 use crate::common::*;
 use crate::serialize::MicrobenchmarkData;
 
@@ -28,7 +29,7 @@ use febft::bft::crypto::signature::{
     KeyPair,
     PublicKey,
 };
-use febft::bft::benchmarks::{ CommStats};
+use febft::bft::benchmarks::{CommStats};
 use febft::bft::core::client::ordered_client::Ordered;
 
 pub fn main() {
@@ -53,20 +54,19 @@ pub fn main() {
             threadpool_threads,
             async_threads,
             //If we are the client, we don't want any threads to send to other clients as that will never happen
-            id: Some(replica_id.to_string())
+            id: Some(replica_id.to_string()),
         };
 
         let _guard = unsafe { init(conf).unwrap() };
 
         main_(NodeId::from(replica_id));
     } else {
-
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
             threadpool_threads,
             async_threads,
             //If we are the client, we don't want any threads to send to other clients as that will never happen
-            id: None
+            id: None,
         };
 
         let _guard = unsafe { init(conf).unwrap() };
@@ -90,7 +90,7 @@ fn main_(id: NodeId) {
         let mut secret_keys: IntMap<KeyPair> = sk_stream()
             .take(clients_config.len())
             .enumerate()
-            .map(|(id, sk)| (1000 + id as u64, sk))
+            .map(|(id, sk)| (u64::from(first_cli) + id as u64, sk))
             .chain(sk_stream()
                 .take(replicas_config.len())
                 .enumerate()
@@ -143,7 +143,7 @@ fn main_(id: NodeId) {
             sk,
             addrs,
             public_keys.clone(),
-            comm_stats
+            comm_stats,
         );
 
         println!("Bootstrapping replica #{}", u32::from(id));
@@ -161,24 +161,17 @@ fn main_(id: NodeId) {
 }
 
 async fn client_async_main() {
-
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
-    let mut first_cli = 1000u32;
+    let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
 
-    let mut local_first_cli = u32::MAX;
-
-    for client in &clients_config {
-        if client.id < local_first_cli {
-            local_first_cli = client.id;
-        }
-    }
+    let client_count: u32 = env::var("NUM_CLIENTS").unwrap_or(String::from("1")).parse().unwrap();
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
         .enumerate()
-        .map(|(id, sk)| (local_first_cli as u64 + id as u64, sk))
+        .map(|(id, sk)| (first_id as u64 + id as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
@@ -197,8 +190,8 @@ async fn client_async_main() {
 
     let comm_stats = None;
 
-    for client in &clients_config {
-        let id = NodeId::from(client.id);
+    for i in 0..client_count {
+        let id = NodeId::from(first_id + i);
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -232,7 +225,7 @@ async fn client_async_main() {
             sk,
             addrs,
             public_keys.clone(),
-            comm_stats.clone()
+            comm_stats.clone(),
         );
 
         let mut tx = tx.clone();
@@ -251,13 +244,13 @@ async fn client_async_main() {
     let (mut queue, queue_tx) = async_queue();
     let queue_tx = Arc::new(queue_tx);
 
-    let mut clients = Vec::with_capacity(clients_config.len());
+    let mut clients = Vec::with_capacity(client_count as usize);
 
-    for _i in 0..clients_config.len() {
+    for _i in 0..client_count {
         clients.push(rx.recv().await.unwrap());
     }
 
-    let mut handles = Vec::with_capacity(clients_config.len());
+    let mut handles = Vec::with_capacity(client_count as usize);
 
     for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
@@ -274,10 +267,10 @@ async fn client_async_main() {
     }
 
     drop(clients_config);
-    
+
     //Start the OS resource monitoring thread
-    crate::os_statistics::start_statistics_thread(NodeId(local_first_cli));
-    
+    crate::os_statistics::start_statistics_thread(NodeId(first_id));
+
     for h in handles {
         let _ = h.join();
     }
@@ -365,11 +358,11 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
         } else if ramp_up > 0 {
-            std::thread::sleep(Duration::from_millis(ramp_up as u64));
+            let to_sleep = fastrand::u32(ramp_up / 2..ramp_up);
+            std::thread::sleep(Duration::from_millis(to_sleep as u64));
 
             ramp_up -= 100;
         }
-
     }
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
@@ -392,37 +385,37 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         let sem_clone = semaphore.clone();
 
         client.clone().update_callback::<Ordered>(Arc::downgrade(&request),
-                               Box::new(move |reply| {
+                                                  Box::new(move |reply| {
 
-            //Release another request for this client
-            sem_clone.release();
+                                                      //Release another request for this client
+                                                      sem_clone.release();
 
-            /* let latency = Utc::now()
-                .signed_duration_since(last_send_instant)
-                .num_nanoseconds()
-                .unwrap_or(i64::MAX);
+                                                      /* let latency = Utc::now()
+                                                          .signed_duration_since(last_send_instant)
+                                                          .num_nanoseconds()
+                                                          .unwrap_or(i64::MAX);
 
-            let time_ms = Utc::now().timestamp_millis();*/
+                                                      let time_ms = Utc::now().timestamp_millis();*/
 
-            /*let _ = q.enqueue(
-                format!(
-                    "{}\t{}\t{}\n",
-                    id,
-                    time_ms,
-                    latency,
-                ),
-            );*/
+                                                      /*let _ = q.enqueue(
+                                                          format!(
+                                                              "{}\t{}\t{}\n",
+                                                              id,
+                                                              time_ms,
+                                                              latency,
+                                                          ),
+                                                      );*/
 
-            //(exec_time, last_send_instant).store(st);
+                                                      //(exec_time, last_send_instant).store(st);
 
-            if MicrobenchmarkData::VERBOSE {
-                if req % 1000 == 0 {
-                    println!("{} // {} operations sent!", id, req);
-                }
+                                                      if MicrobenchmarkData::VERBOSE {
+                                                          if req % 1000 == 0 {
+                                                              println!("{} // {} operations sent!", id, req);
+                                                          }
 
-                println!(" sent!");
-            }
-        }));
+                                                          println!(" sent!");
+                                                      }
+                                                  }));
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);

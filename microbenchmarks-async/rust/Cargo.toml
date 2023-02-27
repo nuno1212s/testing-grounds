@@ -37,7 +37,7 @@ features = [
     "expose_impl",
     "async_runtime_tokio",
     "threadpool_rayon",
-    "socket_async_std_tcp",
+    "socket_tokio_tcp",
     "channel_flume_mpmc",
     "channel_sync_crossbeam",
     "channel_mixed_flume",

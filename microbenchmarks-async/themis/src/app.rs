@@ -43,8 +43,10 @@ impl<'app> app::Application<'app> for Microbenchmark {
         self.iterations += 1;
 
         if self.iterations % self.measurement_interval == 0 {
-            println!("NodeId({:?}) // --- Measurements after {} ops ({} samples) ---",
-                     self.id, self.iterations, self.measurement_interval);
+            let time = Utc::now().timestamp_millis();
+
+            println!("NodeId({:?}) // {} // --- Measurements after {} ops ({} samples) ---",
+                     self.id,time, self.iterations, self.measurement_interval);
 
             let time_diff = Utc::now()
                 .signed_duration_since(self.tp_time)
@@ -56,8 +58,19 @@ impl<'app> app::Application<'app> for Microbenchmark {
                 self.max_tp = throughput;
             }
 
-            println!("NodeId({:?}) // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
-                     self.id, throughput, self.max_tp);
+            println!("NodeId({:?}) // {} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
+                     self.id, time, throughput, self.max_tp);
+
+            //This is needed for some statistics
+            println!("NodeId({:?}) // {} // {} latency = {} (+/- {}) us",
+                     self.id,
+                     Utc::now().timestamp_millis(),
+                     "DUMMY",
+                     "0",
+                     "0",
+            );
+
+            self.tp_time = Utc::now();
         }
 
         let size = max(self.reply_size, size_of::<u64>());
@@ -77,12 +90,12 @@ impl<'app> app::Application<'app> for Microbenchmark {
         ))
     }
 
-    type CheckpointHandle = Cow<'app, Vec<u8>>;
+    type CheckpointHandle = Cow<'app, ()>;
     type CheckpointData = ();
     type TakeFut = Ready<Result<Self::CheckpointHandle>>;
 
     fn take_checkpoint(&'app mut self) -> Self::TakeFut {
-        todo!()
+        ready(Ok(Cow::Borrowed(&())))
     }
 
     type ApplyFut = Ready<std::result::Result<(), ApplyError>>;

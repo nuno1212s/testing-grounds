@@ -20,7 +20,7 @@ REPLICAS=("$REPLICAS_SAFE_CLUSTER_IPS" "$REPLICAS_COP_CLUSTER_IPS")
 #CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
 #1gbe
-CLIENT_MACHINES="192.168.85.30"
+CLIENT_MACHINES=("192.168.70.46" "192.168.70.40")
 
 #Get the correct replica IPs to connect
 if [[ -v CLUSTER ]]; then
@@ -42,73 +42,17 @@ if [[ ! -v MAX_CLIENTS ]]; then
   MAX_CLIENTS=$NUM_CLIENTS
 fi
 
-CLIENT_MACHINES_A=($(echo "$CLIENT_MACHINES" | tr " " "\n"))
-
-if [[ $CLIENT -eq "1" ]]; then
-
-  IP=${CLIENT_MACHINES_A[$CLUSTER]}
-
-  for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-      id=$(expr 1000 + $(expr $(expr $CLUSTER \* "$MAX_CLIENTS") + "$i"))
-      sni=cli${id}
-      port=$(expr 11000 + "$i")
-      echo "$id" "$sni" "$IP" "$port" >> clients.config
-  done
-
-  else
   #Replicas have all IPS stored
-  CURR_MACHINE=0
-  for ip in $CLIENT_MACHINES; do
-      for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-        id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
-        sni=cli${id}
-        port=$(expr 11000 + "$i")
-        echo "$id" "$sni" "$ip" "$port" >> clients.config
-      done
+CURR_MACHINE=0
+TO_GEN_PER_MACHINE=$(expr $CLIENT_GEN / ${#CLIENT_MACHINES[@]})
+for ip in "${CLIENT_MACHINES[@]}"; do
+    FIRST_CLI="$(expr 1000 \* "$(expr $CURR_MACHINE + 1)")"
+    for i in $(seq 0 $(expr "$TO_GEN_PER_MACHINE" - 1)); do
+      id=$(expr $FIRST_CLI + "$i")
+      sni=cli${id}
+      port=$(expr 10000 + "$id")
+      echo "$id" "$sni" "$ip" "$port" >> clients.config
+    done
 
-    CURR_MACHINE=$(expr $CURR_MACHINE + 1)
-  done
-fi
-
-rm -f replicas.config
-
-CURR_IP=0
-for id in $(seq 0 $(expr "$NUM_REPLICAS" - 1)); do
-    sni=srv${id}
-    port=$(expr 10000 + "$id")
-    rep_port=$(expr 12000 + "$id")
-    host=$(expr "$id" % 4)
-
-    #1gbe
-    #host=$(expr 24 + $host)
-    #echo $id $sni 192.168.85.$host $port $rep_port >> replicas.config
-
-    #10gbe
-    echo "$id" "$sni" "${REPLICA_MACHINES[$CURR_IP]}" "$port" "$rep_port" >> replicas.config
-
-    CURR_IP=$(expr $CURR_IP + 1)
+  CURR_MACHINE=$(expr $CURR_MACHINE + 1)
 done
-
-
-if [[ ! $CLIENT -eq "1" ]]; then
-  #if there are clients situated in other clusters, we may need to specify the network card that
-  #it must attach to
-  rm -f replica_client_binds.config
-
-  #Go through the machine
-  CURR_MACHINE=0
-  for REPLICA_IPS in "${REPLICAS[@]}"; do
-    #Get the IP of our own replica
-    REPLICA_IPS=($(echo "$REPLICA_IPS" | tr " " "\n"))
-
-       REPLICA_IP=${REPLICA_IPS[$ID]}
-
-        for i in $(seq 0 $(expr "$NUM_CLIENTS" - 1)); do
-          id=$(expr 1000 + $(expr $(expr $CURR_MACHINE \* "$MAX_CLIENTS") + "$i"))
-          echo "$id" "$REPLICA_IP" >> replica_client_binds.config
-        done
-
-      CURR_MACHINE=$(expr $CURR_MACHINE + 1)
-  done
-
-fi

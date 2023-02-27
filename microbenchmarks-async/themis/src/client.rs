@@ -93,7 +93,7 @@ struct Opts {
     no_wait_for_primary: bool,
 }
 
-pub fn start_clients(config: Config, clients: u64) {
+pub fn start_clients(config: Config, first_id: u64, clients: u64) {
     let counter = Arc::new(AtomicCell::new(0));
     let complete = Arc::new(AtomicCell::new(clients));
     let latencies = Arc::new(AtomicCell::new(0));
@@ -110,7 +110,7 @@ pub fn start_clients(config: Config, clients: u64) {
 
     for i in 0..clients {
         let mut config = config.clone();
-        let id = 100 + i;
+        let id = first_id + i;
         config.set("id", id).expect("set");
         let connected = connected.clone();
         let payload = payload.clone();
@@ -157,7 +157,7 @@ pub fn start_clients(config: Config, clients: u64) {
     connected.wait();
     tracing::info!("go");
 
-    os_statistics::start_statistics_thread(100);
+    os_statistics::start_statistics_thread(first_id);
 
     loop {
         thread::sleep(Duration::from_secs(1));
