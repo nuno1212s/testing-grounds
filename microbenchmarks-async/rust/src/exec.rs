@@ -19,6 +19,7 @@ pub struct Microbenchmark {
     max_tp: f32,
     batch_count: f32,
     max_tp_time: DateTime<Utc>,
+    last_measurement: usize,
     iterations: usize,
     reply: Arc<Vec<u8>>,
     measurements: Measurements,
@@ -38,6 +39,7 @@ impl Microbenchmark {
             max_tp: -1.0,
             batch_count: 0.0,
             max_tp_time: Utc::now(),
+            last_measurement: 0,
             iterations: 0,
             measurements: Measurements::new(id),
         }
@@ -105,7 +107,7 @@ impl Service for Microbenchmark {
             // increase iter count
             self.iterations += 1;
 
-            if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
+            if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 && batch_len < MicrobenchmarkData::MEASUREMENT_INTERVAL {
                 println!("{:?} // --- Measurements after {} ops ({} samples) ---",
                          self.id, self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
 
@@ -113,11 +115,14 @@ impl Service for Microbenchmark {
                     .signed_duration_since(self.max_tp_time)
                     .num_microseconds().expect("Need micro seconds");
 
-                let tp = (MicrobenchmarkData::MEASUREMENT_INTERVAL as f32 * 1000.0 * 1000.0) / (diff as f32);
+
+                let tp = ((self.iterations - self.last_measurement) as f32 * 1000.0 * 1000.0) / (diff as f32);
 
                 if tp > self.max_tp {
                     self.max_tp = tp;
                 }
+
+                self.last_measurement = self.iterations;
 
                 println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
                          self.id, tp, self.max_tp);

@@ -5,7 +5,7 @@ main() {
 
     cd $1/config || exit 0
 
-    regen_hosts_file
+    #regen_hosts_file
 }
 
 regen_config_folder() {

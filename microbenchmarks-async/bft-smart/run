@@ -3,7 +3,6 @@
 main() {
     compile
 
-
     if [ $((CLIENT)) -eq 1 ]
     then
         clients_main
@@ -81,7 +80,7 @@ start_replica() {
 }
 
 start_clients() {
-  ./smartrun.sh bftsmart.demo.microbenchmarks.AsyncLatencyClient 1000 "$NUM_CLIENTS" "$OPS_NUMBER" "$CONCURRENT_RQS" \
+  ./smartrun.sh bftsmart.demo.microbenchmarks.AsyncLatencyClient "$ID" "$NUM_CLIENTS" "$OPS_NUMBER" "$CONCURRENT_RQS" \
   "$REQUEST_SIZE" "$REQUEST_SLEEP_MILLIS" false "$VERBOSE" nosig "$PATH_TO_OS_STATS"
 }
 
