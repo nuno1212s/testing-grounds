@@ -223,6 +223,8 @@ pub async fn setup_replica(
         futures::join!(n, b, timeout)
     };
 
+    let max_batch_size = get_max_batch_size();
+
     let conf = ReplicaConfig::<Microbenchmark, NoPersistentLog> {
         node,
         view: SeqNo::ZERO,
@@ -230,6 +232,7 @@ pub async fn setup_replica(
         service: Microbenchmark::new(node_id),
         global_batch_size,
         batch_timeout: global_batch_timeout,
+        max_batch_size,
         log_mode: Default::default()
     };
 
@@ -267,6 +270,13 @@ async fn get_global_batch_timeout() -> u128 {
         tx.send(unwrap_ctx!(res)).expect("Failed to send");
     });
     rx.await.unwrap()
+}
+
+fn get_max_batch_size() -> usize {
+    let res = parse_usize(&*std::env::var("MAX_BATCH_SIZE")
+        .expect("Failed to find required env var MAX_BATCH_SIZE"));
+
+    unwrap_ctx!(res)
 }
 
 async fn get_batch_timeout() -> u128 {

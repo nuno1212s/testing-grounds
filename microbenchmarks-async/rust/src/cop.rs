@@ -71,7 +71,7 @@ pub fn main() {
 
         let _guard = unsafe { init(conf).unwrap() };
 
-        rt::block_on(client_async_main());
+        client_async_main();
     }
 }
 
@@ -160,7 +160,7 @@ fn main_(id: NodeId) {
     replica.run().unwrap();
 }
 
-async fn client_async_main() {
+fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
@@ -247,7 +247,7 @@ async fn client_async_main() {
     let mut clients = Vec::with_capacity(client_count as usize);
 
     for _i in 0..client_count {
-        clients.push(rx.recv().await.unwrap());
+        clients.push(rt::block_on(rx.recv()).unwrap());
     }
 
     let mut handles = Vec::with_capacity(client_count as usize);

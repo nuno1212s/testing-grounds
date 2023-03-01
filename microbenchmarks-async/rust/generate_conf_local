@@ -6,7 +6,7 @@ cd config
 echo $BATCH_SIZE > batch.config
 
 rm -f clients.config
-for i in `seq 0 $(expr $NUM_CLIENTS - 1)`; do
+for i in `seq 0 $(expr $CLIENT_GEN - 1)`; do
     id=$(expr 1000 + $i)
     sni=cli${id}
     port=$(expr 11000 + $i)

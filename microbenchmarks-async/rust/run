@@ -7,11 +7,11 @@ main() {
 }
 
 generate_conf() {
-    #if [ $LOCAL -eq 1 ]; then
-        #./generate_conf_local || exit 1
-    #else
+    if [ $LOCAL -eq 1 ]; then
+        ./generate_conf_local || exit 1
+    else
         ./generate_conf_cop || exit 1
-    #fi
+    fi
 
     if [ ! -f ca-root/crt ]; then
       echo "Missing ca certificates, generating them".

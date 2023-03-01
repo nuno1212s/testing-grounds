@@ -128,7 +128,7 @@ impl Service for Microbenchmark {
                          self.id, tp, self.max_tp);
 
                 //This gives us the amount of batches per micro seconds, since the diff is in microseconds
-                let mut batches_per_second = (self.batch_count / diff as f32);
+                let mut batches_per_second = self.batch_count / diff as f32;
 
                 //This moves the amount of batches per microsecond to the amount of batches per second
                 batches_per_second *= 1000.0 * 1000.0;
