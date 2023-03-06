@@ -4,6 +4,16 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
 use std::sync::Arc;
+use febft_common::error::*;
+use febft_client::Client;
+use febft_client::unordered_client::UnorderedClientMode;
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_common::ordering::SeqNo;
+use febft_common::threadpool;
+use febft_communication::{NodeConfig, NodeId, PeerAddr};
+use febft_communication::benchmarks::CommStats;
+use febft_consensus::msg_log::persistent::NoPersistentLog;
+use febft_replica::replica::{Replica, ReplicaConfig};
 
 use intmap::IntMap;
 use konst::primitive::{parse_u128, parse_usize};
@@ -140,12 +150,13 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData>> {
+) -> Result<Client<Microbenchmark>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
-    let conf = client::ClientConfig {
+    let conf = febft_client::ClientConfig {
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
+
     Client::bootstrap(conf).await
 }
 
@@ -166,6 +177,8 @@ pub async fn setup_replica(
         futures::join!(n, b, timeout)
     };
 
+    let max_batch_size = get_max_batch_size();
+
     let conf = ReplicaConfig::<Microbenchmark, NoPersistentLog> {
         node,
         global_batch_size,
@@ -173,10 +186,18 @@ pub async fn setup_replica(
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
         batch_timeout: global_batch_timeout,
+        max_batch_size,
         log_mode: Default::default(),
     };
 
     Replica::bootstrap(conf).await
+}
+
+fn get_max_batch_size() -> usize {
+    let res = parse_usize(&*std::env::var("MAX_BATCH_SIZE")
+        .expect("Failed to find required env var MAX_BATCH_SIZE"));
+
+    unwrap_ctx!(res)
 }
 
 async fn get_batch_size() -> usize {
