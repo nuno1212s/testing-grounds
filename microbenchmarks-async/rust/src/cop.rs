@@ -16,21 +16,14 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::core::client::Client;
-use febft::bft::communication::NodeId;
-use febft::bft::async_runtime as rt;
-use febft::bft::{
-    init,
-    InitConfig,
-};
 use semaphores::RawSemaphore;
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::benchmarks::{CommStats};
-use febft::bft::core::client::ordered_client::Ordered;
+use febft_client::Client;
+use febft_client::ordered_client::Ordered;
+use febft_common::{channel, init, InitConfig};
+use febft_common::async_runtime as rt;
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_communication::{NodeId, PeerAddr};
+use crate::exec::Microbenchmark;
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -292,7 +285,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<Microbenchmark>, q: Arc<AsyncSender<String>>) {
     let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());

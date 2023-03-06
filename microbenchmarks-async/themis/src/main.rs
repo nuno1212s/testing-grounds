@@ -97,7 +97,9 @@ fn main() {
     if client {
         log::info!("STARTING CLIENTS ");
 
-        client::start_clients(config, me, variables::client_count());
+
+        client::start_clients(config, variables::client_count());
+
     } else {
         let config = Arc::new(config);
         log::info!("STARTING REPLICA {}", me);

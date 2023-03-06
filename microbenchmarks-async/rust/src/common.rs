@@ -12,29 +12,16 @@ use regex::Regex;
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
 use rustls::server::AllowAnyAuthenticatedClient;
 use rustls_pemfile::{Item, read_one};
-use febft::bft::benchmarks::CommStats;
-
-use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
-use febft::bft::communication::message::ObserveEventKind;
-use febft::bft::core::client::{
-    self,
-    Client,
-};
-use febft::bft::core::client::observing_client::ObserverCallback;
-use febft::bft::core::client::unordered_client::UnorderedClientMode;
-use febft::bft::core::server::{
-    Replica,
-    ReplicaConfig,
-};
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::error::*;
-use febft::bft::msg_log::persistent::NoPersistentLog;
-use febft::bft::ordering::{Orderable, SeqNo};
-use febft::bft::threadpool;
-
+use febft_client::{Client};
+use febft_client::unordered_client::UnorderedClientMode;
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_common::error::*;
+use febft_common::ordering::SeqNo;
+use febft_common::threadpool;
+use febft_communication::{NodeConfig, NodeId, PeerAddr};
+use febft_communication::benchmarks::CommStats;
+use febft_consensus::msg_log::persistent::NoPersistentLog;
+use febft_replica::replica::{Replica, ReplicaConfig};
 use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;
 
@@ -45,7 +32,7 @@ macro_rules! addr {
         (addr, String::from($h))
     }}
 }
-
+/*
 pub struct ObserverCall;
 
 impl ObserverCallback for ObserverCall {
@@ -79,7 +66,7 @@ impl ObserverCallback for ObserverCall {
             ObserveEventKind::Executed(_) => {}
         }
     }
-}
+}*/
 
 pub struct ConfigEntry {
     pub portno: u16,
@@ -197,9 +184,9 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData>> {
+) -> Result<Client<Microbenchmark>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
-    let conf = client::ClientConfig {
+    let conf = febft_client::ClientConfig {
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
