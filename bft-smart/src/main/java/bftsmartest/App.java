@@ -33,7 +33,7 @@ public class App {
         case "client":
             MapInteractiveClient.main(nodeId);
             break;
-        case "server":
+        case "replica":
             MapServer.main(nodeId);
             break;
         default:
