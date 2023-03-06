@@ -13,8 +13,9 @@ use konst::{
     unwrap_ctx,
 };
 
-use febft::bft::error::*;
-use febft::bft::communication::serialize::SharedData;
+use febft_common::error::*;
+use febft_execution::serialize::SharedData;
+
 
 pub struct MicrobenchmarkData;
 

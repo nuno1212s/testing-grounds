@@ -4,7 +4,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::offset::Utc;
-use futures_timer::Delay;
+use febft_client::Client;
+use febft_client::ordered_client::Ordered;
+use febft_common::{channel, init, InitConfig};
+use febft_common::async_runtime as rt;
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_communication::{NodeId, PeerAddr};
+use febft_communication::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
+
 use intmap::IntMap;
 use nolock::queues::mpsc::jiffy::{
     async_queue,
@@ -12,22 +19,8 @@ use nolock::queues::mpsc::jiffy::{
 };
 use rand_core::{OsRng, RngCore};
 
-use febft::bft::{
-    init,
-    InitConfig,
-};
-use febft::bft::async_runtime as rt;
-use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::communication::NodeId;
-use febft::bft::core::client::Client;
-use febft::bft::core::client::ordered_client::Ordered;
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-
 use crate::common::*;
+use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;
 
 pub fn main() {
@@ -282,7 +275,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<Microbenchmark>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({

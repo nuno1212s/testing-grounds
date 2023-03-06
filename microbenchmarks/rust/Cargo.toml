@@ -20,25 +20,12 @@ nolock = "0.3"
 chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 mprober-lib = "0.1.7"
-
-[dependencies.febft]
-path = "../../../febft"
-#git = "https://github.com/nuno1212s/febft.git"
-#rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
-default-features = false
-features = [
-    "expose_impl",
-    "async_runtime_tokio",
-    "threadpool_rayon",
-    "socket_async_std_tcp",
-    "channel_flume_mpmc",
-    "channel_sync_crossbeam",
-    "channel_mixed_flume",
-    "channel_mult_custom_dump",
-    "crypto_signature_ring_ed25519",
-    "crypto_hash_blake3_blake3",
-    "collections_randomstate_fxhash"
-]
+febft-replica = { path = "../../../febft/febft-replica"}
+febft-client = {path = "../../../febft/febft-client"}
+febft-common = {path = "../../../febft/febft-common"}
+febft-consensus = {path = "../../../febft/febft-consensus"}
+febft-execution = {path = "../../../febft/febft-execution"}
+febft-communication = {path = "../../../febft/febft-communication"}
 
 [build-dependencies.capnpc]
 version = "0.16.2"

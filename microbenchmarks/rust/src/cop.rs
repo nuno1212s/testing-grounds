@@ -8,27 +8,21 @@ use std::time::Duration;
 
 use intmap::IntMap;
 use chrono::offset::Utc;
+use febft_client::Client;
+use febft_client::ordered_client::Ordered;
+use febft_common::{async_runtime as rt, channel};
+use febft_common::error::*;
+use febft_common::{init, InitConfig};
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_communication::{NodeId, PeerAddr};
+use febft_communication::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 use futures_timer::Delay;
 use rand_core::{OsRng, RngCore};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
-
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::core::client::Client;
-use febft::bft::communication::NodeId;
-use febft::bft::async_runtime as rt;
-use febft::bft::{
-    init,
-    InitConfig,
-};
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
-use febft::bft::core::client::ordered_client::Ordered;
+use crate::exec::Microbenchmark;
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -282,7 +276,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+async fn run_client(mut client: Client<Microbenchmark>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
