@@ -23,6 +23,7 @@ use febft_common::{channel, init, InitConfig};
 use febft_common::async_runtime as rt;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_communication::{NodeId, PeerAddr};
+use febft_communication::benchmarks::CommStats;
 use crate::exec::Microbenchmark;
 
 pub fn main() {
@@ -122,11 +123,11 @@ fn main_(id: NodeId) {
             addrs
         };
 
-        /* let comm_stats = Some(Arc::new(CommStats::new(id,
+         let comm_stats = Some(Arc::new(CommStats::new(id,
                                                  first_cli,
-                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL))); */
+                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL)));
 
-        let comm_stats = None;
+        //let comm_stats = None;
 
         let sk = secret_keys.remove(id.into()).unwrap();
 
@@ -177,11 +178,11 @@ fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    /* let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(local_first_cli),
-                                             NodeId::from(first_cli),
-                                             MicrobenchmarkData::MEASUREMENT_INTERVAL))); */
+    let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(first_id),
+                                             NodeId::from(first_id),
+                                             MicrobenchmarkData::MEASUREMENT_INTERVAL)));
 
-    let comm_stats = None;
+    //let comm_stats = None;
 
     for i in 0..client_count {
         let id = NodeId::from(first_id + i);

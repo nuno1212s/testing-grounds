@@ -1,3 +1,4 @@
 #!/bin/sh
 
 cargo clean
+rm -rf log
