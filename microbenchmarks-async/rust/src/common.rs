@@ -184,7 +184,7 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<Microbenchmark>> {
+) -> Result<Client<MicrobenchmarkData>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = febft_client::ClientConfig {
         unordered_rq_mode: UnorderedClientMode::BFT,
