@@ -1,7 +1,7 @@
-use std::sync::Weak;
 use std::time::Duration;
 use std::default::Default;
-use std::io::{Read, Write};
+use std::io::{Bytes, Read, Write};
+use bincode::{Decode, Encode};
 
 use konst::{
     primitive::{
@@ -15,6 +15,7 @@ use konst::{
 
 use febft_common::error::*;
 use febft_execution::serialize::SharedData;
+use serde::{Deserialize, Serialize};
 
 pub struct MicrobenchmarkData;
 
@@ -54,13 +55,40 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
-    const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
+    pub(crate) const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
+    pub(crate) const REPLY: [u8; Self::REPLY_SIZE] = [0; Self::REPLY_SIZE];
+}
+
+#[derive(Serialize, Deserialize)]
+#[derive(Encode, Decode)]
+#[derive(Clone)]
+pub struct Request {
+    pub inner: [u8; MicrobenchmarkData::REQUEST_SIZE]
+}
+
+#[derive(Serialize, Deserialize)]
+#[derive(Encode, Decode)]
+#[derive(Clone)]
+pub struct Reply {
+    pub inner: [u8; MicrobenchmarkData::REPLY_SIZE]
+}
+
+impl Request {
+    pub fn new(inner: [u8; MicrobenchmarkData::REQUEST_SIZE]) -> Self {
+        Self { inner }
+    }
+}
+
+impl Reply {
+    pub fn new(inner:  [u8; MicrobenchmarkData::REPLY_SIZE]) -> Self {
+        Self { inner }
+    }
 }
 
 impl SharedData for MicrobenchmarkData {
     type State = Vec<u8>;
-    type Request = Weak<Vec<u8>>;
-    type Reply = Weak<Vec<u8>>;
+    type Request = Request;
+    type Reply = Reply;
 
     fn serialize_state<W>(_w: W, _state: &Self::State) -> Result<()> where W: Write {
         Ok(())
@@ -78,13 +106,7 @@ impl SharedData for MicrobenchmarkData {
 
         let mut rq_msg: messages_capnp::benchmark_request::Builder = root.init_root();
 
-        let request_content = request.upgrade();
-
-        if let Some(request) = request_content {
-            rq_msg.set_data(&*request);
-        } else {
-            rq_msg.set_data(&MicrobenchmarkData::REQUEST);
-        }
+        rq_msg.set_data(&request.inner);
 
         capnp::serialize::write_message(w, &root)
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize request")
@@ -98,9 +120,11 @@ impl SharedData for MicrobenchmarkData {
         let request_msg : messages_capnp::benchmark_request::Reader = reader.get_root()
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to read request message")?;
 
-        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from request message?");
+        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from request message?")?;
 
-        Ok(Weak::new())
+        Ok(Request {
+            inner: MicrobenchmarkData::REQUEST,
+        })
     }
 
     fn serialize_reply<W>(w: W, reply: &Self::Reply) -> Result<()> where W: Write {
@@ -108,13 +132,7 @@ impl SharedData for MicrobenchmarkData {
 
         let mut rq_msg: messages_capnp::benchmark_reply::Builder = root.init_root();
 
-        let reply_content = reply.upgrade();
-
-        if let Some(reply) = reply_content {
-            rq_msg.set_data(&*reply);
-        } else {
-            panic!("Failed to get message to send");
-        }
+        rq_msg.set_data(&reply.inner);
 
         capnp::serialize::write_message(w, &root)
             .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize reply")
@@ -130,7 +148,9 @@ impl SharedData for MicrobenchmarkData {
 
         let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from reply message?");
 
-        Ok(Weak::new())
+        Ok(Reply {
+            inner: MicrobenchmarkData::REPLY,
+        })
     }
 }
 

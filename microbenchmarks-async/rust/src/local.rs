@@ -21,7 +21,7 @@ use semaphores::RawSemaphore;
 
 use crate::common::*;
 use crate::exec::Microbenchmark;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -269,11 +269,6 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
     println!("Warm up...");
 
-    let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        r
-    });
-
     let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
 
     let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
@@ -295,7 +290,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let q = q.clone();
 
-        client.clone().update_callback::<Ordered>(Arc::downgrade(&request), Box::new(move |reply| {
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
@@ -354,7 +349,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let sem_clone = semaphore.clone();
 
-        client.clone().update_callback::<Ordered>(Arc::downgrade(&request),
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
                                                   Box::new(move |reply| {
 
                                                       //Release another request for this client

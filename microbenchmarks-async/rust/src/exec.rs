@@ -7,6 +7,7 @@ use febft_communication::benchmarks::Measurements;
 use febft_communication::NodeId;
 use febft_communication::benchmarks::BenchmarkHelperStore;
 use febft_execution::executable::{BatchReplies, Reply, Request, Service, State, UpdateBatch};
+use crate::serialize;
 
 use crate::serialize::MicrobenchmarkData;
 
@@ -60,15 +61,15 @@ impl Service for Microbenchmark {
         todo!()
     }
 
-    fn update(&mut self, _s: &mut Vec<u8>, _r: Weak<Vec<u8>>) -> Weak<Vec<u8>> {
+    fn update(&mut self, _s: &mut Vec<u8>, _r: serialize::Request) ->serialize::Reply {
         unimplemented!()
     }
 
     fn update_batch(
         &mut self,
         _state: &mut Vec<u8>,
-        mut batch: UpdateBatch<Weak<Vec<u8>>>,
-    ) -> BatchReplies<Weak<Vec<u8>>> {
+        mut batch: UpdateBatch<serialize::Request>,
+    ) -> BatchReplies<serialize::Reply> {
         let batch_len = batch.len();
 
         let meta = batch.take_meta();
@@ -76,9 +77,8 @@ impl Service for Microbenchmark {
         let mut reply_batch = BatchReplies::with_capacity(batch.len());
 
         for update in batch.into_inner() {
-            let (peer_id, sess, opid, _req) = update.into_inner();
-            let reply = Arc::downgrade(&self.reply);
-            reply_batch.add(peer_id, sess, opid, reply);
+            let (peer_id, sess, opid, _) = update.into_inner();
+            reply_batch.add(peer_id, sess, opid, serialize::Reply::new(MicrobenchmarkData::REPLY));
         }
 
         self.batch_count += 1.0;

@@ -31,6 +31,8 @@ febft-execution = {path = "../../../febft/febft-execution"}
 febft-communication = {path = "../../../febft/febft-communication"}
 mprober-lib = "0.1.7"
 procinfo = "0.4.2"
+serde = {version = "1.0.147"}
+bincode = "2.0.0-rc.2"
 
 [build-dependencies.capnpc]
 version = "0.16.2"
