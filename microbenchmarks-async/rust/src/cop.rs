@@ -1,6 +1,6 @@
 use std::env;
 use crate::common::*;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 use std::fs::File;
 use std::io::Write;
@@ -184,9 +184,9 @@ fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(8);
 
-    /* let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(local_first_cli),
-                                             NodeId::from(first_cli),
-                                             MicrobenchmarkData::MEASUREMENT_INTERVAL))); */
+    /*let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(first_id),
+                                             NodeId::from(1000u32),
+                                             MicrobenchmarkData::MEASUREMENT_INTERVAL)));*/
 
     let comm_stats = None;
 
@@ -325,7 +325,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let q = q.clone();
 
-        client.clone().update_callback::<Ordered>(Arc::downgrade(&request), Box::new(move |reply| {
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
@@ -384,7 +384,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
 
         let sem_clone = semaphore.clone();
 
-        client.clone().update_callback::<Ordered>(Arc::downgrade(&request),
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
                                                   Box::new(move |reply| {
 
                                                       //Release another request for this client

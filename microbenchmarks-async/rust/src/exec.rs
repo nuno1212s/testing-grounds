@@ -11,6 +11,7 @@ use febft::bft::benchmarks::{
 use febft::bft::communication::NodeId;
 use febft::bft::error::*;
 use febft::bft::executable::{Service, UpdateBatch, BatchReplies, State, Request, Reply};
+use crate::serialize;
 
 use crate::serialize::MicrobenchmarkData;
 
@@ -49,30 +50,24 @@ impl Microbenchmark {
 impl Service for Microbenchmark {
     type Data = MicrobenchmarkData;
 
-    fn initial_state(&mut self) -> Result<Vec<u8>> {
-        // TODO: remove this
-        drop(MicrobenchmarkData::REQUEST_SIZE);
+    fn initial_state(&mut self) -> Result<serialize::State> {
 
-        Ok((0..)
-            .into_iter()
-            .take(MicrobenchmarkData::STATE_SIZE)
-            .map(|x| (x & 0xff) as u8)
-            .collect())
+        Ok(serialize::State::new(MicrobenchmarkData::STATE))
     }
 
     fn unordered_execution(&self, state: &State<Self>, request: Request<Self>) -> Reply<Self> {
         todo!()
     }
 
-    fn update(&mut self, _s: &mut Vec<u8>, _r: Weak<Vec<u8>>) -> Weak<Vec<u8>> {
+    fn update(&mut self, state: &mut State<Self>, request: Request<Self>) -> Reply<Self> {
         unimplemented!()
     }
 
     fn update_batch(
         &mut self,
-        _state: &mut Vec<u8>,
-        mut batch: UpdateBatch<Weak<Vec<u8>>>,
-    ) -> BatchReplies<Weak<Vec<u8>>> {
+        _state: &mut serialize::State,
+        mut batch: UpdateBatch<serialize::Request>,
+    ) -> BatchReplies<serialize::Reply> {
         let batch_len = batch.len();
 
         let meta = batch.take_meta();
@@ -81,8 +76,7 @@ impl Service for Microbenchmark {
 
         for update in batch.into_inner() {
             let (peer_id, sess, opid, _req) = update.into_inner();
-            let reply = Arc::downgrade(&self.reply);
-            reply_batch.add(peer_id, sess, opid, reply);
+            reply_batch.add(peer_id, sess, opid, serialize::Reply::new(MicrobenchmarkData::REPLY));
         }
 
         self.batch_count += 1.0;

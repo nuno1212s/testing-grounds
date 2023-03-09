@@ -7,6 +7,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = "*"
 regex = "1"
 intmap = "2.0.0"
 rustls = "0.20.6"
@@ -37,6 +38,7 @@ features = [
     "expose_impl",
     "async_runtime_tokio",
     "threadpool_rayon",
+    "serialize_serde",
     "socket_tokio_tcp",
     "channel_flume_mpmc",
     "channel_sync_crossbeam",
