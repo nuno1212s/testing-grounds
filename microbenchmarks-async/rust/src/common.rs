@@ -26,14 +26,11 @@ use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
 };
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::error::*;
 use febft::bft::msg_log::persistent::NoPersistentLog;
-use febft::bft::ordering::{Orderable, SeqNo};
-use febft::bft::threadpool;
+use febft_common::crypto::signature::{KeyPair, PublicKey};
+use febft_common::ordering::{Orderable, SeqNo};
+use febft_common::error::*;
+use febft_common::threadpool;
 
 use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;

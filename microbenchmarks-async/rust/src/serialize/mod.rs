@@ -14,12 +14,8 @@ use konst::{
     unwrap_ctx,
 };
 
-use febft::bft::error::*;
+use febft_common::error::*;
 use febft::bft::communication::serialize::SharedData;
-use febft::bft::ordering::{
-    SeqNo,
-    Orderable,
-};
 
 pub struct MicrobenchmarkData;
 
