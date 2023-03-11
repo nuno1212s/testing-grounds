@@ -18,15 +18,11 @@ use febft::bft::{
     init,
     InitConfig,
 };
-use febft::bft::benchmarks::{
-    BenchmarkHelper,
-    BenchmarkHelperStore,
-};
-use febft::bft::communication::{NodeId, PeerAddr};
 use febft::bft::core::client::Client;
 use febft::bft::core::client::ordered_client::Ordered;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel};
+use febft_communication::{NodeId, PeerAddr};
 
 use crate::common::*;
 use crate::serialize::{MicrobenchmarkData, Request};

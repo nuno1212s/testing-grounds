@@ -29,6 +29,7 @@ mprober-lib = "0.1.7"
 procinfo = "0.4.2"
 
 febft-common = {path ="../../../febft/febft-common"}
+febft-communication = {path = "../../../febft/febft-communication"}
 
 [dependencies.febft]
 path = "../../../febft/febft"

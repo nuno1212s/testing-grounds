@@ -12,10 +12,6 @@ use regex::Regex;
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
 use rustls::server::AllowAnyAuthenticatedClient;
 use rustls_pemfile::{Item, read_one};
-use febft::bft::benchmarks::CommStats;
-
-use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
-use febft::bft::communication::message::ObserveEventKind;
 use febft::bft::core::client::{
     self,
     Client,
@@ -26,11 +22,14 @@ use febft::bft::core::server::{
     Replica,
     ReplicaConfig,
 };
+use febft::bft::message::ObserveEventKind;
 use febft::bft::msg_log::persistent::NoPersistentLog;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::ordering::{Orderable, SeqNo};
 use febft_common::error::*;
 use febft_common::threadpool;
+use febft_communication::{NodeConfig, NodeId, PeerAddr};
+use febft_communication::benchmarks::CommStats;
 
 use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;
