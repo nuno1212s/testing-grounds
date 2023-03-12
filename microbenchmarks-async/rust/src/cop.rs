@@ -16,7 +16,7 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 
-use febft::bft::{
+use febft_pbft_consensus::bft::{
     init,
     InitConfig,
 };

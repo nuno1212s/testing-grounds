@@ -14,7 +14,7 @@ use nolock::queues::mpsc::jiffy::{
 use rand_core::{OsRng, RngCore};
 use semaphores::RawSemaphore;
 
-use febft::bft::{
+use febft_pbft_consensus::bft::{
     init,
     InitConfig,
 };

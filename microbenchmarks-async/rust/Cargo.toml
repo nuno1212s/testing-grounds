@@ -55,6 +55,9 @@ path = "../../../febft/febft-pbft-consensus"
 #    "collections_randomstate_fxhash"
 #]
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.5"
+
 [build-dependencies.capnpc]
 version = "0.16.2"
 
@@ -62,7 +65,7 @@ version = "0.16.2"
 opt-level = 3
 panic = "abort"
 overflow-checks = false
-codegen-units = 1
+codegen-units = 16
 lto = true
 debug = false
 debug-assertions = false
