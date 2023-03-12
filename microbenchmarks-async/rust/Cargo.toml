@@ -30,6 +30,8 @@ procinfo = "0.4.2"
 
 febft-common = {path ="../../../febft/febft-common"}
 febft-communication = {path = "../../../febft/febft-communication"}
+febft-execution = {path = "../../../febft/febft-execution"}
+febft-messages = {path = "../../../febft/febft-messages"}
 
 [dependencies.febft]
 path = "../../../febft/febft"
