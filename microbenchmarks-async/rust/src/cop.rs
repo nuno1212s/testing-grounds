@@ -16,13 +16,13 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 
-use febft::bft::core::client::Client;
 use febft::bft::{
     init,
     InitConfig,
 };
 use semaphores::RawSemaphore;
-use febft::bft::core::client::ordered_client::Ordered;
+use febft_client::client::Client;
+use febft_client::client::ordered_client::Ordered;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel};
 use febft_communication::{NodeId, PeerAddr};
