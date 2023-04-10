@@ -21,9 +21,12 @@ use febft_client::client::unordered_client::UnorderedClientMode;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::ordering::{Orderable, SeqNo};
 use febft_common::error::*;
+use febft_common::node_id::NodeId;
 use febft_common::threadpool;
-use febft_communication::{NodeConfig, NodeId, PeerAddr};
-use febft_communication::benchmarks::CommStats;
+use febft_communication::config::{ClientPoolConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use febft_communication::tcpip::{PeerAddr, TcpNode};
+use febft_metrics::benchmarks::CommStats;
+use febft_pbft_consensus::bft::PBFT;
 use febft_replica::server::{Replica, ReplicaConfig};
 
 use crate::exec::Microbenchmark;
@@ -142,7 +145,6 @@ async fn node_config(
     comm_stats: Option<Arc<CommStats>>,
 ) -> NodeConfig {
 
-    let db_path = format!("PERSISTENT_DB_{:?}", id);
 
     // read TLS configs concurrently
     let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
@@ -159,25 +161,36 @@ async fn node_config(
             batch_timeout, batch_sleep, clients_per_pool)
     };
 
-    // build the node conf
-    NodeConfig {
-        id,
-        n,
-        f: (n - 1) / 3,
-        sk,
-        pk,
+    let tcp = TcpConfig {
         addrs,
-        async_client_config: client_config,
-        async_server_config: server_config,
-        sync_client_config: client_config_replica,
-        sync_server_config: server_config_replica,
-        first_cli: NodeId::from(1000u32),
+        network_config: TlsConfig {
+            async_client_config: client_config,
+            async_server_config: server_config,
+            sync_client_config: client_config_replica,
+            sync_server_config: server_config_replica,
+        },
+        replica_concurrent_connections: 1,
+        client_concurrent_connections: 1,
+    };
+
+    let cp = ClientPoolConfig {
         batch_size,
         clients_per_pool,
         batch_timeout_micros: batch_timeout as u64,
         batch_sleep_micros: batch_sleep as u64,
-        comm_stats,
-        db_path
+    };
+
+    let pk_config = PKConfig {
+        sk,
+        pk,
+    };
+
+    NodeConfig {
+        id,
+        first_cli: NodeId::from(1000u32),
+        tcp_config: tcp,
+        client_pool_config: cp,
+        pk_crypto_config: pk_config,
     }
 }
 
@@ -188,9 +201,11 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData>> {
+) -> Result<Client<MicrobenchmarkData, TcpNode<PBFT<MicrobenchmarkData>>>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
     let conf = client::ClientConfig {
+        n,
+        f: 1,
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
@@ -204,8 +219,9 @@ pub async fn setup_replica(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Replica<Microbenchmark>> {
+) -> Result<Replica<Microbenchmark, TcpNode<PBFT<MicrobenchmarkData>>>> {
     let node_id = id.clone();
+    let db_path = format!("PERSISTENT_DB_{:?}", id);
 
     let (node, global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, sk, addrs, pk, comm_stats);
@@ -221,10 +237,13 @@ pub async fn setup_replica(
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
+        n,
         global_batch_size,
         batch_timeout: global_batch_timeout,
         max_batch_size,
-        log_mode: Default::default()
+        db_path,
+        log_mode: Default::default(),
+        f: 1
     };
 
     Replica::bootstrap(conf).await

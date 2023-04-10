@@ -3,9 +3,9 @@ use std::sync::{Arc, Weak};
 use chrono::DateTime;
 use chrono::offset::Utc;
 use febft_common::error::*;
-use febft_communication::benchmarks::{BenchmarkHelperStore, Measurements};
-use febft_communication::NodeId;
+use febft_common::node_id::NodeId;
 use febft_execution::app::{BatchReplies, Reply, Request, Service, State, UpdateBatch};
+use febft_metrics::benchmarks::{BenchmarkHelperStore, Measurements};
 
 use crate::serialize;
 

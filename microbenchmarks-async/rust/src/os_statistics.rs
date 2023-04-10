@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use febft_communication::NodeId;
+use febft_common::node_id::NodeId;
 
 
 pub fn start_statistics_thread(node_id: NodeId) {

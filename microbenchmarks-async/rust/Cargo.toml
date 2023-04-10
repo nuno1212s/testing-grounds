@@ -34,6 +34,7 @@ febft-execution = { path = "../../../febft/febft-execution" }
 febft-messages = { path = "../../../febft/febft-messages" }
 febft-replica = { path = "../../../febft/febft-replica" }
 febft-client = { path = "../../../febft/febft-client" }
+febft-metrics = {path = "../../../febft/febft-metrics"}
 
 [dependencies.febft-pbft-consensus]
 path = "../../../febft/febft-pbft-consensus"

@@ -14,15 +14,13 @@ use nolock::queues::mpsc::jiffy::{
 use rand_core::{OsRng, RngCore};
 use semaphores::RawSemaphore;
 
-use febft_pbft_consensus::bft::{
-    init,
-    InitConfig,
-};
+use febft_pbft_consensus::bft::{init, InitConfig, PBFT};
 use febft_client::client::Client;
 use febft_client::client::ordered_client::Ordered;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel};
-use febft_communication::{NodeId, PeerAddr};
+use febft_common::node_id::NodeId;
+use febft_communication::tcpip::{PeerAddr, TcpNode};
 
 use crate::common::*;
 use crate::serialize::{MicrobenchmarkData, Request};
@@ -265,7 +263,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<MicrobenchmarkData, TcpNode<PBFT<MicrobenchmarkData>>>, q: Arc<AsyncSender<String>>) {
     let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());
