@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
 use std::sync::Arc;
+use std::time::Duration;
 
 use intmap::IntMap;
 use konst::primitive::{parse_u128, parse_usize};
@@ -13,10 +14,8 @@ use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig}
 use rustls::server::AllowAnyAuthenticatedClient;
 use rustls_pemfile::{Item, read_one};
 use febft_pbft_consensus::bft::message::ObserveEventKind;
-use febft_pbft_consensus::bft::msg_log::persistent::NoPersistentLog;
 use febft_client::client;
 use febft_client::client::Client;
-use febft_client::client::observing_client::ObserverCallback;
 use febft_client::client::unordered_client::UnorderedClientMode;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::ordering::{Orderable, SeqNo};
@@ -25,9 +24,17 @@ use febft_common::node_id::NodeId;
 use febft_common::threadpool;
 use febft_communication::config::{ClientPoolConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
 use febft_communication::tcpip::{PeerAddr, TcpNode};
+use febft_messages::serialize::{ClientServiceMsg, ServiceMsg};
 use febft_metrics::benchmarks::CommStats;
-use febft_pbft_consensus::bft::PBFT;
-use febft_replica::server::{Replica, ReplicaConfig};
+use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
+use febft_pbft_consensus::bft::{PBFTOrderProtocol};
+use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
+use febft_pbft_consensus::bft::sync::view::ViewInfo;
+use febft_replica::config::ReplicaConfig;
+use febft_replica::server::{Replica};
+use febft_state_transfer::CollabStateTransfer;
+use febft_state_transfer::config::StateTransferConfig;
+use febft_state_transfer::message::serialize::CSTMsg;
 
 use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;
@@ -39,7 +46,7 @@ macro_rules! addr {
         (addr, String::from($h))
     }}
 }
-
+/*
 pub struct ObserverCall;
 
 impl ObserverCallback for ObserverCall {
@@ -74,6 +81,8 @@ impl ObserverCallback for ObserverCall {
         }
     }
 }
+
+ */
 
 pub struct ConfigEntry {
     pub portno: u16,
@@ -194,6 +203,18 @@ async fn node_config(
     }
 }
 
+/// Set up the data handles so we initialize the networking layer
+pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
+pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+
+/// Set up the networking layer with the data handles we have
+pub type ReplicaNetworking = TcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
+pub type ClientNetworking = TcpNode<ClientServiceMsg<MicrobenchmarkData>>;
+
+/// Set up the protocols with the types that have been built up to here
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking>;
+pub type StateTransferProtocol = CollabStateTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking>;
+
 pub async fn setup_client(
     n: usize,
     id: NodeId,
@@ -201,14 +222,16 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData, TcpNode<PBFT<MicrobenchmarkData>>>> {
+) -> Result<Client<MicrobenchmarkData, ClientNetworking>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
+
     let conf = client::ClientConfig {
         n,
         f: 1,
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
+
     Client::bootstrap(conf).await
 }
 
@@ -219,7 +242,7 @@ pub async fn setup_replica(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Replica<Microbenchmark, TcpNode<PBFT<MicrobenchmarkData>>>> {
+) -> Result<Replica<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking>> {
     let node_id = id.clone();
     let db_path = format!("PERSISTENT_DB_{:?}", id);
 
@@ -232,18 +255,34 @@ pub async fn setup_replica(
 
     let max_batch_size = get_max_batch_size();
 
-    let conf = ReplicaConfig::<Microbenchmark, NoPersistentLog> {
+    let op_config = PBFTConfig {
+        node_id,
+        follower_handle: None,
+        view: ViewInfo::new(SeqNo::ZERO, n, 1)?,
+        timeout_dur: Default::default(),
+        db_path,
+        proposer_config: ProposerConfig {
+            target_batch_size: 0,
+            max_batch_size: 0,
+            batch_timeout: 0,
+        },
+        _phantom_data: Default::default(),
+    };
+
+    let st_config = StateTransferConfig {
+        timeout_duration: Duration::from_secs(3),
+    };
+
+    let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
+        id,
         n,
-        global_batch_size,
-        batch_timeout: global_batch_timeout,
-        max_batch_size,
-        db_path,
-        log_mode: Default::default(),
-        f: 1
+        f: 1,
+        op_config,
+        st_config,
     };
 
     Replica::bootstrap(conf).await
@@ -359,7 +398,6 @@ fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificat
 
 #[inline]
 fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
-
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {

@@ -35,9 +35,11 @@ febft-messages = { path = "../../../febft/febft-messages" }
 febft-replica = { path = "../../../febft/febft-replica" }
 febft-client = { path = "../../../febft/febft-client" }
 febft-metrics = {path = "../../../febft/febft-metrics"}
+febft-state-transfer = {path = "../../../febft/febft-state-transfer", features = ["serialize_serde"]}
 
 [dependencies.febft-pbft-consensus]
 path = "../../../febft/febft-pbft-consensus"
+features = ["serialize_serde"]
 #git = "https://github.com/nuno1212s/febft.git"
 #rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
 #default-features = false
