@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 use chrono::offset::Utc;
@@ -67,7 +67,10 @@ fn main_() {
 
     let mut pending_threads = Vec::with_capacity(4);
 
+    let barrier = Arc::new(Barrier::new(replicas_config.len()));
+
     for replica in &replicas_config {
+        let barrier = barrier.clone();
         let id = NodeId::from(replica.id);
 
         println!("Starting replica {:?}", id);
@@ -117,6 +120,12 @@ fn main_() {
                 println!("Running replica #{}", u32::from(id));
                 replica
             });
+
+            barrier.wait();
+
+            println!("{:?} // Let's go", id);
+
+            barrier.wait();
 
             replica.run().unwrap();
         }).unwrap();
