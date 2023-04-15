@@ -262,9 +262,9 @@ pub async fn setup_replica(
         timeout_dur: Default::default(),
         db_path,
         proposer_config: ProposerConfig {
-            target_batch_size: 0,
-            max_batch_size: 0,
-            batch_timeout: 0,
+            target_batch_size: global_batch_size as u64,
+            max_batch_size: global_batch_size as u64 * 2,
+            batch_timeout: global_batch_timeout as u64,
         },
         _phantom_data: Default::default(),
     };

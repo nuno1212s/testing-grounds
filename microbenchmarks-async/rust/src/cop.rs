@@ -9,21 +9,19 @@ use std::time::{Duration};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
-use konst::primitive::{parse_u32, parse_usize};
-use rand_core::{OsRng, RngCore};
+use konst::primitive::{parse_usize};
 use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
 
-use febft_pbft_consensus::bft::{PBFT};
 use semaphores::RawSemaphore;
 use febft_client::client::Client;
 use febft_client::client::ordered_client::Ordered;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel, init, InitConfig};
 use febft_common::node_id::NodeId;
-use febft_communication::tcpip::{PeerAddr, TcpNode};
+use febft_communication::tcpip::{PeerAddr};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
