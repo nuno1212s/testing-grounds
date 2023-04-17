@@ -473,7 +473,7 @@ async fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
             .with_safe_default_kx_groups()
             .with_safe_default_protocol_versions()
             .unwrap()
-            .with_client_cert_verifier(auth)
+            .with_client_cert_verifier(Arc::new(auth))
             .with_single_cert(chain, sk)
             .expect("Failed to make cfg");
 
@@ -530,7 +530,7 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             .with_safe_default_kx_groups()
             .with_safe_default_protocol_versions()
             .unwrap()
-            .with_client_cert_verifier(auth)
+            .with_client_cert_verifier(Arc::new(auth))
             .with_single_cert(chain, sk)
             .expect("Failed to make cfg");
 
