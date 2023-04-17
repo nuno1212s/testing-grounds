@@ -255,22 +255,21 @@ pub async fn setup_replica(
 
     let max_batch_size = get_max_batch_size();
 
-    let op_config = PBFTConfig {
-        node_id,
-        follower_handle: None,
-        view: ViewInfo::new(SeqNo::ZERO, n, 1)?,
-        timeout_dur: Default::default(),
-        db_path,
-        proposer_config: ProposerConfig {
-            target_batch_size: global_batch_size as u64,
-            max_batch_size: global_batch_size as u64 * 2,
-            batch_timeout: global_batch_timeout as u64,
-        },
-        _phantom_data: Default::default(),
+    let proposer_config = ProposerConfig {
+        target_batch_size: global_batch_size as u64,
+        max_batch_size: global_batch_size as u64 * 2,
+        batch_timeout: global_batch_timeout as u64,
     };
 
+    let view = ViewInfo::new(SeqNo::ZERO, n, 1)?;
+
+    let timeout_duration = Duration::from_secs(3);
+
+    let op_config = PBFTConfig::new(node_id, None,
+                                    view, timeout_duration.clone(), db_path, proposer_config);
+
     let st_config = StateTransferConfig {
-        timeout_duration: Duration::from_secs(3),
+        timeout_duration,
     };
 
     let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking> {
