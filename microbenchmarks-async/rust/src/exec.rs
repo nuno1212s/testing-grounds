@@ -46,7 +46,7 @@ impl Microbenchmark {
 impl Service for Microbenchmark {
     type Data = MicrobenchmarkData;
 
-    fn initial_state(&mut self) -> Result<serialize::State> {
+    fn initial_state() -> Result<serialize::State> {
 
         Ok(serialize::State::new(MicrobenchmarkData::STATE))
     }
