@@ -55,8 +55,8 @@ impl Service for Microbenchmark {
         todo!()
     }
 
-    fn update(&mut self, state: &mut State<Self>, request: Request<Self>) -> Reply<Self> {
-        unimplemented!()
+    fn update(&mut self, _: &mut State<Self>, _: Request<Self>) -> Reply<Self> {
+        serialize::Reply::new(MicrobenchmarkData::REPLY)
     }
 
     fn update_batch(

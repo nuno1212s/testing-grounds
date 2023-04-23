@@ -103,11 +103,22 @@ pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
 
     loop {
         match file.read_line(&mut buf) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => {
+                println!("Finalizing reading the config file {} with size {}", path, config.len());
+
+                break;
+            }
+            Err(err) => {
+                println!("Finalizing reading the config file {} with size {} with err {:?}", path, config.len(), err);
+
+                break;
+            }
             _ => {
                 match parse_entry(&re, &buf) {
                     Some(entry) => config.push(entry),
-                    None => (),
+                    None => {
+                        println!("Failed to parse entry: {}", buf);
+                    },
                 }
                 buf.clear();
             }
