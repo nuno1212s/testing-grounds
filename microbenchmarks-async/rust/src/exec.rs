@@ -56,7 +56,60 @@ impl Service for Microbenchmark {
     }
 
     fn update(&mut self, _: &mut State<Self>, _: Request<Self>) -> Reply<Self> {
-        serialize::Reply::new(MicrobenchmarkData::REPLY)
+        let reply = serialize::Reply::new(MicrobenchmarkData::REPLY);
+
+        // increase iter count
+        self.iterations += 1;
+
+        if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
+            println!("{:?} // --- Measurements after {} ops ({} samples) ---",
+                     self.id, self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
+
+            let diff = Utc::now()
+                .signed_duration_since(self.max_tp_time)
+                .num_microseconds().expect("Need micro seconds");
+
+
+            let tp = ((self.iterations - self.last_measurement) as f32 * 1000.0 * 1000.0) / (diff as f32);
+
+            if tp > self.max_tp {
+                self.max_tp = tp;
+            }
+
+            self.last_measurement = self.iterations;
+
+            println!("{:?} // Throughput = {} operations/sec (Maximum observed: {} ops/sec)",
+                     self.id, tp, self.max_tp);
+
+            //This gives us the amount of batches per micro seconds, since the diff is in microseconds
+            let mut batches_per_second = self.batch_count / diff as f32;
+
+            //This moves the amount of batches per microsecond to the amount of batches per second
+            batches_per_second *= 1000.0 * 1000.0;
+
+            println!("{:?} // Batch throughput = {} batches/sec",
+                     self.id, batches_per_second);
+
+            //Reset the amount of batches
+            self.batch_count = 0.0;
+
+            self.measurements.total_latency.log_latency("Total");
+            self.measurements.consensus_latency.log_latency("Consensus");
+            self.measurements.pre_cons_latency.log_latency("Pre-consensus");
+            self.measurements.pos_cons_latency.log_latency("Pos-consensus");
+            self.measurements.pre_prepare_latency.log_latency("Propose / PrePrepare");
+            self.measurements.prepare_latency.log_latency("Write / Prepare");
+            self.measurements.commit_latency.log_latency("Accept / Commit");
+            self.measurements.prepare_msg_latency.log_latency("Prepare msg");
+            self.measurements.propose_time_latency.log_latency("Propose time");
+            self.measurements.prepare_time_taken.log_latency("Prepare time taken");
+            self.measurements.commit_time_taken.log_latency("Commit time taken");
+            self.measurements.batch_size.log_batch();
+
+            self.max_tp_time = Utc::now();
+        }
+
+        reply
     }
 
     fn update_batch(

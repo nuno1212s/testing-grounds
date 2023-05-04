@@ -3,7 +3,12 @@
 main() {
     generate_conf
     compile
+    delete_log
     exec_microbenchmarks
+}
+
+delete_log() {
+  rm -rf ./log/
 }
 
 generate_conf() {
