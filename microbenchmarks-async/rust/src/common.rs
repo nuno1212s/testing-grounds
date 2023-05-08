@@ -26,6 +26,7 @@ use febft_communication::config::{ClientPoolConfig, NodeConfig, PKConfig, TcpCon
 use febft_communication::tcpip::{PeerAddr, TcpNode};
 use febft_messages::serialize::{ClientServiceMsg, ServiceMsg};
 use febft_metrics::benchmarks::CommStats;
+use febft_metrics::InfluxDBArgs;
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
@@ -154,6 +155,24 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
         } else { None };
 
     Some(ConfigEntry { id, rep_portno, hostname, ipaddr, portno })
+}
+
+/// Get the configuration for influx DB
+pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
+    
+    let ip = std::env::var("INFLUX_IP").expect("INFLUX_IP not set");
+    let db_name = std::env::var("INFLUX_DB_NAME").expect("INFLUX_DB_NAME not set");
+    let user = std::env::var("INFLUX_USER").expect("INFLUX_USER not set");
+    let password = std::env::var("INFLUX_PASSWORD").expect("INFLUX_PASSWORD not set");
+    
+    InfluxDBArgs {
+        ip,
+        db_name,
+        user,
+        password,
+        node_id: id,
+    }
+    
 }
 
 async fn node_config(

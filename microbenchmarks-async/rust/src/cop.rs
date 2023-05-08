@@ -22,6 +22,7 @@ use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel, init, InitConfig};
 use febft_common::node_id::NodeId;
 use febft_communication::tcpip::{PeerAddr};
+use febft_metrics::with_metrics;
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -49,8 +50,11 @@ pub fn main() {
         };
 
         let _guard = unsafe { init(conf).unwrap() };
+        let node_id = NodeId::from(replica_id);
 
-        main_(NodeId::from(replica_id));
+        febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics())], influx_db_config(node_id));
+
+        main_(node_id);
     } else {
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
@@ -61,6 +65,10 @@ pub fn main() {
         };
 
         let _guard = unsafe { init(conf).unwrap() };
+
+        let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
+
+        febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics())], influx_db_config(NodeId::from(first_id)));
 
         client_async_main();
     }
