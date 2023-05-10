@@ -164,13 +164,18 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
     let db_name = std::env::var("INFLUX_DB_NAME").expect("INFLUX_DB_NAME not set");
     let user = std::env::var("INFLUX_USER").expect("INFLUX_USER not set");
     let password = std::env::var("INFLUX_PASSWORD").expect("INFLUX_PASSWORD not set");
-    
+
+    let extra = std::env::var("INFLUX_EXTRA_TEST").unwrap_or("".to_string());
+
+    let extra = Some(format!("test-{}", extra));
+
     InfluxDBArgs {
         ip,
         db_name,
         user,
         password,
         node_id: id,
+        extra,
     }
     
 }
