@@ -159,7 +159,7 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
 
 /// Get the configuration for influx DB
 pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
-    
+
     let ip = std::env::var("INFLUX_IP").expect("INFLUX_IP not set");
     let db_name = std::env::var("INFLUX_DB_NAME").expect("INFLUX_DB_NAME not set");
     let user = std::env::var("INFLUX_USER").expect("INFLUX_USER not set");
@@ -177,7 +177,7 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
         node_id: id,
         extra,
     }
-    
+
 }
 
 async fn node_config(
