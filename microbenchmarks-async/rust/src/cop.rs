@@ -18,11 +18,12 @@ use nolock::queues::mpsc::jiffy::{
 use semaphores::RawSemaphore;
 use febft_client::client::Client;
 use febft_client::client::ordered_client::Ordered;
+use febft_client::concurrent_client::ConcurrentClient;
 use febft_common::crypto::signature::{KeyPair, PublicKey};
 use febft_common::{async_runtime as rt, channel, init, InitConfig};
 use febft_common::node_id::NodeId;
 use febft_communication::tcpip::{PeerAddr};
-use febft_metrics::with_metrics;
+use febft_metrics::{MetricLevel, with_metric_level, with_metrics};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -54,7 +55,8 @@ pub fn main() {
 
         febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
                                                with_metrics(febft_messages::metric::metrics()),
-                                               with_metrics(febft_communication::metric::metrics())],
+                                               with_metrics(febft_communication::metric::metrics()),
+                                               with_metric_level(MetricLevel::Trace)],
                                           influx_db_config(node_id));
 
         main_(node_id);
@@ -74,7 +76,8 @@ pub fn main() {
         febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
                                                with_metrics(febft_messages::metric::metrics()),
                                                with_metrics(febft_client::metric::metrics()),
-                                               with_metrics(febft_communication::metric::metrics())],
+                                               with_metrics(febft_communication::metric::metrics()),
+                                               with_metric_level(MetricLevel::Trace)],
                                           influx_db_config(NodeId::from(first_id)));
 
         client_async_main();
@@ -310,6 +313,8 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
         r
     });
 
+    let concurrent_client = ConcurrentClient::from_client(client, concurrent_rqs).unwrap();
+
     let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
 
     let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
@@ -322,7 +327,7 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
         semaphore.acquire();
 
         if MicrobenchmarkData::VERBOSE {
-            println!("{:?} // Sending req {}...", client.id(), req);
+            println!("{:?} // Sending req {}...", concurrent_client.id(), req);
         }
 
         let last_send_instant = Utc::now();
@@ -331,7 +336,7 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
 
         let q = q.clone();
 
-        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
+        concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
@@ -359,7 +364,7 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
 
                 println!(" sent!");
             }
-        }));
+        })).unwrap();
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
@@ -390,38 +395,38 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
 
         let sem_clone = semaphore.clone();
 
-        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
-                                                  Box::new(move |reply| {
+        concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
+                                                     Box::new(move |reply| {
 
-                                                      //Release another request for this client
-                                                      sem_clone.release();
+                                                         //Release another request for this client
+                                                         sem_clone.release();
 
-                                                      /* let latency = Utc::now()
-                                                          .signed_duration_since(last_send_instant)
-                                                          .num_nanoseconds()
-                                                          .unwrap_or(i64::MAX);
+                                                         /* let latency = Utc::now()
+                                                             .signed_duration_since(last_send_instant)
+                                                             .num_nanoseconds()
+                                                             .unwrap_or(i64::MAX);
 
-                                                      let time_ms = Utc::now().timestamp_millis();*/
+                                                         let time_ms = Utc::now().timestamp_millis();*/
 
-                                                      /*let _ = q.enqueue(
-                                                          format!(
-                                                              "{}\t{}\t{}\n",
-                                                              id,
-                                                              time_ms,
-                                                              latency,
-                                                          ),
-                                                      );*/
+                                                         /*let _ = q.enqueue(
+                                                             format!(
+                                                                 "{}\t{}\t{}\n",
+                                                                 id,
+                                                                 time_ms,
+                                                                 latency,
+                                                             ),
+                                                         );*/
 
-                                                      //(exec_time, last_send_instant).store(st);
+                                                         //(exec_time, last_send_instant).store(st);
 
-                                                      if MicrobenchmarkData::VERBOSE {
-                                                          if req % 1000 == 0 {
-                                                              println!("{} // {} operations sent!", id, req);
-                                                          }
+                                                         if MicrobenchmarkData::VERBOSE {
+                                                             if req % 1000 == 0 {
+                                                                 println!("{} // {} operations sent!", id, req);
+                                                             }
 
-                                                          println!(" sent!");
-                                                      }
-                                                  }));
+                                                             println!(" sent!");
+                                                         }
+                                                     })).unwrap();
 
         if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
             std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
@@ -433,7 +438,7 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
         semaphore.acquire();
     }
 
-    println!("{:?} // Done.", client.id());
+    println!("{:?} // Done.", concurrent_client.id());
 
     /*
     if id == 1000 {
