@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 main() {
     generate_conf
@@ -70,7 +70,23 @@ select_test_name() {
 }
 
 exec_microbenchmarks() {
+
+  PIDS=()
+
+  if [ $ID -ge 1000 ]; then
+    for i in $(seq 0 "$(expr "$NUM_CLIENTS" - 1)"); do
+      exec ./target/release/microbenchmarks-async "$(expr $ID + $i)" &
+      PID1=$!
+      PIDS+=("$PID1")
+    done
+
+    for pid in ${PIDS[*]}; do
+      wait $pid
+    done
+  else
     exec ./target/release/microbenchmarks-async
+  fi
 }
 
 main
+#sudo apt install linux-tools-5.15 && echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid

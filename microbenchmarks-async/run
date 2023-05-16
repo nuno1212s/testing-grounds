@@ -16,8 +16,14 @@ die() {
 
 import_env() {
     unset _JAVA_OPTIONS
-    . ./env 2>/dev/null || die Error: No environment file found: env
     . ./env_id 2> /dev/null || die Error: No ID env file found: env_id
+
+    if [ $ID -ge 1000 ]; then
+      . ./env_cli 2>/dev/null || die Error: No environment file found: env
+    else
+      . ./env 2>/dev/null || die Error: No environment file found: env
+    fi
+
     case $1 in
         stop|compile|clean)
             if [ -f $BACKEND/$1 ]; then

@@ -1,5 +1,6 @@
 mod exec;
 mod serialize;
+mod metric;
 
 mod cop;
 mod local;

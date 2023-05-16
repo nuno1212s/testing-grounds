@@ -1,11 +1,12 @@
 use std::env;
+use std::env::args;
 use crate::common::*;
 use crate::serialize::{MicrobenchmarkData, Request};
 
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 
 use intmap::IntMap;
 use chrono::offset::Utc;
@@ -14,6 +15,7 @@ use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
+use regex::internal::Inst;
 
 use semaphores::RawSemaphore;
 use febft_client::client::Client;
@@ -174,9 +176,17 @@ fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
 
-    let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
+    let arg_vec: Vec<String> = args().collect();
 
-    let client_count: u32 = env::var("NUM_CLIENTS").unwrap_or(String::from("1")).parse().unwrap();
+    let default = String::from("1000");
+
+    println!("arg_vec: {:?}", arg_vec);
+
+    let mut first_id: u32 = arg_vec.last().unwrap_or(&default).parse().unwrap();
+
+    //let client_count: u32 = env::var("NUM_CLIENTS").unwrap_or(String::from("1")).parse().unwrap();
+
+    let client_count = 1;
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
@@ -193,10 +203,6 @@ fn client_async_main() {
         .collect();
 
     let (tx, mut rx) = channel::new_bounded_async(8);
-
-    /*let comm_stats = Some(Arc::new(CommStats::new(NodeId::from(first_id),
-                                             NodeId::from(1000u32),
-                                             MicrobenchmarkData::MEASUREMENT_INTERVAL)));*/
 
     let comm_stats = None;
 
@@ -251,9 +257,6 @@ fn client_async_main() {
 
     drop((secret_keys, public_keys, replicas_config));
 
-    let (mut queue, queue_tx) = async_queue();
-    let queue_tx = Arc::new(queue_tx);
-
     let mut clients = Vec::with_capacity(client_count as usize);
 
     for _i in 0..client_count {
@@ -262,36 +265,27 @@ fn client_async_main() {
 
     let mut handles = Vec::with_capacity(client_count as usize);
 
+    // Get one client to run on this thread
+    let our_client = clients.pop();
+
     for client in clients {
-        let queue_tx = Arc::clone(&queue_tx);
         let id = client.id();
 
         let h = std::thread::Builder::new()
             .name(format!("Client {:?}", client.id()))
-            .spawn(move || { run_client(client, queue_tx) })
+            .spawn(move || { run_client(client) })
             .expect(format!("Failed to start thread for client {:?} ", &id.id()).as_str());
 
         handles.push(h);
-
-        // Delay::new(Duration::from_millis(5)).await;
     }
 
     drop(clients_config);
 
-    //Start the OS resource monitoring thread
-    //crate::os_statistics::start_statistics_thread(NodeId(first_id));
+    run_client(our_client.unwrap());
 
     for h in handles {
         let _ = h.join();
     }
-
-    let mut file = File::create("./latencies.out").unwrap();
-
-    while let Ok(line) = queue.try_dequeue() {
-        file.write_all(line.as_ref()).unwrap();
-    }
-
-    file.flush().unwrap();
 }
 
 fn sk_stream() -> impl Iterator<Item=KeyPair> {
@@ -302,7 +296,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>) {
     let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());
@@ -331,32 +325,12 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
             println!("{:?} // Sending req {}...", concurrent_client.id(), req);
         }
 
-        let last_send_instant = Utc::now();
-
         let sem_clone = semaphore.clone();
-
-        let q = q.clone();
 
         concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
-
-            let latency = Utc::now()
-                .signed_duration_since(last_send_instant)
-                .num_nanoseconds()
-                .unwrap_or(i64::MAX);
-
-            let time_ms = Utc::now().timestamp_millis();
-
-            /*let _ = q.enqueue(
-                format!(
-                    "{}\t{}\t{}\n",
-                    id,
-                    time_ms,
-                    latency,
-                ),
-            );*/
 
             if MicrobenchmarkData::VERBOSE {
                 if req % 1000 == 0 {
@@ -383,6 +357,8 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
 
     //let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
+    let start = Instant::now();
+
     for req in iterator {
         semaphore.acquire();
 
@@ -390,35 +366,14 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
             print!("Sending req {}...", req);
         }
 
-        let q = q.clone();
-
         let last_send_instant = Utc::now();
 
         let sem_clone = semaphore.clone();
 
         concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
                                                      Box::new(move |reply| {
-
                                                          //Release another request for this client
                                                          sem_clone.release();
-
-                                                         /* let latency = Utc::now()
-                                                             .signed_duration_since(last_send_instant)
-                                                             .num_nanoseconds()
-                                                             .unwrap_or(i64::MAX);
-
-                                                         let time_ms = Utc::now().timestamp_millis();*/
-
-                                                         /*let _ = q.enqueue(
-                                                             format!(
-                                                                 "{}\t{}\t{}\n",
-                                                                 id,
-                                                                 time_ms,
-                                                                 latency,
-                                                             ),
-                                                         );*/
-
-                                                         //(exec_time, last_send_instant).store(st);
 
                                                          if MicrobenchmarkData::VERBOSE {
                                                              if req % 1000 == 0 {
@@ -439,34 +394,11 @@ fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<A
         semaphore.acquire();
     }
 
+    let time_passed = start.elapsed();
+
+    let ops_done = MicrobenchmarkData::OPS_NUMBER / 2;
+
     println!("{:?} // Done.", concurrent_client.id());
 
-    /*
-    if id == 1000 {
-        println!("{} // Average time for {} executions (-10%) = {} us",
-                 id,
-                 MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.average(true, false) / 1000.0);
-
-        println!("{} // Standard deviation for {} executions (-10%) = {} us",
-                 id,
-                 MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.standard_deviation(true, true) / 1000.0);
-
-        println!("{} // Average time for {} executions (all samples) = {} us",
-                 id,
-                 MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.average(false, true) / 1000.0);
-
-        println!("{} // Standard deviation for {} executions (all samples) = {} us",
-                 id,
-                 MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.standard_deviation(false, true) / 1000.0);
-
-        println!("{} // Maximum time for {} executions (all samples) = {} us",
-                 id,
-                 MicrobenchmarkData::OPS_NUMBER / 2,
-                 st.max(false) / 1000);
-    }
-    */
+    println!("{:?} // Test done in {:?}. ({} ops/s)", concurrent_client.id(), time_passed, (ops_done * 1_000_000) / time_passed.as_micros() as usize );
 }
