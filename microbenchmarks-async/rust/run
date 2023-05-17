@@ -3,7 +3,7 @@
 main() {
     generate_conf
     compile
-    #delete_log
+    delete_log
     select_test_name
     exec_microbenchmarks
 }
