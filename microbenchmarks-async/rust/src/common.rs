@@ -214,7 +214,7 @@ async fn node_config(
             sync_server_config: server_config_replica,
         },
         replica_concurrent_connections: 1,
-        client_concurrent_connections: 1,
+        client_concurrent_connections: 2,
     };
 
     let cp = ClientPoolConfig {
