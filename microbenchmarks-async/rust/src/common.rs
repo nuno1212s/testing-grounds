@@ -23,6 +23,7 @@ use febft_common::error::*;
 use febft_common::node_id::NodeId;
 use febft_common::threadpool;
 use febft_communication::config::{ClientPoolConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use febft_communication::tcp_ip_simplex::TCPSimplexNode;
 use febft_communication::tcpip::{PeerAddr, TcpNode};
 use febft_messages::serialize::{ClientServiceMsg, ServiceMsg};
 use febft_metrics::benchmarks::CommStats;
@@ -243,8 +244,8 @@ pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
 pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type ReplicaNetworking = TcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
-pub type ClientNetworking = TcpNode<ClientServiceMsg<MicrobenchmarkData>>;
+pub type ReplicaNetworking = TCPSimplexNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
+pub type ClientNetworking = TCPSimplexNode<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the protocols with the types that have been built up to here
 pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking>;
