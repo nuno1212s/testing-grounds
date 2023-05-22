@@ -22,7 +22,8 @@ use febft_common::ordering::{Orderable, SeqNo};
 use febft_common::error::*;
 use febft_common::node_id::NodeId;
 use febft_common::threadpool;
-use febft_communication::config::{ClientPoolConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use febft_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use febft_communication::mio_tcp::MIOTcpNode;
 use febft_communication::tcp_ip_simplex::TCPSimplexNode;
 use febft_communication::tcpip::{PeerAddr, TcpNode};
 use febft_messages::serialize::{ClientServiceMsg, ServiceMsg};
@@ -120,7 +121,7 @@ pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
                     Some(entry) => config.push(entry),
                     None => {
                         println!("Failed to parse entry: {}", buf);
-                    },
+                    }
                 }
                 buf.clear();
             }
@@ -160,7 +161,6 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
 
 /// Get the configuration for influx DB
 pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
-
     let ip = std::env::var("INFLUX_IP").expect("INFLUX_IP not set");
     let db_name = std::env::var("INFLUX_DB_NAME").expect("INFLUX_DB_NAME not set");
     let user = std::env::var("INFLUX_USER").expect("INFLUX_USER not set");
@@ -178,7 +178,6 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
         node_id: id,
         extra,
     }
-
 }
 
 async fn node_config(
@@ -188,12 +187,15 @@ async fn node_config(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> NodeConfig {
+) -> MioConfig {
+    let first_cli = NodeId::from(1000u32);
 
+    let mio_worker_count = if id < first_cli { 4 } else { 1 };
 
     // read TLS configs concurrently
-    let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
-        batch_timeout, batch_sleep, clients_per_pool) = {
+    let (client_config, server_config,
+        client_config_replica, server_config_replica,
+        batch_size, batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_tls_sync_server_config(id);
         let cli_rustls = get_client_config_replica(id);
@@ -215,7 +217,7 @@ async fn node_config(
             sync_server_config: server_config_replica,
         },
         replica_concurrent_connections: 1,
-        client_concurrent_connections: 2,
+        client_concurrent_connections: 1,
     };
 
     let cp = ClientPoolConfig {
@@ -230,13 +232,20 @@ async fn node_config(
         pk,
     };
 
-    NodeConfig {
+    let node_config = NodeConfig {
         id,
         first_cli: NodeId::from(1000u32),
         tcp_config: tcp,
         client_pool_config: cp,
         pk_crypto_config: pk_config,
-    }
+    };
+
+    let mio_cfg = MioConfig {
+        node_config,
+        worker_count: mio_worker_count,
+    };
+
+    mio_cfg
 }
 
 /// Set up the data handles so we initialize the networking layer
@@ -244,8 +253,8 @@ pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
 pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type ReplicaNetworking = TCPSimplexNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
-pub type ClientNetworking = TCPSimplexNode<ClientServiceMsg<MicrobenchmarkData>>;
+pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
+pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the protocols with the types that have been built up to here
 pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking>;
