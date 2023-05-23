@@ -190,7 +190,7 @@ async fn node_config(
 ) -> MioConfig {
     let first_cli = NodeId::from(1000u32);
 
-    let mio_worker_count = if id < first_cli { 4 } else { 1 };
+    let mio_worker_count = if id < first_cli { 6 } else { 1 };
 
     // read TLS configs concurrently
     let (client_config, server_config,
