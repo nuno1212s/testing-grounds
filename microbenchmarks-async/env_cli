@@ -5,7 +5,7 @@ export BACKEND=rust
 export VERBOSE=false
 export UPDATE_MAX_FDS=0
 
-export NUM_CLIENTS=15
+export NUM_CLIENTS=100
 export CLIENT_GEN=3000
 export NUM_REPLICAS=4
 export BATCH_SIZE=1024
@@ -25,9 +25,9 @@ export BATCH_TIMEOUT_MICROS=100
 #1 ms sleep between client pool collections
 export BATCH_SLEEP_MICROS=100
 
-export OPS_NUMBER=10000000
+export OPS_NUMBER=100000
 export CONCURRENT_RQS=100
-export MEASUREMENT_INTERVAL=1000
+export MEASUREMENT_INTERVAL=20000
 
 export STATE_SIZE=0
 export REPLY_SIZE=0
