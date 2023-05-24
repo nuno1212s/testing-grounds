@@ -76,9 +76,7 @@ pub fn main() {
 
         let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
 
-        febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
-                                               with_metrics(febft_messages::metric::metrics()),
-                                               with_metrics(febft_communication::metric::metrics()),
+        febft_metrics::initialize_metrics(vec![with_metrics(febft_communication::metric::metrics()),
                                                with_metrics(febft_client::metric::metrics()),
                                                with_metric_level(MetricLevel::Trace)],
                                           influx_db_config(NodeId::from(first_id)));
