@@ -59,7 +59,7 @@ pub fn main() {
                                                with_metrics(febft_messages::metric::metrics()),
                                                with_metrics(febft_communication::metric::metrics()),
                                                with_metrics(febft_replica::metric::metrics()),
-                                               with_metric_level(MetricLevel::Trace)],
+                                               with_metric_level(MetricLevel::Info)],
                                           influx_db_config(node_id));
 
         main_(node_id);
@@ -78,7 +78,7 @@ pub fn main() {
 
         febft_metrics::initialize_metrics(vec![with_metrics(febft_communication::metric::metrics()),
                                                with_metrics(febft_client::metric::metrics()),
-                                               with_metric_level(MetricLevel::Trace)],
+                                               with_metric_level(MetricLevel::Info)],
                                           influx_db_config(NodeId::from(first_id)));
 
         client_async_main();
