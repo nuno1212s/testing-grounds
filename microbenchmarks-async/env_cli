@@ -1,7 +1,7 @@
 export LOCAL=0
 export COMPILE=1
 
-export BACKEND=rust
+export BACKEND=bft-smart
 export VERBOSE=false
 export UPDATE_MAX_FDS=0
 
