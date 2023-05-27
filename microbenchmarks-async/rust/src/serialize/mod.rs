@@ -2,7 +2,7 @@ use std::sync::Weak;
 use std::time::Duration;
 use std::default::Default;
 use std::io::{Read, Write};
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, Deserializer};
 
 use konst::{
     primitive::{
@@ -13,6 +13,7 @@ use konst::{
     option::unwrap_or,
     unwrap_ctx,
 };
+use serde::ser::SerializeStruct;
 
 use febft_common::error::*;
 use febft_execution::serialize::SharedData;
@@ -62,34 +63,34 @@ impl MicrobenchmarkData {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Request {
-    inner: [u8; MicrobenchmarkData::REQUEST_SIZE],
+    inner: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Reply {
-    inner: [u8; MicrobenchmarkData::REPLY_SIZE],
+    inner: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
-    inner: [u8; MicrobenchmarkData::STATE_SIZE],
+    inner: Vec<u8>,
 }
 
 impl Request {
     pub fn new(inner: [u8; MicrobenchmarkData::REQUEST_SIZE]) -> Self {
-        Self { inner }
+        Self { inner: Vec::from(inner) }
     }
 }
 
 impl Reply {
     pub fn new(inner: [u8; MicrobenchmarkData::REPLY_SIZE]) -> Self {
-        Self { inner }
+        Self { inner: Vec::from(inner) }
     }
 }
 
 impl State {
     pub fn new(inner: [u8; MicrobenchmarkData::STATE_SIZE]) -> Self {
-        Self { inner }
+        Self { inner: Vec::from(inner) }
     }
 }
 
@@ -103,7 +104,7 @@ impl SharedData for MicrobenchmarkData {
     }
 
     fn deserialize_state<R>(_r: R) -> Result<Self::State> where R: Read {
-        Ok(State { inner: MicrobenchmarkData::STATE })
+        Ok(State { inner: Vec::from(MicrobenchmarkData::STATE) })
     }
 
     fn serialize_request<W>(w: W, request: &Self::Request) -> Result<()> where W: Write {
@@ -127,7 +128,7 @@ impl SharedData for MicrobenchmarkData {
         let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from request message?");
 
         Ok(Request {
-            inner: MicrobenchmarkData::REQUEST
+            inner: Vec::from(MicrobenchmarkData::REQUEST)
         })
     }
 
@@ -152,7 +153,7 @@ impl SharedData for MicrobenchmarkData {
         let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from reply message?");
 
         Ok(Reply {
-            inner: MicrobenchmarkData::REPLY
+            inner: Vec::from(MicrobenchmarkData::REPLY)
         })
     }
 }

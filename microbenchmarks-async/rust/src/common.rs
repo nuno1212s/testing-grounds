@@ -217,8 +217,8 @@ async fn node_config(
             sync_client_config: client_config_replica,
             sync_server_config: server_config_replica,
         },
-        replica_concurrent_connections: 1,
-        client_concurrent_connections: 1,
+        replica_concurrent_connections: 4,
+        client_concurrent_connections: 2,
     };
 
     let cp = ClientPoolConfig {
@@ -313,7 +313,7 @@ pub async fn setup_replica(
 
     let op_config = PBFTConfig::new(node_id, None,
                                     view, timeout_duration.clone(),
-                                    db_path, proposer_config);
+                                    130, db_path, proposer_config);
 
     let st_config = StateTransferConfig {
         timeout_duration,
