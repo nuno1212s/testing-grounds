@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use intmap::IntMap;
-use konst::primitive::{parse_u128, parse_usize};
+use konst::primitive::{parse_u128, parse_u32, parse_usize};
 use konst::unwrap_ctx;
 use regex::Regex;
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
@@ -311,9 +311,11 @@ pub async fn setup_replica(
 
     let timeout_duration = Duration::from_secs(3);
 
+    let watermark = get_watermark();
+
     let op_config = PBFTConfig::new(node_id, None,
                                     view, timeout_duration.clone(),
-                                    30, db_path, proposer_config);
+                                    watermark, db_path, proposer_config);
 
     let st_config = StateTransferConfig {
         timeout_duration,
@@ -415,6 +417,12 @@ pub fn get_concurrent_rqs() -> usize {
     unwrap_ctx!(res)
 }
 
+pub fn get_watermark() -> u32 {
+    let res = parse_u32(&*std::env::var("WATERMARK")
+        .expect("Failed to find required env var CONCURRENT_RQS"));
+
+    unwrap_ctx!(res)
+}
 
 fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
     let mut certs = Vec::new();
