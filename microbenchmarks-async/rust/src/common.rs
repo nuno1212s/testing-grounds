@@ -313,7 +313,7 @@ pub async fn setup_replica(
 
     let op_config = PBFTConfig::new(node_id, None,
                                     view, timeout_duration.clone(),
-                                    130, db_path, proposer_config);
+                                    30, db_path, proposer_config);
 
     let st_config = StateTransferConfig {
         timeout_duration,
