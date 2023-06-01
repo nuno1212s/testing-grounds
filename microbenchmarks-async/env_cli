@@ -25,7 +25,7 @@ export BATCH_TIMEOUT_MICROS=100
 #1 ms sleep between client pool collections
 export BATCH_SLEEP_MICROS=100
 
-export OPS_NUMBER=1000000
+export OPS_NUMBER=3000000
 export CONCURRENT_RQS=100
 export MEASUREMENT_INTERVAL=20000
 
