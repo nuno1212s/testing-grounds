@@ -28,13 +28,13 @@ semaphores = { version = "0.1.2", git = "https://github.com/nuno1212s/Semaphores
 mprober-lib = "0.1.7"
 procinfo = "0.4.2"
 
-febft-common = { path = "../../../febft/febft-common" }
-febft-communication = { path = "../../../febft/febft-communication" }
-febft-execution = { path = "../../../febft/febft-execution" }
-febft-messages = { path = "../../../febft/febft-messages" }
-febft-replica = { path = "../../../febft/febft-replica" }
-febft-client = { path = "../../../febft/febft-client" }
-febft-metrics = {path = "../../../febft/febft-metrics"}
+atlas-common = { path = "../../../Atlas/atlas-common" }
+atlas-communication = { path = "../../../Atlas/atlas-communication" }
+atlas-execution = { path = "../../../Atlas/atlas-execution" }
+atlas-core = { path = "../../../Atlas/atlas-core" }
+atlas-replica = { path = "../../../Atlas/atlas-replica" }
+atlas-client = { path = "../../../Atlas/atlas-client" }
+atlas-metrics = {path = "../../../Atlas/atlas-metrics"}
 febft-state-transfer = {path = "../../../febft/febft-state-transfer", features = ["serialize_serde"]}
 
 [dependencies.febft-pbft-consensus]

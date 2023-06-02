@@ -15,8 +15,8 @@ use konst::{
 };
 use serde::ser::SerializeStruct;
 
-use febft_common::error::*;
-use febft_execution::serialize::SharedData;
+use atlas_common::error::*;
+use atlas_execution::serialize::SharedData;
 
 pub struct MicrobenchmarkData;
 

@@ -18,14 +18,14 @@ use nolock::queues::mpsc::jiffy::{
 use regex::internal::Inst;
 
 use semaphores::RawSemaphore;
-use febft_client::client::Client;
-use febft_client::client::ordered_client::Ordered;
-use febft_client::concurrent_client::ConcurrentClient;
-use febft_common::crypto::signature::{KeyPair, PublicKey};
-use febft_common::{async_runtime as rt, channel, init, InitConfig};
-use febft_common::node_id::NodeId;
-use febft_communication::tcpip::{PeerAddr};
-use febft_metrics::{MetricLevel, with_metric_level, with_metrics};
+use atlas_client::client::Client;
+use atlas_client::client::ordered_client::Ordered;
+use atlas_client::concurrent_client::ConcurrentClient;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::{async_runtime as rt, channel, init, InitConfig};
+use atlas_common::node_id::NodeId;
+use atlas_communication::tcpip::{PeerAddr};
+use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -55,10 +55,10 @@ pub fn main() {
         let _guard = unsafe { init(conf).unwrap() };
         let node_id = NodeId::from(replica_id);
 
-        febft_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
-                                               with_metrics(febft_messages::metric::metrics()),
-                                               with_metrics(febft_communication::metric::metrics()),
-                                               with_metrics(febft_replica::metric::metrics()),
+        atlas_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
+                                               with_metrics(atlas_core::metric::metrics()),
+                                               with_metrics(atlas_communication::metric::metrics()),
+                                               with_metrics(atlas_replica::metric::metrics()),
                                                with_metric_level(MetricLevel::Info)],
                                           influx_db_config(node_id));
 
@@ -76,8 +76,8 @@ pub fn main() {
 
         let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
 
-        febft_metrics::initialize_metrics(vec![with_metrics(febft_communication::metric::metrics()),
-                                               with_metrics(febft_client::metric::metrics()),
+        atlas_metrics::initialize_metrics(vec![with_metrics(atlas_communication::metric::metrics()),
+                                               with_metrics(atlas_client::metric::metrics()),
                                                with_metric_level(MetricLevel::Info)],
                                           influx_db_config(NodeId::from(first_id)));
 
