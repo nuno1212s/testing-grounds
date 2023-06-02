@@ -1,6 +1,7 @@
 mod app;
 mod client;
 mod variables;
+mod os_statistics;
 
 use std::sync::Arc;
 use std::{env, thread};
@@ -49,6 +50,7 @@ async fn setup(config: Arc<Config>) {
         verifier,
         &config,
     );
+
     let protocol = modules::protocol(protocol, peer_in.1, client_in.1, app_out.1, &config);
 
     let app = Microbenchmark::new(me as u64);
@@ -62,6 +64,7 @@ async fn setup(config: Arc<Config>) {
         let _metrics = spawn(start_server(port));
 
     info!("setup modules");
+    os_statistics::start_statistics_thread(me as u64);
 
     let state = try_join!(peers, clients, protocol, application);
     if let Err(e) = state {
@@ -92,12 +95,9 @@ fn main() {
     config.set("id", me).expect("set id");
 
     if client {
-
         log::info!("STARTING CLIENTS ");
 
-
-        client::start_clients(config, variables::client_count());
-
+        client::start_clients(config, me, variables::client_count());
     } else {
         let config = Arc::new(config);
         log::info!("STARTING REPLICA {}", me);

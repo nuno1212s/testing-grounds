@@ -1,0 +1,3 @@
+#!/bin/sh
+pkill -9 java
+exec rm -f log/*

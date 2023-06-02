@@ -1,0 +1,87 @@
+#!/bin/sh
+
+main() {
+    compile
+
+    if [ $((CLIENT)) -eq 1 ]
+    then
+        clients_main
+    else
+        servers_main
+    fi
+}
+
+compile() {
+    if [ $((COMPILE)) -eq 1 ]
+    then
+       ./compile
+    fi
+}
+
+servers_main() {
+
+    if  [ $((LOCAL)) -eq 1 ]
+    then
+        servers_local_main $DEST_FOLDER
+    else
+        servers_cop_main $DEST_FOLDER
+    fi
+}
+
+servers_local_main() {
+
+    echo "Starting servers..."
+    for ID in $(seq 0 $(($NUM_REPLICAS - 1))); do
+
+        DEST_FOLDER="build/local/rep${ID}"
+        ./generate_conf_local $DEST_FOLDER
+
+        cd $DEST_FOLDER || exit 0
+
+        start_replica "$ID" &
+
+        cd "../../../" || exit 0
+
+        sleep 0.5
+    done
+
+    wait $!
+}
+
+servers_cop_main() {
+    DEST_FOLDER="build/local/rep${ID}"
+
+    ./generate_conf_cop $DEST_FOLDER
+
+    cd $DEST_FOLDER || exit 0
+
+    start_replica "$ID"
+}
+
+clients_main() {
+
+    DEST_FOLDER="build/local/cli0"
+
+    if [ "$LOCAL" -eq 1 ]
+    then
+        ./generate_conf_local $DEST_FOLDER
+    else
+        ./generate_conf_cop $DEST_FOLDER
+    fi
+
+    cd $DEST_FOLDER || exit 0
+
+    start_clients
+}
+
+start_replica() {
+  ./smartrun.sh bftsmart.demo.microbenchmarks.ThroughputLatencyServer "$1" "$MEASUREMENT_INTERVAL" \
+   "$REPLY_SIZE" "$STATE_SIZE" "$VERBOSE" nosig "$PATH_TO_OS_STATS"
+}
+
+start_clients() {
+  ./smartrun.sh bftsmart.demo.microbenchmarks.AsyncLatencyClient "$ID" "$NUM_CLIENTS" "$OPS_NUMBER" "$CONCURRENT_RQS" \
+  "$REQUEST_SIZE" "$REQUEST_SLEEP_MILLIS" false "$VERBOSE" nosig "$PATH_TO_OS_STATS"
+}
+
+main

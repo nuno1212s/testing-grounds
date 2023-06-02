@@ -4,36 +4,40 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
 use std::sync::Arc;
+use std::time::Duration;
 
 use intmap::IntMap;
-use konst::primitive::{parse_u128, parse_usize};
+use konst::primitive::{parse_u128, parse_u32, parse_usize};
 use konst::unwrap_ctx;
 use regex::Regex;
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
 use rustls::server::AllowAnyAuthenticatedClient;
 use rustls_pemfile::{Item, read_one};
-use febft::bft::benchmarks::CommStats;
-
-use febft::bft::communication::{NodeConfig, NodeId, PeerAddr};
-use febft::bft::communication::message::ObserveEventKind;
-use febft::bft::core::client::{
-    self,
-    Client,
-};
-use febft::bft::core::client::observing_client::ObserverCallback;
-use febft::bft::core::client::unordered_client::UnorderedClientMode;
-use febft::bft::core::server::{
-    Replica,
-    ReplicaConfig,
-};
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::error::*;
-use febft::bft::msg_log::persistent::NoPersistentLog;
-use febft::bft::ordering::{Orderable, SeqNo};
-use febft::bft::threadpool;
+use febft_pbft_consensus::bft::message::ObserveEventKind;
+use atlas_client::client;
+use atlas_client::client::Client;
+use atlas_client::client::unordered_client::UnorderedClientMode;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::ordering::{Orderable, SeqNo};
+use atlas_common::error::*;
+use atlas_common::node_id::NodeId;
+use atlas_common::threadpool;
+use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use atlas_communication::mio_tcp::MIOTcpNode;
+use atlas_communication::tcp_ip_simplex::TCPSimplexNode;
+use atlas_communication::tcpip::{PeerAddr, TcpNode};
+use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
+use atlas_metrics::benchmarks::CommStats;
+use atlas_metrics::InfluxDBArgs;
+use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
+use febft_pbft_consensus::bft::{PBFTOrderProtocol};
+use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
+use febft_pbft_consensus::bft::sync::view::ViewInfo;
+use atlas_replica::config::ReplicaConfig;
+use atlas_replica::server::{Replica};
+use febft_state_transfer::CollabStateTransfer;
+use febft_state_transfer::config::StateTransferConfig;
+use febft_state_transfer::message::serialize::CSTMsg;
 
 use crate::exec::Microbenchmark;
 use crate::serialize::MicrobenchmarkData;
@@ -46,6 +50,7 @@ macro_rules! addr {
     }}
 }
 
+/*
 pub struct ObserverCall;
 
 impl ObserverCallback for ObserverCall {
@@ -81,6 +86,8 @@ impl ObserverCallback for ObserverCall {
     }
 }
 
+ */
+
 pub struct ConfigEntry {
     pub portno: u16,
     pub rep_portno: Option<u16>,
@@ -100,11 +107,22 @@ pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
 
     loop {
         match file.read_line(&mut buf) {
-            Ok(0) | Err(_) => break,
+            Ok(0) => {
+                println!("Finalizing reading the config file {} with size {}", path, config.len());
+
+                break;
+            }
+            Err(err) => {
+                println!("Finalizing reading the config file {} with size {} with err {:?}", path, config.len(), err);
+
+                break;
+            }
             _ => {
                 match parse_entry(&re, &buf) {
                     Some(entry) => config.push(entry),
-                    None => (),
+                    None => {
+                        println!("Failed to parse entry: {}", buf);
+                    }
                 }
                 buf.clear();
             }
@@ -142,6 +160,27 @@ fn parse_entry(re: &Regex, line: &str) -> Option<ConfigEntry> {
     Some(ConfigEntry { id, rep_portno, hostname, ipaddr, portno })
 }
 
+/// Get the configuration for influx DB
+pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
+    let ip = std::env::var("INFLUX_IP").expect("INFLUX_IP not set");
+    let db_name = std::env::var("INFLUX_DB_NAME").expect("INFLUX_DB_NAME not set");
+    let user = std::env::var("INFLUX_USER").expect("INFLUX_USER not set");
+    let password = std::env::var("INFLUX_PASSWORD").expect("INFLUX_PASSWORD not set");
+
+    let extra = std::env::var("INFLUX_EXTRA_TEST").unwrap_or("".to_string());
+
+    let extra = Some(format!("test-{}", extra));
+
+    InfluxDBArgs {
+        ip,
+        db_name,
+        user,
+        password,
+        node_id: id,
+        extra,
+    }
+}
+
 async fn node_config(
     n: usize,
     id: NodeId,
@@ -149,13 +188,15 @@ async fn node_config(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> NodeConfig {
+) -> MioConfig {
+    let first_cli = NodeId::from(1000u32);
 
-    let db_path = format!("PERSISTENT_DB_{:?}", id);
+    let mio_worker_count = std::env::var("MIO_WORKER_COUNT").unwrap_or("1".to_string()).parse::<usize>().unwrap();
 
     // read TLS configs concurrently
-    let (client_config, server_config, client_config_replica, server_config_replica, batch_size,
-        batch_timeout, batch_sleep, clients_per_pool) = {
+    let (client_config, server_config,
+        client_config_replica, server_config_replica,
+        batch_size, batch_timeout, batch_sleep, clients_per_pool) = {
         let cli = get_client_config(id);
         let srv = get_tls_sync_server_config(id);
         let cli_rustls = get_client_config_replica(id);
@@ -168,27 +209,57 @@ async fn node_config(
             batch_timeout, batch_sleep, clients_per_pool)
     };
 
-    // build the node conf
-    NodeConfig {
-        id,
-        n,
-        f: (n - 1) / 3,
-        sk,
-        pk,
+    let tcp = TcpConfig {
         addrs,
-        async_client_config: client_config,
-        async_server_config: server_config,
-        sync_client_config: client_config_replica,
-        sync_server_config: server_config_replica,
-        first_cli: NodeId::from(1000u32),
+        network_config: TlsConfig {
+            async_client_config: client_config,
+            async_server_config: server_config,
+            sync_client_config: client_config_replica,
+            sync_server_config: server_config_replica,
+        },
+        replica_concurrent_connections: 4,
+        client_concurrent_connections: 2,
+    };
+
+    let cp = ClientPoolConfig {
         batch_size,
         clients_per_pool,
         batch_timeout_micros: batch_timeout as u64,
         batch_sleep_micros: batch_sleep as u64,
-        comm_stats,
-        db_path
-    }
+    };
+
+    let pk_config = PKConfig {
+        sk,
+        pk,
+    };
+
+    let node_config = NodeConfig {
+        id,
+        first_cli,
+        tcp_config: tcp,
+        client_pool_config: cp,
+        pk_crypto_config: pk_config,
+    };
+
+    let mio_cfg = MioConfig {
+        node_config,
+        worker_count: mio_worker_count,
+    };
+
+    mio_cfg
 }
+
+/// Set up the data handles so we initialize the networking layer
+pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
+pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+
+/// Set up the networking layer with the data handles we have
+pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
+pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
+
+/// Set up the protocols with the types that have been built up to here
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking>;
+pub type StateTransferProtocol = CollabStateTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking>;
 
 pub async fn setup_client(
     n: usize,
@@ -197,12 +268,16 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData>> {
+) -> Result<Client<MicrobenchmarkData, ClientNetworking>> {
     let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
+
     let conf = client::ClientConfig {
+        n,
+        f: 1,
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
     };
+
     Client::bootstrap(conf).await
 }
 
@@ -213,8 +288,9 @@ pub async fn setup_replica(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Replica<Microbenchmark>> {
+) -> Result<Replica<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking>> {
     let node_id = id.clone();
+    let db_path = format!("PERSISTENT_DB_{:?}", id);
 
     let (node, global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, sk, addrs, pk, comm_stats);
@@ -223,14 +299,38 @@ pub async fn setup_replica(
         futures::join!(n, b, timeout)
     };
 
-    let conf = ReplicaConfig::<Microbenchmark, NoPersistentLog> {
+    let max_batch_size = get_max_batch_size();
+
+    let proposer_config = ProposerConfig {
+        target_batch_size: global_batch_size as u64,
+        max_batch_size: global_batch_size as u64 * 2,
+        batch_timeout: global_batch_timeout as u64,
+    };
+
+    let view = ViewInfo::new(SeqNo::ZERO, n, 1)?;
+
+    let timeout_duration = Duration::from_secs(3);
+
+    let watermark = get_watermark();
+
+    let op_config = PBFTConfig::new(node_id, None,
+                                    view, timeout_duration.clone(),
+                                    watermark, db_path, proposer_config);
+
+    let st_config = StateTransferConfig {
+        timeout_duration,
+    };
+
+    let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
         service: Microbenchmark::new(node_id),
-        global_batch_size,
-        batch_timeout: global_batch_timeout,
-        log_mode: Default::default()
+        id,
+        n,
+        f: 1,
+        op_config,
+        st_config,
     };
 
     Replica::bootstrap(conf).await
@@ -267,6 +367,13 @@ async fn get_global_batch_timeout() -> u128 {
         tx.send(unwrap_ctx!(res)).expect("Failed to send");
     });
     rx.await.unwrap()
+}
+
+fn get_max_batch_size() -> usize {
+    let res = parse_usize(&*std::env::var("MAX_BATCH_SIZE")
+        .expect("Failed to find required env var MAX_BATCH_SIZE"));
+
+    unwrap_ctx!(res)
 }
 
 async fn get_batch_timeout() -> u128 {
@@ -310,6 +417,12 @@ pub fn get_concurrent_rqs() -> usize {
     unwrap_ctx!(res)
 }
 
+pub fn get_watermark() -> u32 {
+    let res = parse_u32(&*std::env::var("WATERMARK")
+        .expect("Failed to find required env var CONCURRENT_RQS"));
+
+    unwrap_ctx!(res)
+}
 
 fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
     let mut certs = Vec::new();
@@ -339,7 +452,6 @@ fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificat
 
 #[inline]
 fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
-
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
@@ -415,7 +527,7 @@ async fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
             .with_safe_default_kx_groups()
             .with_safe_default_protocol_versions()
             .unwrap()
-            .with_client_cert_verifier(auth)
+            .with_client_cert_verifier(Arc::new(auth))
             .with_single_cert(chain, sk)
             .expect("Failed to make cfg");
 
@@ -472,7 +584,7 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             .with_safe_default_kx_groups()
             .with_safe_default_protocol_versions()
             .unwrap()
-            .with_client_cert_verifier(auth)
+            .with_client_cert_verifier(Arc::new(auth))
             .with_single_cert(chain, sk)
             .expect("Failed to make cfg");
 

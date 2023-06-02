@@ -3,6 +3,11 @@ use std::time::Duration;
 
 use konst::primitive::{parse_bool, parse_u64, parse_usize};
 
+pub fn id() -> usize {
+    let string = env::var("ID").unwrap();
+    
+    parse_usize(&*string).unwrap()
+}
 
 pub fn request_size() -> usize {
     let string = env::var("REQUEST_SIZE").unwrap();

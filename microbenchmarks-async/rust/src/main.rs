@@ -1,13 +1,19 @@
 mod exec;
 mod serialize;
+mod metric;
 
 mod cop;
 mod local;
 mod common;
 mod os_statistics;
+mod bench;
 
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
 #[global_allocator]
-static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+static GLOBAL: Jemalloc = Jemalloc;
 
 fn main() {
     let is_local = std::env::var("LOCAL")

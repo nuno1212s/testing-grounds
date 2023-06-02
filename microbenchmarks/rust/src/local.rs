@@ -109,7 +109,7 @@ fn main_() {
 
         let comm_stats = Arc::new(CommStats::new(id,
                                                  first_cli,
-                                                 10000));
+                                                 MicrobenchmarkData::MEASUREMENT_INTERVAL));
 
         println!("Setting up replica...");
         let fut = setup_replica(
@@ -177,7 +177,7 @@ async fn client_async_main() {
 
     let comm_stats = Arc::new(CommStats::new(NodeId::from(first_cli),
                                              NodeId::from(first_cli),
-                                             10000));
+                                             MicrobenchmarkData::MEASUREMENT_INTERVAL));
 
     for client in &clients_config {
         let id = NodeId::from(client.id);

@@ -14,7 +14,7 @@ use themis_core::app::{Request};
 use themis_core::config::{Config, DEFAULT_CONFIG_PATH, load_from_paths};
 use themis_core::execute::Runtime;
 use tracing::Instrument;
-use crate::variables;
+use crate::{os_statistics, variables};
 
 struct Context {
     config: Arc<Config>,
@@ -93,7 +93,7 @@ struct Opts {
     no_wait_for_primary: bool,
 }
 
-pub fn start_clients(config: Config, clients: u64) {
+pub fn start_clients(config: Config, first_id: u64, clients: u64) {
     let counter = Arc::new(AtomicCell::new(0));
     let complete = Arc::new(AtomicCell::new(clients));
     let latencies = Arc::new(AtomicCell::new(0));
@@ -110,7 +110,7 @@ pub fn start_clients(config: Config, clients: u64) {
 
     for i in 0..clients {
         let mut config = config.clone();
-        let id = 100 + i;
+        let id = first_id + i;
         config.set("id", id).expect("set");
         let connected = connected.clone();
         let payload = payload.clone();
@@ -156,6 +156,9 @@ pub fn start_clients(config: Config, clients: u64) {
     tracing::info!("waiting for {} connected clients", clients);
     connected.wait();
     tracing::info!("go");
+
+    os_statistics::start_statistics_thread(first_id);
+
     loop {
         thread::sleep(Duration::from_secs(1));
         seconds += 1;
@@ -168,6 +171,7 @@ pub fn start_clients(config: Config, clients: u64) {
         let smoother = rps_vec.iter().rev().take(smooth);
         let actual = smoother.len();
         let total: u64 = smoother.sum();
+
         let avg_lag: u64 = if total > 0 {
             lag_vec.iter().rev().take(smooth).sum::<u64>() / total as u64
         } else {

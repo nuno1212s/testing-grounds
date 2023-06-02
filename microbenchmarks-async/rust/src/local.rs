@@ -1,6 +1,7 @@
+use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 use chrono::offset::Utc;
@@ -11,27 +12,18 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 use rand_core::{OsRng, RngCore};
+use semaphores::RawSemaphore;
 
-use febft::bft::{
-    init,
-    InitConfig,
-};
-use febft::bft::async_runtime as rt;
-use febft::bft::benchmarks::{
-    BenchmarkHelper,
-    BenchmarkHelperStore,
-};
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::communication::NodeId;
-use febft::bft::core::client::Client;
-use febft::bft::core::client::ordered_client::Ordered;
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
+use febft_pbft_consensus::bft::{PBFT};
+use atlas_client::client::Client;
+use atlas_client::client::ordered_client::Ordered;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::{async_runtime as rt, channel, init, InitConfig};
+use atlas_common::node_id::NodeId;
+use atlas_communication::tcpip::{PeerAddr, TcpNode};
 
 use crate::common::*;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -51,7 +43,7 @@ pub fn main() {
     if !is_client {
         main_();
     } else {
-        rt::block_on(client_async_main());
+        client_async_main();
     }
 }
 
@@ -75,7 +67,10 @@ fn main_() {
 
     let mut pending_threads = Vec::with_capacity(4);
 
+    let barrier = Arc::new(Barrier::new(replicas_config.len()));
+
     for replica in &replicas_config {
+        let barrier = barrier.clone();
         let id = NodeId::from(replica.id);
 
         println!("Starting replica {:?}", id);
@@ -126,6 +121,12 @@ fn main_() {
                 replica
             });
 
+            barrier.wait();
+
+            println!("{:?} // Let's go", id);
+
+            barrier.wait();
+
             replica.run().unwrap();
         }).unwrap();
 
@@ -143,14 +144,18 @@ fn main_() {
     }
 }
 
-async fn client_async_main() {
+fn client_async_main() {
     let clients_config = parse_config("./config/clients.config").unwrap();
     let replicas_config = parse_config("./config/replicas.config").unwrap();
+
+    let mut first_id: u32 = env::var("ID").unwrap_or(String::from("1000")).parse().unwrap();
+
+    let client_count: u32 = env::var("NUM_CLIENTS").unwrap_or(String::from("1")).parse().unwrap();
 
     let mut secret_keys: IntMap<KeyPair> = sk_stream()
         .take(clients_config.len())
         .enumerate()
-        .map(|(id, sk)| (1000 + id as u64, sk))
+        .map(|(id, sk)| (first_id as u64 + id as u64, sk))
         .chain(sk_stream()
             .take(replicas_config.len())
             .enumerate()
@@ -163,14 +168,9 @@ async fn client_async_main() {
 
     let (tx, mut rx) = channel::new_bounded_async(clients_config.len());
 
-    let mut first_cli: u32 = u32::MAX;
 
-    for client in &clients_config {
-        let id = NodeId::from(client.id);
-
-        if client.id < first_cli {
-            first_cli = client.id;
-        }
+    for i in 0..client_count {
+        let id = NodeId::from(i + first_id);
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -224,42 +224,35 @@ async fn client_async_main() {
     let (mut queue, queue_tx) = async_queue();
     let queue_tx = Arc::new(queue_tx);
 
-    let mut clients = Vec::with_capacity(clients_config.len());
+    let mut clients = Vec::with_capacity(client_count as usize);
 
-    for _i in 0..clients_config.len() {
-        clients.push(rx.recv().await.unwrap());
+    for _i in 0..client_count {
+        clients.push(rt::block_on(rx.recv()).unwrap());
     }
 
     //We have all the clients, start the OS resource monitoring thread
     //crate::os_statistics::start_statistics_thread(NodeId(first_cli));
 
-    let mut handles = Vec::with_capacity(clients_config.len());
+    let mut handles = Vec::with_capacity(client_count as usize);
 
-    for mut client in clients {
+    for client in clients {
         let queue_tx = Arc::clone(&queue_tx);
+        let id = client.id();
 
-        let h = rt::spawn({
-
-            {
-                let observer = client.bootstrap_observer().await;
-
-                let mut guard = observer.lock().unwrap();
-
-                if let Some(observer_reg) = &mut *guard {
-                    observer_reg.register_observer(Box::new(ObserverCall));
-                }
-            }
-
-            run_client(client, queue_tx)
-        });
+        let h = std::thread::Builder::new()
+            .name(format!("Client {:?}", client.id()))
+            .spawn(move || { run_client(client, queue_tx) })
+            .expect(format!("Failed to start thread for client {:?} ", &id.id()).as_str());
 
         handles.push(h);
+
+        // Delay::new(Duration::from_millis(5)).await;
     }
 
     drop(clients_config);
 
     for mut h in handles {
-        let _ = h.await;
+        let _ = h.join();
     }
 
     let mut file = File::create("./latencies.out").unwrap();
@@ -279,158 +272,144 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
-
-    let concurrent_rqs: usize = crate::common::get_concurrent_rqs();
-
-
-    let mut sessions = Vec::with_capacity(concurrent_rqs);
+fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<AsyncSender<String>>) {
+    let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());
 
     println!("Warm up...");
 
-    for _session in 0..concurrent_rqs {
-        let mut ramp_up: i32 = 1000;
+    let request = Arc::new({
+        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        r
+    });
 
-        let mut client = client.clone();
+    let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
+
+    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
+
+    let mut ramp_up = 1000;
+
+    for req in iterator {
+
+        //Only allow concurrent_rqs per client at the network
+        semaphore.acquire();
+
+        if MicrobenchmarkData::VERBOSE {
+            println!("{:?} // Sending req {}...", client.id(), req);
+        }
+
+        let last_send_instant = Utc::now();
+
+        let sem_clone = semaphore.clone();
 
         let q = q.clone();
 
-        let request = Arc::new({
-            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-            OsRng.fill_bytes(&mut r);
-            r
-        });
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
 
-        let join_handle = rt::spawn(async move {
-            let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
+            //Release another request for this client
+            sem_clone.release();
 
-            for req in iterator {
-                if MicrobenchmarkData::VERBOSE {
-                    print!("Sending req {}...", req);
+            let latency = Utc::now()
+                .signed_duration_since(last_send_instant)
+                .num_nanoseconds()
+                .unwrap_or(i64::MAX);
+
+            let time_ms = Utc::now().timestamp_millis();
+
+            /*let _ = q.enqueue(
+                format!(
+                    "{}\t{}\t{}\n",
+                    id,
+                    time_ms,
+                    latency,
+                ),
+            );*/
+
+            if MicrobenchmarkData::VERBOSE {
+                if req % 1000 == 0 {
+                    println!("{} // {} operations sent!", id, req);
                 }
 
-                let last_send_instant = Utc::now();
-
-                client.update::<Ordered>(Arc::downgrade(&request)).await;
-
-                let latency = Utc::now()
-                    .signed_duration_since(last_send_instant)
-                    .num_nanoseconds()
-                    .unwrap_or(i64::MAX);
-
-                let time_ms = Utc::now().timestamp_millis();
-
-                let _ = q.enqueue(
-                    format!(
-                        "{}\t{}\t{}\n",
-                        id,
-                        time_ms,
-                        latency,
-                    ),
-                );
-
-                if MicrobenchmarkData::VERBOSE {
-                    if req % 1000 == 0 {
-                        println!("{} // {} operations sent!", id, req);
-                    }
-
-                    println!(" sent!");
-                }
-
-                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
-                } else if ramp_up > 0 {
-                    Delay::new(Duration::from_millis(ramp_up as u64)).await;
-                }
-
-                ramp_up -= 100;
+                println!(" sent!");
             }
-        });
+        }));
 
-        sessions.push(join_handle);
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        } else if ramp_up > 0 {
+            let to_sleep = fastrand::u32(ramp_up / 2..ramp_up);
+            std::thread::sleep(Duration::from_millis(to_sleep as u64));
+
+            ramp_up -= 100;
+        }
     }
-
-    for mut x in sessions {
-        x.await;
-    }
-
-    let mut sessions = Vec::with_capacity(concurrent_rqs);
 
     println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
 
-    for _session in 0..concurrent_rqs {
-        let mut client = client.clone();
+    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
 
-        let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
+    //let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
-        let request = Arc::new({
-            let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-            OsRng.fill_bytes(&mut r);
-            r
-        });
+    for req in iterator {
+        semaphore.acquire();
+
+        if MicrobenchmarkData::VERBOSE {
+            print!("Sending req {}...", req);
+        }
 
         let q = q.clone();
 
-        let join_handle = rt::spawn(async move {
+        let last_send_instant = Utc::now();
 
-            let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2 / concurrent_rqs);
+        let sem_clone = semaphore.clone();
 
-            for req in iterator {
-                if MicrobenchmarkData::VERBOSE {
-                    print!("Sending req {}...", req);
-                }
+        client.clone().update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
+                                                  Box::new(move |reply| {
 
-                let last_send_instant = Utc::now();
+                                                      //Release another request for this client
+                                                      sem_clone.release();
 
-                client.update::<Ordered>(Arc::downgrade(&request)).await;
+                                                      /* let latency = Utc::now()
+                                                          .signed_duration_since(last_send_instant)
+                                                          .num_nanoseconds()
+                                                          .unwrap_or(i64::MAX);
 
-                let exec_time = Utc::now();
+                                                      let time_ms = Utc::now().timestamp_millis();*/
 
-                let latency = Utc::now()
-                    .signed_duration_since(last_send_instant)
-                    .num_nanoseconds()
-                    .unwrap_or(i64::MAX);
+                                                      /*let _ = q.enqueue(
+                                                          format!(
+                                                              "{}\t{}\t{}\n",
+                                                              id,
+                                                              time_ms,
+                                                              latency,
+                                                          ),
+                                                      );*/
 
-                let time_ms = Utc::now().timestamp_millis();
+                                                      //(exec_time, last_send_instant).store(st);
 
-                let _ = q.enqueue(
-                    format!(
-                        "{}\t{}\t{}\n",
-                        id,
-                        time_ms,
-                        latency,
-                    ),
-                );
+                                                      if MicrobenchmarkData::VERBOSE {
+                                                          if req % 1000 == 0 {
+                                                              println!("{} // {} operations sent!", id, req);
+                                                          }
 
-                (exec_time, last_send_instant).store(&mut st);
+                                                          println!(" sent!");
+                                                      }
+                                                  }));
 
-                if MicrobenchmarkData::VERBOSE {
-                    if req % 1000 == 0 {
-                        println!("{} // {} operations sent!", id, req);
-                    }
-
-                    println!(" sent!");
-                }
-
-                if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-                    Delay::new(MicrobenchmarkData::REQUEST_SLEEP_MILLIS).await;
-                }
-            }
-
-            st
-        });
-
-        sessions.push(join_handle);
+        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
+            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        }
     }
 
-    let mut st = sessions.pop().unwrap().await.unwrap();
-
-    for x in sessions {
-        x.await;
+    //Wait for all requests to finish
+    for _ in 0..concurrent_rqs {
+        semaphore.acquire();
     }
 
+    println!("{:?} // Done.", client.id());
+
+    /*
     if id == 1000 {
         println!("{} // Average time for {} executions (-10%) = {} us",
                  id,
@@ -457,4 +436,5 @@ async fn run_client(client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<Strin
                  MicrobenchmarkData::OPS_NUMBER / 2,
                  st.max(false) / 1000);
     }
+    */
 }
