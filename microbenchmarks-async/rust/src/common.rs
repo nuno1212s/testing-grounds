@@ -29,6 +29,7 @@ use atlas_communication::tcpip::{PeerAddr, TcpNode};
 use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
+use atlas_persistent_log::PersistentLog;
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
@@ -257,9 +258,14 @@ pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage,
 pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
 pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
 
+/// Set up the persistent logging type with the existing data handles
+pub type Logging = PersistentLog<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
+
 /// Set up the protocols with the types that have been built up to here
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking>;
-pub type StateTransferProtocol = CollabStateTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking>;
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking, Logging>;
+pub type StateTransferProtocol = CollabStateTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
+
+pub type SMRReplica = Replica<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking, Logging>;
 
 pub async fn setup_client(
     n: usize,
@@ -288,7 +294,7 @@ pub async fn setup_replica(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Replica<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking>> {
+) -> Result<SMRReplica> {
     let node_id = id.clone();
     let db_path = format!("PERSISTENT_DB_{:?}", id);
 
@@ -315,13 +321,13 @@ pub async fn setup_replica(
 
     let op_config = PBFTConfig::new(node_id, None,
                                     view, timeout_duration.clone(),
-                                    watermark, db_path, proposer_config);
+                                    watermark,  proposer_config);
 
     let st_config = StateTransferConfig {
         timeout_duration,
     };
 
-    let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking> {
+    let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking, Logging> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
@@ -331,6 +337,8 @@ pub async fn setup_replica(
         f: 1,
         op_config,
         st_config,
+        db_path,
+        phantom: Default::default(),
     };
 
     Replica::bootstrap(conf).await

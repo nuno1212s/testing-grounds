@@ -34,8 +34,9 @@ atlas-execution = { path = "../../../Atlas/atlas-execution" }
 atlas-core = { path = "../../../Atlas/atlas-core" }
 atlas-replica = { path = "../../../Atlas/atlas-replica" }
 atlas-client = { path = "../../../Atlas/atlas-client" }
-atlas-metrics = {path = "../../../Atlas/atlas-metrics"}
-febft-state-transfer = {path = "../../../febft/febft-state-transfer", features = ["serialize_serde"]}
+atlas-metrics = { path = "../../../Atlas/atlas-metrics" }
+atlas-persistent-log = { path = "../../../Atlas/atlas-persistent-log" }
+febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
 
 [dependencies.febft-pbft-consensus]
 path = "../../../febft/febft-pbft-consensus"
