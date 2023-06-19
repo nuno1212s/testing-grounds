@@ -16,7 +16,7 @@ use konst::{
 use serde::ser::SerializeStruct;
 
 use atlas_common::error::*;
-use atlas_execution::serialize::SharedData;
+use atlas_execution::serialize::ApplicationData;
 
 pub struct MicrobenchmarkData;
 
@@ -94,7 +94,7 @@ impl State {
     }
 }
 
-impl SharedData for MicrobenchmarkData {
+impl ApplicationData for MicrobenchmarkData {
     type State = State;
     type Request = Request;
     type Reply = Reply;
