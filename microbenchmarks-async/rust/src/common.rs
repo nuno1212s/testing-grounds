@@ -27,6 +27,9 @@ use atlas_communication::mio_tcp::MIOTcpNode;
 use atlas_communication::tcp_ip_simplex::TCPSimplexNode;
 use atlas_communication::tcpip::{PeerAddr, TcpNode};
 use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
+use atlas_log_transfer::CollabLogTransfer;
+use atlas_log_transfer::config::LogTransferConfig;
+use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
 use atlas_persistent_log::PersistentLog;
@@ -34,14 +37,15 @@ use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
 use febft_pbft_consensus::bft::sync::view::ViewInfo;
-use atlas_replica::config::ReplicaConfig;
+use atlas_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_replica::server::{Replica};
+use atlas_replica::server::monolithic_server::MonReplica;
 use febft_state_transfer::CollabStateTransfer;
 use febft_state_transfer::config::StateTransferConfig;
 use febft_state_transfer::message::serialize::CSTMsg;
 
 use crate::exec::Microbenchmark;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, State};
 
 #[macro_export]
 macro_rules! addr {
@@ -252,20 +256,22 @@ async fn node_config(
 
 /// Set up the data handles so we initialize the networking layer
 pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
-pub type StateTransferMessage = CSTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+pub type StateTransferMessage = CSTMsg<State>;
+pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage>>;
+pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>;
 pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
 pub type Logging = PersistentLog<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, ReplicaNetworking, Logging>;
-pub type StateTransferProtocol = CollabStateTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging>;
+pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
+pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
 
-pub type SMRReplica = Replica<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking, Logging>;
+pub type SMRReplica = MonReplica<State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
 
 pub async fn setup_client(
     n: usize,
@@ -327,21 +333,33 @@ pub async fn setup_replica(
         timeout_duration,
     };
 
-    let conf = ReplicaConfig::<Microbenchmark, OrderProtocol, StateTransferProtocol, ReplicaNetworking, Logging> {
+    let lt_config = LogTransferConfig {
+        timeout_duration,
+    };
+
+    let service = Microbenchmark::new(id);
+
+    let conf = ReplicaConfig::<State, MicrobenchmarkData, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
-        service: Microbenchmark::new(node_id),
         id,
         n,
         f: 1,
         op_config,
-        st_config,
+        lt_config,
         db_path,
-        phantom: Default::default(),
+        pl_config: (),
+        p: Default::default(),
     };
 
-    Replica::bootstrap(conf).await
+    let mon_conf = MonolithicStateReplicaConfig {
+        service,
+        replica_config: conf,
+        st_config,
+    };
+
+    MonReplica::bootstrap(mon_conf).await
 }
 
 async fn get_batch_size() -> usize {

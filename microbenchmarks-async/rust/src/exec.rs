@@ -4,12 +4,12 @@ use chrono::DateTime;
 use chrono::offset::Utc;
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
-use atlas_execution::app::{BatchReplies, Reply, Request, Service, State, UpdateBatch};
+use atlas_execution::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 use atlas_metrics::benchmarks::{BenchmarkHelperStore, Measurements};
 
 use crate::serialize;
 
-use crate::serialize::{MicrobenchmarkData};
+use crate::serialize::{MicrobenchmarkData, State};
 
 pub struct Microbenchmark {
     id: NodeId,
@@ -43,19 +43,19 @@ impl Microbenchmark {
     }
 }
 
-impl Service for Microbenchmark {
-    type Data = MicrobenchmarkData;
+impl Application<State> for Microbenchmark {
+    type AppData = MicrobenchmarkData;
 
     fn initial_state() -> Result<serialize::State> {
-
         Ok(serialize::State::new(MicrobenchmarkData::STATE))
     }
 
-    fn unordered_execution(&self, state: &State<Self>, request: Request<Self>) -> Reply<Self> {
+    fn unordered_execution(&self, state: &State, request: Request<Self, State>) -> Reply<Self, State> {
         todo!()
     }
 
-    fn update(&mut self, _: &mut State<Self>, _: Request<Self>) -> Reply<Self> {
+    fn update(&mut self, state: &mut State, request: Request<Self, State>) -> Reply<Self, State> {
+
         let reply = serialize::Reply::new(MicrobenchmarkData::REPLY);
 
         // increase iter count
@@ -112,9 +112,10 @@ impl Service for Microbenchmark {
         reply
     }
 
+
     fn update_batch(
         &mut self,
-        _state: &mut serialize::State,
+        _state: &mut State,
         mut batch: UpdateBatch<serialize::Request>,
     ) -> BatchReplies<serialize::Reply> {
         let batch_len = batch.len();

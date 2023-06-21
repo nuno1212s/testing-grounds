@@ -17,6 +17,7 @@ use serde::ser::SerializeStruct;
 
 use atlas_common::error::*;
 use atlas_execution::serialize::ApplicationData;
+use atlas_execution::state::monolithic_state::MonolithicState;
 
 pub struct MicrobenchmarkData;
 
@@ -94,18 +95,20 @@ impl State {
     }
 }
 
-impl ApplicationData for MicrobenchmarkData {
-    type State = State;
-    type Request = Request;
-    type Reply = Reply;
+impl MonolithicState for State {
 
-    fn serialize_state<W>(_w: W, _state: &Self::State) -> Result<()> where W: Write {
-        Ok(())
+    fn serialize_state<W>(mut w: W, request: &Self) -> Result<()> where W: Write {
+        w.write_all(&MicrobenchmarkData::STATE).wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize state")
     }
 
-    fn deserialize_state<R>(_r: R) -> Result<Self::State> where R: Read {
+    fn deserialize_state<R>(r: R) -> Result<Self> where R: Read, Self: Sized {
         Ok(State { inner: Vec::from(MicrobenchmarkData::STATE) })
     }
+}
+
+impl ApplicationData for MicrobenchmarkData {
+    type Request = Request;
+    type Reply = Reply;
 
     fn serialize_request<W>(w: W, request: &Self::Request) -> Result<()> where W: Write {
         let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
