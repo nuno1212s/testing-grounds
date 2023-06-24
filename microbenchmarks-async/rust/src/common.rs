@@ -32,7 +32,7 @@ use atlas_log_transfer::config::LogTransferConfig;
 use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
-use atlas_persistent_log::PersistentLog;
+use atlas_persistent_log::{MonStatePersistentLog, PersistentLog};
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
@@ -264,7 +264,7 @@ pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProt
 pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
-pub type Logging = PersistentLog<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
+pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
 pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging>;

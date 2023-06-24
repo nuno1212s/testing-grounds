@@ -1,5 +1,5 @@
 use crate::common::*;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 use std::fs::File;
 use std::io::Write;
@@ -14,21 +14,14 @@ use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
-
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::core::client::Client;
-use febft::bft::communication::NodeId;
-use febft::bft::async_runtime as rt;
-use febft::bft::{
-    init,
-    InitConfig,
-};
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
-use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
-use febft::bft::core::client::ordered_client::Ordered;
+use atlas_client::client::Client;
+use atlas_client::client::ordered_client::Ordered;
+use atlas_common::{channel, init, InitConfig};
+use atlas_common::node_id::NodeId;
+use atlas_common::async_runtime as rt;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_communication::tcpip::PeerAddr;
+use atlas_metrics::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -282,7 +275,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+async fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
 
     let request = Arc::new({
@@ -304,7 +297,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
 
         let last_send_instant = Utc::now();
 
-        if let Err(error) = client.update::<Ordered>(Arc::downgrade(&request)).await {
+        if let Err(error) = client.update::<Ordered>(Request::new(MicrobenchmarkData::REQUEST)).await {
             println!("Failed to send client update {:?}", error);
         }
 
@@ -351,7 +344,7 @@ async fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<S
         }
 
         let last_send_instant = Utc::now();
-        client.update::<Ordered>(Arc::downgrade(&request)).await;
+        client.update::<Ordered>(Request::new(MicrobenchmarkData::REQUEST)).await;
         let exec_time = Utc::now();
         let latency = exec_time
             .signed_duration_since(last_send_instant)
