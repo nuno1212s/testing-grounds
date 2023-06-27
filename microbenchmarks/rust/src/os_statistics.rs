@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use atlas_common::node_id::NodeId;
 
-use febft::bft::communication::NodeId;
 
 pub fn start_statistics_thread(node_id: NodeId) {
     std::thread::Builder::new()

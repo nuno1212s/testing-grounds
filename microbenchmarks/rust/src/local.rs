@@ -11,24 +11,22 @@ use nolock::queues::mpsc::jiffy::{
     AsyncSender,
 };
 use rand_core::{OsRng, RngCore};
+use atlas_client::client::Client;
+use atlas_client::client::ordered_client::Ordered;
+use atlas_common::{channel, init, InitConfig};
+use atlas_common::async_runtime as rt;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::node_id::NodeId;
+use atlas_communication::tcpip::PeerAddr;
+use atlas_metrics::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
 
 use febft::bft::{
     init,
     InitConfig,
 };
-use febft::bft::async_runtime as rt;
-use febft::bft::benchmarks::{BenchmarkHelper, BenchmarkHelperStore, CommStats};
-use febft::bft::communication::{channel, PeerAddr};
-use febft::bft::communication::NodeId;
-use febft::bft::core::client::Client;
-use febft::bft::core::client::ordered_client::Ordered;
-use febft::bft::crypto::signature::{
-    KeyPair,
-    PublicKey,
-};
 
 use crate::common::*;
-use crate::serialize::MicrobenchmarkData;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
@@ -282,14 +280,8 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>>) {
+fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>, q: Arc<AsyncSender<String>>) {
     let mut ramp_up: i32 = 1000;
-
-    let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
-        OsRng.fill_bytes(&mut r);
-        r
-    });
 
     let iterator = 0..MicrobenchmarkData::OPS_NUMBER / 2;
 
@@ -303,7 +295,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         }
 
         let last_send_instant = Utc::now();
-        rt::block_on(client.update::<Ordered>(Arc::downgrade(&request)));
+        rt::block_on(client.update::<Ordered>(Request::new(MicrobenchmarkData::REQUEST)));
         let latency = Utc::now()
             .signed_duration_since(last_send_instant)
             .num_nanoseconds()
@@ -349,7 +341,7 @@ fn run_client(mut client: Client<MicrobenchmarkData>, q: Arc<AsyncSender<String>
         }
 
         let last_send_instant = Utc::now();
-        rt::block_on(client.update::<Ordered>(Arc::downgrade(&request)));
+        rt::block_on(client.update::<Ordered>(Request::new(MicrobenchmarkData::REQUEST)));
         let exec_time = Utc::now();
         let latency = exec_time
             .signed_duration_since(last_send_instant)
