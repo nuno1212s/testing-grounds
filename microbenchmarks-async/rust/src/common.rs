@@ -21,11 +21,12 @@ use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
+use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
 use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
 use atlas_communication::mio_tcp::MIOTcpNode;
 use atlas_communication::tcp_ip_simplex::TCPSimplexNode;
-use atlas_communication::tcpip::{PeerAddr, TcpNode};
+use atlas_communication::tcpip::{TcpNode};
 use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_log_transfer::config::LogTransferConfig;
@@ -33,6 +34,8 @@ use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
 use atlas_persistent_log::{MonStatePersistentLog, PersistentLog};
+use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
+use atlas_reconfiguration::message::NodeTriple;
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
@@ -186,6 +189,8 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
     }
 }
 
+const BOOSTRAP_NODES: [u32; 2] = [0, 1];
+
 async fn node_config(
     n: usize,
     id: NodeId,
@@ -215,7 +220,6 @@ async fn node_config(
     };
 
     let tcp = TcpConfig {
-        addrs,
         network_config: TlsConfig {
             async_client_config: client_config,
             async_server_config: server_config,
@@ -233,17 +237,32 @@ async fn node_config(
         batch_sleep_micros: batch_sleep as u64,
     };
 
-    let pk_config = PKConfig {
-        sk,
-        pk,
+    let mut known_nodes = Vec::new();
+
+    for boostrap_node in BOOSTRAP_NODES {
+
+        let boostrap_node_id = NodeId::from(boostrap_node);
+
+        let boostrap_addr = addrs.get(boostrap_node as u64).cloned().unwrap();
+
+        let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
+
+        known_nodes.push(NodeTriple::new(boostrap_node_id,  boostrap_pk, boostrap_addr));
+    }
+
+    let reconf_config = ReconfigurableNetworkConfig {
+        node_id: id,
+        key_pair: sk,
+        our_address: addrs.get(id.0 as u64).cloned().unwrap(),
+        known_nodes,
     };
 
     let node_config = NodeConfig {
         id,
         first_cli,
+        reconfig: reconf_config,
         tcp_config: tcp,
         client_pool_config: cp,
-        pk_crypto_config: pk_config,
     };
 
     let mio_cfg = MioConfig {
@@ -327,7 +346,7 @@ pub async fn setup_replica(
 
     let op_config = PBFTConfig::new(node_id, None,
                                     view, timeout_duration.clone(),
-                                    watermark,  proposer_config);
+                                    watermark, proposer_config);
 
     let st_config = StateTransferConfig {
         timeout_duration,

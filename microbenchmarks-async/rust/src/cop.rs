@@ -24,7 +24,7 @@ use atlas_client::concurrent_client::ConcurrentClient;
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
 use atlas_common::node_id::NodeId;
-use atlas_communication::tcpip::{PeerAddr};
+use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
 
 pub fn main() {
