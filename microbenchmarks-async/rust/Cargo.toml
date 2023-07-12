@@ -61,8 +61,8 @@ features = ["serialize_serde"]
 #    "collections_randomstate_fxhash"
 #]
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = "0.5"
+#[target.'cfg(not(target_env = "msvc"))'.dependencies]
+#tikv-jemallocator = "0.5"
 
 [build-dependencies.capnpc]
 version = "0.16.2"
