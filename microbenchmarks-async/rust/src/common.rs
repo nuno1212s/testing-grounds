@@ -35,7 +35,9 @@ use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
 use atlas_persistent_log::{MonStatePersistentLog, PersistentLog};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
-use atlas_reconfiguration::message::NodeTriple;
+use atlas_reconfiguration::message::{NodeTriple, ReconfData};
+use atlas_reconfiguration::network_reconfig::NetworkInfo;
+use atlas_reconfiguration::{ReconfigurableNodeProtocol, ReconfigurableNode};
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::{PBFTOrderProtocol};
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
@@ -194,9 +196,6 @@ const BOOSTRAP_NODES: [u32; 2] = [0, 1];
 async fn node_config(
     n: usize,
     id: NodeId,
-    sk: KeyPair,
-    addrs: IntMap<PeerAddr>,
-    pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
 ) -> MioConfig {
     let first_cli = NodeId::from(1000u32);
@@ -237,30 +236,10 @@ async fn node_config(
         batch_sleep_micros: batch_sleep as u64,
     };
 
-    let mut known_nodes = Vec::new();
-
-    for boostrap_node in BOOSTRAP_NODES {
-
-        let boostrap_node_id = NodeId::from(boostrap_node);
-
-        let boostrap_addr = addrs.get(boostrap_node as u64).cloned().unwrap();
-
-        let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
-
-        known_nodes.push(NodeTriple::new(boostrap_node_id,  boostrap_pk, boostrap_addr));
-    }
-
-    let reconf_config = ReconfigurableNetworkConfig {
-        node_id: id,
-        key_pair: sk,
-        our_address: addrs.get(id.0 as u64).cloned().unwrap(),
-        known_nodes,
-    };
 
     let node_config = NodeConfig {
         id,
         first_cli,
-        reconfig: reconf_config,
         tcp_config: tcp,
         client_pool_config: cp,
     };
@@ -279,18 +258,45 @@ pub type StateTransferMessage = CSTMsg<State>;
 pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type ReplicaNetworking = MIOTcpNode<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>;
-pub type ClientNetworking = MIOTcpNode<ClientServiceMsg<MicrobenchmarkData>>;
+pub type ReplicaNetworking = MIOTcpNode<NetworkInfo, ReconfData, ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>;
+pub type ClientNetworking = MIOTcpNode<NetworkInfo, ReconfData, ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
 pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
+pub type ReconfProtocol = ReconfigurableNodeProtocol;
 pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging>;
 pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
 
-pub type SMRReplica = MonReplica<State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
+pub type SMRReplica = MonReplica<ReconfProtocol, State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
+
+pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
+
+pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>) -> Result<ReconfigurableNetworkConfig> {
+    let own_addr = addrs.get(id.0 as u64).cloned().unwrap();
+
+    let mut known_nodes = Vec::new();
+
+    for boostrap_node in BOOSTRAP_NODES {
+
+        let boostrap_node_id = NodeId::from(boostrap_node);
+
+        let boostrap_addr = addrs.get(boostrap_node as u64).cloned().unwrap();
+
+        let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
+
+        known_nodes.push(NodeTriple::new(boostrap_node_id,  boostrap_pk, boostrap_addr));
+    }
+
+    Ok(ReconfigurableNetworkConfig {
+        node_id: id,
+        key_pair: sk,
+        our_address: own_addr,
+        known_nodes,
+    })
+}
 
 pub async fn setup_client(
     n: usize,
@@ -299,14 +305,17 @@ pub async fn setup_client(
     addrs: IntMap<PeerAddr>,
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
-) -> Result<Client<MicrobenchmarkData, ClientNetworking>> {
-    let node = node_config(n, id, sk, addrs, pk, comm_stats).await;
+) -> Result<SMRClient> {
+    let reconf = setup_reconf(id, sk, addrs, pk)?;
+
+    let node = node_config(n, id, comm_stats).await;
 
     let conf = client::ClientConfig {
         n,
         f: 1,
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
+        reconfiguration: reconf,
     };
 
     Client::bootstrap(conf).await
@@ -323,8 +332,10 @@ pub async fn setup_replica(
     let node_id = id.clone();
     let db_path = format!("PERSISTENT_DB_{:?}", id);
 
+    let reconf_config = setup_reconf(id, sk, addrs, pk)?;
+
     let (node, global_batch_size, global_batch_timeout) = {
-        let n = node_config(n, id, sk, addrs, pk, comm_stats);
+        let n = node_config(n, id, comm_stats);
         let b = get_global_batch_size();
         let timeout = get_global_batch_timeout();
         futures::join!(n, b, timeout)
@@ -358,7 +369,7 @@ pub async fn setup_replica(
 
     let service = Microbenchmark::new(id);
 
-    let conf = ReplicaConfig::<State, MicrobenchmarkData, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging> {
+    let conf = ReplicaConfig::<ReconfProtocol, State, MicrobenchmarkData, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
@@ -370,6 +381,7 @@ pub async fn setup_replica(
         db_path,
         pl_config: (),
         p: Default::default(),
+        reconfig_node: reconf_config,
     };
 
     let mon_conf = MonolithicStateReplicaConfig {

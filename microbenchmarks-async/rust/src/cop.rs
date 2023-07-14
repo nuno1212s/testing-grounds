@@ -296,7 +296,7 @@ fn sk_stream() -> impl Iterator<Item=KeyPair> {
     })
 }
 
-fn run_client(mut client: Client<MicrobenchmarkData, ClientNetworking>) {
+fn run_client(mut client: SMRClient) {
     let concurrent_rqs: usize = get_concurrent_rqs();
 
     let id = u32::from(client.id());
