@@ -253,7 +253,8 @@ async fn node_config(
 }
 
 /// Set up the data handles so we initialize the networking layer
-pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
+pub type ReconfigurationMessage = ReconfData;
+pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData, ReconfData>;
 pub type StateTransferMessage = CSTMsg<State>;
 pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
@@ -266,7 +267,7 @@ pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtoco
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocol;
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging>;
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging, ReconfigurationMessage>;
 pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
 
