@@ -191,7 +191,7 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
     }
 }
 
-const BOOSTRAP_NODES: [u32; 2] = [0, 1];
+const BOOSTRAP_NODES: [u32; 4] = [0, 1, 2, 3];
 
 async fn node_config(
     n: usize,
@@ -225,8 +225,8 @@ async fn node_config(
             sync_client_config: client_config_replica,
             sync_server_config: server_config_replica,
         },
-        replica_concurrent_connections: 4,
-        client_concurrent_connections: 2,
+        replica_concurrent_connections: 1,
+        client_concurrent_connections: 1,
     };
 
     let cp = ClientPoolConfig {
@@ -281,14 +281,13 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
     let mut known_nodes = Vec::new();
 
     for boostrap_node in BOOSTRAP_NODES {
-
         let boostrap_node_id = NodeId::from(boostrap_node);
 
         let boostrap_addr = addrs.get(boostrap_node as u64).cloned().unwrap();
 
         let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
 
-        known_nodes.push(NodeTriple::new(boostrap_node_id,  boostrap_pk, boostrap_addr));
+        known_nodes.push(NodeTriple::new(boostrap_node_id, boostrap_pk, boostrap_addr));
     }
 
     Ok(ReconfigurableNetworkConfig {
@@ -319,7 +318,7 @@ pub async fn setup_client(
         reconfiguration: reconf,
     };
 
-    Client::bootstrap(conf).await
+    Client::<ReconfProtocol, MicrobenchmarkData, ClientNetworking>::bootstrap::<OrderProtocol>(conf).await
 }
 
 pub async fn setup_replica(
