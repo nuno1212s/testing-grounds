@@ -28,6 +28,7 @@ use atlas_communication::mio_tcp::MIOTcpNode;
 use atlas_communication::tcp_ip_simplex::TCPSimplexNode;
 use atlas_communication::tcpip::{TcpNode};
 use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
+use atlas_core::smr::networking::NodeWrap;
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_log_transfer::config::LogTransferConfig;
 use atlas_log_transfer::messages::serialize::LTMsg;
@@ -259,8 +260,10 @@ pub type StateTransferMessage = CSTMsg<State>;
 pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type ReplicaNetworking = MIOTcpNode<NetworkInfo, ReconfData, ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>;
-pub type ClientNetworking = MIOTcpNode<NetworkInfo, ReconfData, ClientServiceMsg<MicrobenchmarkData>>;
+///
+pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
+pub type ReplicaNetworking = NodeWrap<Network<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
+pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
 pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
