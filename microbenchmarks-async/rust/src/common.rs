@@ -20,13 +20,11 @@ use atlas_client::client::unordered_client::UnorderedClientMode;
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_common::error::*;
-use atlas_common::node_id::NodeId;
+use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
 use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
 use atlas_communication::mio_tcp::MIOTcpNode;
-use atlas_communication::tcp_ip_simplex::TCPSimplexNode;
-use atlas_communication::tcpip::{TcpNode};
 use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
 use atlas_core::smr::networking::NodeWrap;
 use atlas_log_transfer::CollabLogTransfer;
@@ -240,7 +238,6 @@ async fn node_config(
 
     let node_config = NodeConfig {
         id,
-        first_cli,
         tcp_config: tcp,
         client_pool_config: cp,
     };
@@ -278,7 +275,7 @@ pub type SMRReplica = MonReplica<ReconfProtocol, State, Microbenchmark, OrderPro
 
 pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
 
-pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>) -> Result<ReconfigurableNetworkConfig> {
+pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>, node_type: NodeType) -> Result<ReconfigurableNetworkConfig> {
     let own_addr = addrs.get(id.0 as u64).cloned().unwrap();
 
     let mut known_nodes = Vec::new();
@@ -290,11 +287,12 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
 
         let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
 
-        known_nodes.push(NodeTriple::new(boostrap_node_id, boostrap_pk, boostrap_addr));
+        known_nodes.push(NodeTriple::new(boostrap_node_id, boostrap_pk, boostrap_addr, NodeType::Replica));
     }
 
     Ok(ReconfigurableNetworkConfig {
         node_id: id,
+        node_type,
         key_pair: sk,
         our_address: own_addr,
         known_nodes,
@@ -309,7 +307,7 @@ pub async fn setup_client(
     pk: IntMap<PublicKey>,
     comm_stats: Option<Arc<CommStats>>,
 ) -> Result<SMRClient> {
-    let reconf = setup_reconf(id, sk, addrs, pk)?;
+    let reconf = setup_reconf(id, sk, addrs, pk, NodeType::Client)?;
 
     let node = node_config(n, id, comm_stats).await;
 
@@ -335,7 +333,7 @@ pub async fn setup_replica(
     let node_id = id.clone();
     let db_path = format!("PERSISTENT_DB_{:?}", id);
 
-    let reconf_config = setup_reconf(id, sk, addrs, pk)?;
+    let reconf_config = setup_reconf(id, sk, addrs, pk, NodeType::Replica)?;
 
     let (node, global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, comm_stats);

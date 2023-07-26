@@ -21,7 +21,6 @@ use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
-use atlas_communication::tcpip::{TcpNode};
 
 use crate::common::*;
 use crate::serialize::{MicrobenchmarkData, Request};
