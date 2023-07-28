@@ -1,31 +1,23 @@
 use std::env;
 use std::env::args;
-use crate::common::*;
-use crate::serialize::{MicrobenchmarkData, Request};
-
-use std::fs::File;
-use std::io::Write;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use intmap::IntMap;
 use chrono::offset::Utc;
-use konst::primitive::{parse_usize};
-use nolock::queues::mpsc::jiffy::{
-    async_queue,
-    AsyncSender,
-};
-use regex::internal::Inst;
-
+use intmap::IntMap;
+use konst::primitive::parse_usize;
 use semaphores::RawSemaphore;
-use atlas_client::client::Client;
+
 use atlas_client::client::ordered_client::Ordered;
 use atlas_client::concurrent_client::ConcurrentClient;
-use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
+
+use crate::common::*;
+use crate::serialize::{MicrobenchmarkData, Request};
 
 pub fn main() {
     let is_client = std::env::var("CLIENT")
