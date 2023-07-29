@@ -267,7 +267,7 @@ pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtoco
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocol;
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, StateTransferMessage, LogTransferMessage, ReplicaNetworking, Logging, ReconfigurationMessage>;
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking, Logging, ReconfigurationMessage>;
 pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
 
