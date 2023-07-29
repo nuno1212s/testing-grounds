@@ -290,6 +290,9 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
         known_nodes.push(NodeTriple::new(boostrap_node_id, boostrap_pk, boostrap_addr, NodeType::Replica));
     }
 
+    println!("Known nodes: {:?}", known_nodes);
+
+
     Ok(ReconfigurableNetworkConfig {
         node_id: id,
         node_type,
