@@ -257,7 +257,6 @@ pub type StateTransferMessage = CSTMsg<State>;
 pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
-///
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
 pub type ReplicaNetworking = NodeWrap<Network<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;

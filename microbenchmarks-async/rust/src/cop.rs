@@ -1,11 +1,26 @@
 use std::env;
 use std::env::args;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
+use atlas_common::error::*;
 use chrono::offset::Utc;
 use intmap::IntMap;
 use konst::primitive::parse_usize;
+use log4rs::append::Append;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::policy::compound::trigger::Trigger;
+use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
+use log4rs::Config;
+use log4rs::config::{Appender, Logger, Root};
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::filter::threshold::ThresholdFilter;
+use log::LevelFilter;
 use semaphores::RawSemaphore;
 
 use atlas_client::client::ordered_client::Ordered;
@@ -19,6 +34,47 @@ use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
 use crate::common::*;
 use crate::serialize::{MicrobenchmarkData, Request};
 
+#[derive(Debug)]
+pub struct InitTrigger {
+    has_been_triggered: AtomicBool,
+}
+
+impl Trigger for InitTrigger {
+    fn trigger(&self, file: &LogFile) -> anyhow::Result<bool> {
+        if file.len_estimate() == 0 {
+            println!("Not triggering rollover because file is empty");
+
+            self.has_been_triggered.store(true, Relaxed);
+            return Ok(false);
+        }
+
+        Ok(self.has_been_triggered.compare_exchange(false, true, Relaxed, Relaxed).is_ok())
+    }
+}
+
+fn format_old_log(id: u32, str: &str) -> String {
+    format!("./logs/log_{}/old/febft{}.log.{}", id, str, "{}")
+}
+
+fn format_log(id: u32, str: &str) -> String {
+    format!("./logs/log_{}/febft{}.log", id, str)
+}
+
+fn policy(id: u32, str: &str) -> CompoundPolicy {
+    let trigger = InitTrigger { has_been_triggered: AtomicBool::new(false) };
+
+    let roller = FixedWindowRoller::builder().base(1).build(format_old_log(id, str).as_str(), 5).wrapped(ErrorKind::MsgLog).unwrap();
+
+    CompoundPolicy::new(Box::new(trigger), Box::new(roller))
+}
+
+fn file_appender(id: u32, str: &str) -> Box<dyn Append> {
+    Box::new(RollingFileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}")))
+        .build(format_log(id, str).as_str(), Box::new(policy(id, str)))
+        .wrapped_msg(ErrorKind::MsgLog, "Failed to create rolling file appender").unwrap())
+}
+
 pub fn main() {
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
@@ -28,6 +84,35 @@ pub fn main() {
         .unwrap_or(String::from("2")).as_str()).unwrap();
     let async_threads = parse_usize(std::env::var("ASYNC_THREADS")
         .unwrap_or(String::from("2")).as_str()).unwrap();
+
+    let id: u32 = std::env::var("ID")
+        .iter()
+        .flat_map(|id| id.parse())
+        .next()
+        .unwrap();
+
+    let console_appender = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}"))).build();
+
+    let config = Config::builder()
+        .appender(Appender::builder().build("comm", file_appender(id, "_comm")))
+        .appender(Appender::builder().build("reconfig", file_appender(id, "_reconfig")))
+        .appender(Appender::builder().build("consensus", file_appender(id, "_consensus")))
+        .appender(Appender::builder().build("file", file_appender(id, "")))
+        .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
+        .logger(Logger::builder()
+            .appender("comm").build("atlas_communication", LevelFilter::Warn))
+        .logger(Logger::builder()
+            .appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
+        .logger(Logger::builder()
+            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Trace))
+        .build(Root::builder()
+                   .appender("console")
+                   .appender("file")
+                   .build(LevelFilter::Debug),
+        ).wrapped(ErrorKind::MsgLog).unwrap();
+
+    let _handle = log4rs::init_config(config).wrapped(ErrorKind::MsgLog).unwrap();
 
     if !is_client {
         let replica_id: u32 = std::env::var("ID")
@@ -65,6 +150,7 @@ pub fn main() {
             //If we are the client, we don't want any threads to send to other clients as that will never happen
             id: None,
         };
+
 
         let _guard = unsafe { init(conf).unwrap() };
 
@@ -392,5 +478,5 @@ fn run_client(mut client: SMRClient) {
 
     println!("{:?} // Done.", concurrent_client.id());
 
-    println!("{:?} // Test done in {:?}. ({} ops/s)", concurrent_client.id(), time_passed, (ops_done * 1_000_000) / time_passed.as_micros() as usize );
+    println!("{:?} // Test done in {:?}. ({} ops/s)", concurrent_client.id(), time_passed, (ops_done * 1_000_000) / time_passed.as_micros() as usize);
 }
