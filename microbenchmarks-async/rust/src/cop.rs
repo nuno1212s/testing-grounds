@@ -101,11 +101,11 @@ pub fn main() {
         .appender(Appender::builder().build("file", file_appender(id, "")))
         .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
         .logger(Logger::builder()
-            .appender("comm").build("atlas_communication", LevelFilter::Warn))
+            .appender("comm").build("atlas_communication", LevelFilter::Info))
         .logger(Logger::builder()
             .appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
         .logger(Logger::builder()
-            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Trace))
+            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .build(Root::builder()
                    .appender("console")
                    .appender("file")
@@ -138,7 +138,7 @@ pub fn main() {
                                                with_metrics(atlas_replica::metric::metrics()),
                                                with_metrics(atlas_log_transfer::metrics::metrics()),
                                                with_metrics(febft_state_transfer::metrics::metrics()),
-                                               with_metric_level(MetricLevel::Info)],
+                                               with_metric_level(MetricLevel::Trace)],
                                           influx_db_config(node_id));
 
         main_(node_id);
