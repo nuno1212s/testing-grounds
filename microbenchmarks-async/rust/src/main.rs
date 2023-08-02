@@ -1,3 +1,7 @@
+#![feature(alloc_error_hook)]
+
+use std::alloc::{Layout, set_alloc_error_hook};
+
 mod exec;
 mod serialize;
 mod metric;
@@ -15,12 +19,19 @@ mod bench;
 // #[global_allocator]
 // static GLOBAL: Jemalloc = Jemalloc;
 
+fn custom_alloc_error_hook(layout: Layout) {
+    panic!("allocation error: {:?} bytes", layout.size())
+}
+
 fn main() {
     let is_local = std::env::var("LOCAL")
         .map(|x| x == "1")
         .unwrap_or(false);
 
     println!("Starting local? {}", is_local);
+
+
+    set_alloc_error_hook(custom_alloc_error_hook);
 
     if is_local {
         local::main()
