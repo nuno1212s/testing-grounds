@@ -103,13 +103,12 @@ pub fn main() {
         .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
         .logger(Logger::builder()
             .appender("comm").build("atlas_communication", LevelFilter::Info))
-        .logger(Logger::builder().appender("common").build("atlas_common", LevelFilter::Trace))
+        .logger(Logger::builder().appender("common").build("atlas_common", LevelFilter::Debug))
         .logger(Logger::builder()
-            .appender("reconfig").build("atlas_reconfiguration", LevelFilter::Trace))
+            .appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
         .logger(Logger::builder()
-            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Trace))
+            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .build(Root::builder()
-                   .appender("console")
                    .appender("file")
                    .build(LevelFilter::Debug),
         ).wrapped(ErrorKind::MsgLog).unwrap();
