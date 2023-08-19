@@ -75,6 +75,31 @@ fn file_appender(id: u32, str: &str) -> Box<dyn Append> {
         .wrapped_msg(ErrorKind::MsgLog, "Failed to create rolling file appender").unwrap())
 }
 
+fn generate_log(id: u32) {
+    let console_appender = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}"))).build();
+
+    let config = Config::builder()
+        .appender(Appender::builder().build("comm", file_appender(id, "_comm")))
+        .appender(Appender::builder().build("reconfig", file_appender(id, "_reconfig")))
+        .appender(Appender::builder().build("common", file_appender(id, "_common")))
+        .appender(Appender::builder().build("consensus", file_appender(id, "_consensus")))
+        .appender(Appender::builder().build("file", file_appender(id, "")))
+        .appender(Appender::builder().build("log_transfer", file_appender(id, "_log_transfer")))
+        .appender(Appender::builder().build("state_transfer", file_appender(id, "_state_transfer")))
+        .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
+
+        .logger(Logger::builder().appender("comm").build("atlas_communication", LevelFilter::Debug))
+        .logger(Logger::builder().appender("common").build("atlas_common", LevelFilter::Debug))
+        .logger(Logger::builder().appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
+        .logger(Logger::builder().appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
+        .logger(Logger::builder().appender("log_transfer").build("atlas_log_transfer", LevelFilter::Debug))
+        .logger(Logger::builder().appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
+        .build(Root::builder().appender("file").build(LevelFilter::Debug), ).wrapped(ErrorKind::MsgLog).unwrap();
+
+    let _handle = log4rs::init_config(config).wrapped(ErrorKind::MsgLog).unwrap();
+}
+
 pub fn main() {
     let is_client = std::env::var("CLIENT")
         .map(|x| x == "1")
@@ -91,53 +116,26 @@ pub fn main() {
         .next()
         .unwrap();
 
-    let console_appender = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}"))).build();
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("comm", file_appender(id, "_comm")))
-        .appender(Appender::builder().build("reconfig", file_appender(id, "_reconfig")))
-        .appender(Appender::builder().build("common", file_appender(id, "_common")))
-        .appender(Appender::builder().build("consensus", file_appender(id, "_consensus")))
-        .appender(Appender::builder().build("file", file_appender(id, "")))
-        .appender(Appender::builder().build("log_transfer", file_appender(id, "_log_transfer")))
-        .appender(Appender::builder().build("state_transfer", file_appender(id, "_state_transfer")))
-        .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
-        .logger(Logger::builder()
-            .appender("comm").build("atlas_communication", LevelFilter::Info))
-        .logger(Logger::builder().appender("common").build("atlas_common", LevelFilter::Debug))
-        .logger(Logger::builder()
-            .appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
-        .logger(Logger::builder()
-            .appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
-        .logger(Logger::builder()
-            .appender("log_transfer").build("atlas_log_transfer", LevelFilter::Debug))
-        .logger(Logger::builder()
-            .appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
-        .build(Root::builder()
-                   .appender("file")
-                   .build(LevelFilter::Debug),
-        ).wrapped(ErrorKind::MsgLog).unwrap();
-
-    let _handle = log4rs::init_config(config).wrapped(ErrorKind::MsgLog).unwrap();
 
     if !is_client {
-        let replica_id: u32 = std::env::var("ID")
+        let id: u32 = std::env::var("ID")
             .iter()
             .flat_map(|id| id.parse())
             .next()
             .unwrap();
+
+        generate_log(id);
 
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
             threadpool_threads,
             async_threads,
             //If we are the client, we don't want any threads to send to other clients as that will never happen
-            id: Some(replica_id.to_string()),
+            id: Some(id.to_string()),
         };
 
         let _guard = unsafe { init(conf).unwrap() };
-        let node_id = NodeId::from(replica_id);
+        let node_id = NodeId::from(id);
 
         atlas_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
                                                with_metrics(atlas_core::metric::metrics()),
@@ -157,7 +155,6 @@ pub fn main() {
             //If we are the client, we don't want any threads to send to other clients as that will never happen
             id: None,
         };
-
 
         let _guard = unsafe { init(conf).unwrap() };
 
@@ -293,6 +290,8 @@ fn client_async_main() {
 
     for i in 0..client_count {
         let id = NodeId::from(first_id + i);
+
+        generate_log(id.0 as u32);
 
         let addrs = {
             let mut addrs = IntMap::new();
