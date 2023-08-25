@@ -25,7 +25,7 @@ use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
 use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
 use atlas_communication::mio_tcp::MIOTcpNode;
-use atlas_core::serialize::{ClientServiceMsg, ServiceMsg};
+use atlas_core::serialize::{ClientServiceMsg, Service};
 use atlas_core::smr::networking::NodeWrap;
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_log_transfer::config::LogTransferConfig;
@@ -258,7 +258,7 @@ pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, Or
 
 /// Set up the networking layer with the data handles we have
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
-pub type ReplicaNetworking = NodeWrap<Network<ServiceMsg<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
+pub type ReplicaNetworking = NodeWrap<Network<Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
