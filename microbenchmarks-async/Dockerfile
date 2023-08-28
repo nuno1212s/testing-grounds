@@ -13,7 +13,20 @@ FROM rustlang/rust:nightly-bullseye-slim AS build
 ARG APP_NAME
 WORKDIR /app
 
-RUN apt update && apt install -y capnproto && rm -rf /var/lib/apt/lists/*
+ARG request_size
+ARG reply_size
+ARG state_size
+
+ENV REQUEST_SIZE $request_size
+ENV REPLY_SIZE $reply_size
+ENV STATE_SIZE $state_size
+ENV VERBOSE false
+
+COPY Atlas ./Atlas
+COPY febft ./febft
+COPY testing-grounds/microbenchmarks-async/rust ./testing-grounds/microbenchmarks-async/rust
+
+RUN apt update && apt install -y capnproto clang && rm -rf /var/lib/apt/lists/*
 
 # Build the application.
 # Leverage a cache mount to /usr/local/cargo/registry/
@@ -22,13 +35,10 @@ RUN apt update && apt install -y capnproto && rm -rf /var/lib/apt/lists/*
 # Leverage a bind mount to the src directory to avoid having to copy the
 # source code into the container. Once built, copy the executable to an
 # output directory before the cache mounted /app/target is unmounted.
-RUN --mount=type=bind,source=src,target=src \
-    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
-    --mount=type=bind,source=build.rs,target=build.rs \
-    --mount=type=cache,target=/app/target/ \
+RUN --mount=type=cache,target=/app/testing-grounds/microbenchmarks-async/rust/target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     <<EOF
+cd testing-grounds/microbenchmarks-async/rust
 set -e
 cargo build --locked --release
 cp ./target/release/$APP_NAME /bin/server
@@ -63,9 +73,6 @@ USER appuser
 
 # Copy the executable from the "build" stage.
 COPY --from=build /bin/server /bin/
-
-# Configure rocket to listen on all interfaces.
-ENV ROCKET_ADDRESS=0.0.0.0
 
 # Expose the port that the application listens on.
 EXPOSE 10000

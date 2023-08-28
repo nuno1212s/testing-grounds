@@ -396,9 +396,11 @@ fn run_client(mut client: SMRClient) {
 
     let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
 
-    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
+    let iterator = 0..(MicrobenchmarkData::get_ops_number() / 2);
 
     let mut ramp_up = 1000;
+
+    let rq_sleep = MicrobenchmarkData::get_request_sleep_millis();
 
     for req in iterator {
 
@@ -425,8 +427,8 @@ fn run_client(mut client: SMRClient) {
             }
         })).unwrap();
 
-        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        if rq_sleep != Duration::ZERO {
+            std::thread::sleep(rq_sleep);
         } else if ramp_up > 0 {
             let to_sleep = fastrand::u32(ramp_up / 2..ramp_up);
             std::thread::sleep(Duration::from_millis(to_sleep as u64));
@@ -435,9 +437,9 @@ fn run_client(mut client: SMRClient) {
         }
     }
 
-    println!("Executing experiment for {} ops", MicrobenchmarkData::OPS_NUMBER / 2);
+    println!("Executing experiment for {} ops", MicrobenchmarkData::get_ops_number() / 2);
 
-    let iterator = 0..(MicrobenchmarkData::OPS_NUMBER / 2);
+    let iterator = 0..(MicrobenchmarkData::get_ops_number() / 2);
 
     //let mut st = BenchmarkHelper::new(client.id(), MicrobenchmarkData::OPS_NUMBER / 2);
 
@@ -468,8 +470,8 @@ fn run_client(mut client: SMRClient) {
                                                          }
                                                      })).unwrap();
 
-        if MicrobenchmarkData::REQUEST_SLEEP_MILLIS != Duration::ZERO {
-            std::thread::sleep(MicrobenchmarkData::REQUEST_SLEEP_MILLIS);
+        if rq_sleep != Duration::ZERO {
+            std::thread::sleep(rq_sleep);
         }
     }
 
@@ -480,7 +482,7 @@ fn run_client(mut client: SMRClient) {
 
     let time_passed = start.elapsed();
 
-    let ops_done = MicrobenchmarkData::OPS_NUMBER / 2;
+    let ops_done = MicrobenchmarkData::get_ops_number() / 2;
 
     println!("{:?} // Done.", concurrent_client.id());
 

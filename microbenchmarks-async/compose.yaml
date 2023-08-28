@@ -10,7 +10,7 @@
 services:
   server:
     build:
-      context: .
+      context: rust
       target: final
     ports:
       - 10000:10000

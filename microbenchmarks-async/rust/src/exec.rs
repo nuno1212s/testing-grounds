@@ -20,6 +20,7 @@ pub struct Microbenchmark {
     iterations: usize,
     reply: Arc<Vec<u8>>,
     measurements: Measurements,
+    measurement_interval: usize
 }
 
 impl Microbenchmark {
@@ -39,6 +40,7 @@ impl Microbenchmark {
             last_measurement: 0,
             iterations: 0,
             measurements: Measurements::new(id),
+            measurement_interval: MicrobenchmarkData::get_measurement_interval(),
         }
     }
 }
@@ -61,9 +63,9 @@ impl Application<State> for Microbenchmark {
         // increase iter count
         self.iterations += 1;
 
-        if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 {
+        if self.iterations % self.measurement_interval == 0 {
             println!("{:?} // --- Measurements after {} ops ({} samples) ---",
-                     self.id, self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
+                     self.id, self.iterations, self.measurement_interval);
 
             let diff = Utc::now()
                 .signed_duration_since(self.max_tp_time)
@@ -151,9 +153,9 @@ impl Application<State> for Microbenchmark {
             // increase iter count
             self.iterations += 1;
 
-            if self.iterations % MicrobenchmarkData::MEASUREMENT_INTERVAL == 0 && batch_len < MicrobenchmarkData::MEASUREMENT_INTERVAL {
+            if self.iterations % self.measurement_interval == 0 && batch_len < self.measurement_interval {
                 println!("{:?} // --- Measurements after {} ops ({} samples) ---",
-                         self.id, self.iterations, MicrobenchmarkData::MEASUREMENT_INTERVAL);
+                         self.id, self.iterations, self.measurement_interval);
 
                 let diff = Utc::now()
                     .signed_duration_since(self.max_tp_time)

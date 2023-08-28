@@ -37,20 +37,23 @@ impl MicrobenchmarkData {
         unwrap_ctx!(result)
     };
 
-    pub const MEASUREMENT_INTERVAL: usize = {
-        let result = parse_usize(env!("MEASUREMENT_INTERVAL"));
-        unwrap_ctx!(result)
-    };
+    pub fn get_measurement_interval() -> usize {
+        std::env::var("MEASUREMENT_INTERVAL")
+            .map(|s| s.parse().unwrap())
+            .unwrap_or(1000)
+    }
 
-    pub const OPS_NUMBER: usize = {
-        let result = parse_usize(env!("OPS_NUMBER"));
-        unwrap_ctx!(result)
-    };
+    pub fn get_ops_number() -> usize {
+        std::env::var("OPS_NUMBER")
+            .map(|s| s.parse().unwrap())
+            .unwrap_or(1000)
+    }
 
-    pub const REQUEST_SLEEP_MILLIS: Duration = {
-        let result = parse_u64(unwrap_or!(option_env!("REQUEST_SLEEP_MILLIS"), "0"));
-        Duration::from_millis(unwrap_ctx!(result))
-    };
+    pub fn get_request_sleep_millis() -> Duration {
+        Duration::from_millis(std::env::var("OPS_NUMBER")
+            .map(|s| s.parse().unwrap())
+            .unwrap_or(0))
+    }
 
     pub const VERBOSE: bool = {
         let result = parse_bool(unwrap_or!(option_env!("VERBOSE"), "false"));
@@ -96,7 +99,6 @@ impl State {
 }
 
 impl MonolithicState for State {
-
     fn serialize_state<W>(mut w: W, request: &Self) -> Result<()> where W: Write {
         w.write_all(&MicrobenchmarkData::STATE).wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize state")
     }
