@@ -47,6 +47,8 @@ use atlas_replica::server::monolithic_server::MonReplica;
 use febft_state_transfer::CollabStateTransfer;
 use febft_state_transfer::config::StateTransferConfig;
 use febft_state_transfer::message::serialize::CSTMsg;
+use atlas_smr_exec::single_threaded::monolithic_executor::MonolithicExecutor;
+use atlas_smr_exec::SingleThreadedMonExecutor;
 
 use crate::exec::Microbenchmark;
 use crate::serialize::{MicrobenchmarkData, State};
@@ -270,7 +272,7 @@ pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking
 pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
 
-pub type SMRReplica = MonReplica<ReconfProtocol, State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
+pub type SMRReplica = MonReplica<ReconfProtocol, SingleThreadedMonExecutor, State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
 
 pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
 
