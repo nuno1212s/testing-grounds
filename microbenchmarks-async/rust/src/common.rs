@@ -256,7 +256,7 @@ async fn node_config(
 pub type ReconfigurationMessage = ReconfData;
 pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
 pub type StateTransferMessage = CSTMsg<State>;
-pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
@@ -264,7 +264,7 @@ pub type ReplicaNetworking = NodeWrap<Network<Service<MicrobenchmarkData, OrderP
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
-pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
+pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocol;
