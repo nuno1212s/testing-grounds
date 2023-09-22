@@ -23,7 +23,7 @@ mprober-lib = "0.1.7"
 
 atlas-common = { path = "../../../Atlas/atlas-common" }
 atlas-communication = { path = "../../../Atlas/atlas-communication" }
-atlas-execution = { path = "../../../Atlas/atlas-execution" }
+atlas-execution = { path = "../../../Atlas/atlas-smr-application" }
 atlas-core = { path = "../../../Atlas/atlas-core" }
 atlas-replica = { path = "../../../Atlas/atlas-replica" }
 atlas-client = { path = "../../../Atlas/atlas-client" }
