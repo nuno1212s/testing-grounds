@@ -402,6 +402,9 @@ fn run_client(mut client: SMRClient) {
 
     let rq_sleep = MicrobenchmarkData::get_request_sleep_millis();
 
+    println!("{:?} // {:?} requests will be performed with {} concurrent requests, sleep is {:?} and ramp up is {}",concurrent_client.id() ,MicrobenchmarkData::get_ops_number()/2, concurrent_rqs,
+    rq_sleep, ramp_up);
+
     for req in iterator {
 
         //Only allow concurrent_rqs per client at the network
