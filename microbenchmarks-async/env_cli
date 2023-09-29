@@ -21,17 +21,17 @@ export MIO_WORKER_COUNT=1
 export ASYNC_THREADS=2
 
 #1 ms batch timeout
-export BATCH_TIMEOUT_MICROS=100
+export BATCH_TIMEOUT_MICROS=50
 #1 ms sleep between client pool collections
-export BATCH_SLEEP_MICROS=100
+export BATCH_SLEEP_MICROS=50
 
 export OPS_NUMBER=3000000
 export CONCURRENT_RQS=100
 export MEASUREMENT_INTERVAL=20000
 
 export STATE_SIZE=0
-export REPLY_SIZE=0
-export REQUEST_SIZE=0
+export REPLY_SIZE=1024
+export REQUEST_SIZE=1024
 export REQUEST_SLEEP_MILLIS=0
 
 export RUST_LOG=INFO
