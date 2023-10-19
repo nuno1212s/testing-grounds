@@ -5,17 +5,15 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
-use atlas_common::error::*;
 use chrono::offset::Utc;
 use intmap::IntMap;
 use konst::primitive::parse_usize;
 use log4rs::append::Append;
 use log4rs::append::console::ConsoleAppender;
+use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::trigger::Trigger;
-use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
 use log4rs::Config;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
@@ -27,6 +25,7 @@ use atlas_client::client::ordered_client::Ordered;
 use atlas_client::concurrent_client::ConcurrentClient;
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
@@ -140,7 +139,7 @@ pub fn main() {
         atlas_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
                                                with_metrics(atlas_core::metric::metrics()),
                                                with_metrics(atlas_communication::metric::metrics()),
-                                               with_metrics(atlas_replica::metric::metrics()),
+                                               with_metrics(atlas_smr_replica::metric::metrics()),
                                                with_metrics(atlas_log_transfer::metrics::metrics()),
                                                with_metrics(febft_state_transfer::metrics::metrics()),
                                                with_metric_level(MetricLevel::Trace)],

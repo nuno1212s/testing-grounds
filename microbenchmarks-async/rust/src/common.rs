@@ -257,13 +257,14 @@ async fn node_config(
 pub type ReconfigurationMessage = ReconfData;
 pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
 pub type StateTransferMessage = CSTMsg<State>;
-pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, OrderProtocolMessage>;
-
 pub type DecLogMsg = LogSerialization<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg>;
+
 
 /// Set up the networking layer with the data handles we have
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
-pub type ReplicaNetworking = NodeWrap<Network<Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
+pub type Serv = Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>;
+pub type ReplicaNetworking = NodeWrap<Network<Serv>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
@@ -275,9 +276,7 @@ pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking
 pub type DecisionLog = Log<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
 pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, DecisionLog, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
-
 pub type SMRReplica = MonReplica<ReconfProtocol, SingleThreadedMonExecutor, State, Microbenchmark, OrderProtocol, DecisionLog, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
-
 pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
 
 pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>, node_type: NodeType) -> Result<ReconfigurableNetworkConfig> {
@@ -296,7 +295,6 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
     }
 
     println!("Known nodes: {:?}", known_nodes);
-
 
     Ok(ReconfigurableNetworkConfig {
         node_id: id,
