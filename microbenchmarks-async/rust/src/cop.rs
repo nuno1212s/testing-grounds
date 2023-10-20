@@ -5,17 +5,15 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
-use atlas_common::error::*;
 use chrono::offset::Utc;
 use intmap::IntMap;
 use konst::primitive::parse_usize;
 use log4rs::append::Append;
 use log4rs::append::console::ConsoleAppender;
+use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::trigger::Trigger;
-use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
 use log4rs::Config;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
@@ -27,6 +25,7 @@ use atlas_client::client::ordered_client::Ordered;
 use atlas_client::concurrent_client::ConcurrentClient;
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
@@ -87,6 +86,7 @@ fn generate_log(id: u32) {
         .appender(Appender::builder().build("file", file_appender(id, "")))
         .appender(Appender::builder().build("log_transfer", file_appender(id, "_log_transfer")))
         .appender(Appender::builder().build("state_transfer", file_appender(id, "_state_transfer")))
+        .appender(Appender::builder().build("decision_log", file_appender(id, "_decision_log")))
         .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
 
         .logger(Logger::builder().appender("comm").build("atlas_communication", LevelFilter::Debug))
@@ -95,6 +95,7 @@ fn generate_log(id: u32) {
         .logger(Logger::builder().appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .logger(Logger::builder().appender("log_transfer").build("atlas_log_transfer", LevelFilter::Debug))
         .logger(Logger::builder().appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
+        .logger(Logger::builder().appender("decision_log").build("atlas_decision_log", LevelFilter::Debug))
         .build(Root::builder().appender("file").build(LevelFilter::Debug), ).wrapped(ErrorKind::MsgLog).unwrap();
 
     let _handle = log4rs::init_config(config).wrapped(ErrorKind::MsgLog).unwrap();
@@ -140,7 +141,7 @@ pub fn main() {
         atlas_metrics::initialize_metrics(vec![with_metrics(febft_pbft_consensus::bft::metric::metrics()),
                                                with_metrics(atlas_core::metric::metrics()),
                                                with_metrics(atlas_communication::metric::metrics()),
-                                               with_metrics(atlas_replica::metric::metrics()),
+                                               with_metrics(atlas_smr_replica::metric::metrics()),
                                                with_metrics(atlas_log_transfer::metrics::metrics()),
                                                with_metrics(febft_state_transfer::metrics::metrics()),
                                                with_metric_level(MetricLevel::Trace)],

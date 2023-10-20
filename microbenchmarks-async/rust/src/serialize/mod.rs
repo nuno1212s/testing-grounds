@@ -1,23 +1,20 @@
-use std::sync::Weak;
-use std::time::Duration;
 use std::default::Default;
 use std::io::{Read, Write};
-use serde::{Serialize, Deserialize, Deserializer};
+use std::time::Duration;
 
 use konst::{
-    primitive::{
-        parse_usize,
-        parse_bool,
-        parse_u64,
-    },
     option::unwrap_or,
+    primitive::{
+        parse_bool,
+        parse_usize,
+    },
     unwrap_ctx,
 };
-use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
 
 use atlas_common::error::*;
-use atlas_execution::serialize::ApplicationData;
-use atlas_execution::state::monolithic_state::MonolithicState;
+use atlas_smr_application::serialize::ApplicationData;
+use atlas_smr_application::state::monolithic_state::MonolithicState;
 
 pub struct MicrobenchmarkData;
 

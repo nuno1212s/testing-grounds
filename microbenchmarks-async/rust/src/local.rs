@@ -5,20 +5,16 @@ use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 use chrono::offset::Utc;
-use futures_timer::Delay;
 use intmap::IntMap;
 use nolock::queues::mpsc::jiffy::{
     async_queue,
     AsyncSender,
 };
-use rand_core::{OsRng, RngCore};
 use semaphores::RawSemaphore;
 
-use febft_pbft_consensus::bft::{PBFT};
-use atlas_client::client::Client;
 use atlas_client::client::ordered_client::Ordered;
-use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 
