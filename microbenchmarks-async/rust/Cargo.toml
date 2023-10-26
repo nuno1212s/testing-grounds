@@ -42,6 +42,7 @@ atlas-persistent-log = { path = "../../../Atlas/Atlas-Persistent-Log" }
 atlas-log-transfer = { path = "../../../Atlas/Atlas-Log-Transfer", features = ["serialize_serde"] }
 atlas-decision-log = { path = "../../../Atlas/Atlas-Decision-Log", features = ["serialize_serde"] }
 atlas-smr-execution = { path = "../../../Atlas/Atlas-SMR-Execution" }
+atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
 febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
 
