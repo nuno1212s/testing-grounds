@@ -267,8 +267,10 @@ pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
 
 /// Set up the networking layer with the data handles we have
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
-pub type Serv = Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, ViewTransferMessage>;
-pub type ReplicaNetworking = NodeWrap<Network<Serv>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, ViewTransferMessage, NetworkInfo, ReconfData>;
+pub type Serv = Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage,
+    LogTransferMessage, ViewTransferMessage>;
+pub type ReplicaNetworking = NodeWrap<Network<Serv>, MicrobenchmarkData, OrderProtocolMessage,
+    StateTransferMessage, LogTransferMessage, ViewTransferMessage, NetworkInfo, ReconfData>;
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
