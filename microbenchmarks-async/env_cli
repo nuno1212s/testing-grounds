@@ -14,7 +14,7 @@ export CLIENTS_PER_POOL=1000
 
 #Global batch size from all joined client pools
 export GLOBAL_BATCH_SIZE=5000
-export GLOBAL_BATCH_SLEEP_MICROS=250
+export GLOBAL_BATCH_SLEEP_MICROS=1000000
 
 export THREADPOOL_THREADS=2
 export MIO_WORKER_COUNT=1

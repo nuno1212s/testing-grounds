@@ -47,7 +47,7 @@ impl MicrobenchmarkData {
     }
 
     pub fn get_request_sleep_millis() -> Duration {
-        Duration::from_millis(std::env::var("OPS_NUMBER")
+        Duration::from_millis(std::env::var("REQUEST_SLEEP_MILLIS")
             .map(|s| s.parse().unwrap())
             .unwrap_or(0))
     }
