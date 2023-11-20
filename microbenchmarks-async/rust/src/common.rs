@@ -13,37 +13,43 @@ use regex::Regex;
 use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
 use rustls::server::AllowAnyAuthenticatedClient;
 use rustls_pemfile::{Item, read_one};
-use febft_pbft_consensus::bft::message::ObserveEventKind;
+
 use atlas_client::client;
 use atlas_client::client::Client;
 use atlas_client::client::unordered_client::UnorderedClientMode;
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
-use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_common::error::*;
 use atlas_common::node_id::{NodeId, NodeType};
+use atlas_common::ordering::SeqNo;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
-use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, PKConfig, TcpConfig, TlsConfig};
+use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, TcpConfig, TlsConfig};
 use atlas_communication::mio_tcp::MIOTcpNode;
+use atlas_core::ordering_protocol::permissioned::VTMsg;
 use atlas_core::serialize::{ClientServiceMsg, Service};
 use atlas_core::smr::networking::NodeWrap;
+use atlas_decision_log::config::DecLogConfig;
+use atlas_decision_log::Log;
+use atlas_decision_log::serialize::LogSerialization;
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_log_transfer::config::LogTransferConfig;
 use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
-use atlas_persistent_log::{MonStatePersistentLog, PersistentLog};
+use atlas_persistent_log::stateful_logs::monolithic_state::MonStatePersistentLog;
+use atlas_reconfiguration::ReconfigurableNodeProtocol;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use atlas_reconfiguration::message::{NodeTriple, ReconfData};
 use atlas_reconfiguration::network_reconfig::NetworkInfo;
-use atlas_reconfiguration::{ReconfigurableNodeProtocol, ReconfigurableNode};
-use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
-use febft_pbft_consensus::bft::{PBFTOrderProtocol};
+use atlas_smr_execution::SingleThreadedMonExecutor;
+use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
+use atlas_smr_replica::server::monolithic_server::MonReplica;
+use atlas_view_transfer::message::serialize::ViewTransfer;
+use atlas_view_transfer::SimpleViewTransferProtocol;
+use febft_pbft_consensus::bft::PBFTOrderProtocol;
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
+use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
 use febft_pbft_consensus::bft::sync::view::ViewInfo;
-use atlas_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
-use atlas_replica::server::{Replica};
-use atlas_replica::server::monolithic_server::MonReplica;
 use febft_state_transfer::CollabStateTransfer;
 use febft_state_transfer::config::StateTransferConfig;
 use febft_state_transfer::message::serialize::CSTMsg;
@@ -254,24 +260,32 @@ async fn node_config(
 pub type ReconfigurationMessage = ReconfData;
 pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
 pub type StateTransferMessage = CSTMsg<State>;
-pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+pub type DecLogMsg = LogSerialization<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
+pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg>;
+pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
+
 
 /// Set up the networking layer with the data handles we have
 pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
-pub type ReplicaNetworking = NodeWrap<Network<Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage>>, MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage, LogTransferMessage, NetworkInfo, ReconfData>;
+pub type Serv = Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage,
+    LogTransferMessage, ViewTransferMessage>;
+pub type ReplicaNetworking = NodeWrap<Network<Serv>, MicrobenchmarkData, OrderProtocolMessage,
+    StateTransferMessage, LogTransferMessage, ViewTransferMessage, NetworkInfo, ReconfData>;
 pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
 
 /// Set up the persistent logging type with the existing data handles
-pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, StateTransferMessage>;
+pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocol;
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking, Logging>;
-pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
+pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking>;
+pub type DecisionLog = Log<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
+pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, DecisionLog, ReplicaNetworking, Logging>;
 pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
-
-pub type SMRReplica = MonReplica<ReconfProtocol, State, Microbenchmark, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging>;
-
+pub type ViewTransferProt = SimpleViewTransferProtocol<OrderProtocol, ReplicaNetworking>;
+pub type SMRReplica = MonReplica<ReconfProtocol, SingleThreadedMonExecutor, State, Microbenchmark,
+    OrderProtocol, DecisionLog, StateTransferProtocol, LogTransferProtocol,
+    ViewTransferProt, ReplicaNetworking, Logging>;
 pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
 
 pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>, node_type: NodeType) -> Result<ReconfigurableNetworkConfig> {
@@ -290,7 +304,6 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
     }
 
     println!("Known nodes: {:?}", known_nodes);
-
 
     Ok(ReconfigurableNetworkConfig {
         node_id: id,
@@ -370,9 +383,14 @@ pub async fn setup_replica(
         timeout_duration,
     };
 
+    let dl_config = DecLogConfig {
+        default_ongoing_capacity: watermark as usize,
+    };
+
     let service = Microbenchmark::new(id);
 
-    let conf = ReplicaConfig::<ReconfProtocol, State, MicrobenchmarkData, OrderProtocol, StateTransferProtocol, LogTransferProtocol, ReplicaNetworking, Logging> {
+    let conf = ReplicaConfig::<ReconfProtocol, State, MicrobenchmarkData, OrderProtocol, DecisionLog,
+        StateTransferProtocol, LogTransferProtocol, ViewTransferProt, ReplicaNetworking, Logging> {
         node,
         view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
@@ -380,11 +398,13 @@ pub async fn setup_replica(
         n,
         f: 1,
         op_config,
+        dl_config,
         lt_config,
         db_path,
         pl_config: (),
         p: Default::default(),
         reconfig_node: reconf_config,
+        vt_config: (),
     };
 
     let mon_conf = MonolithicStateReplicaConfig {
