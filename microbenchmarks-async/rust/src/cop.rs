@@ -62,7 +62,7 @@ fn format_log(id: u32, str: &str) -> String {
 fn policy(id: u32, str: &str) -> CompoundPolicy {
     let trigger = InitTrigger { has_been_triggered: AtomicBool::new(false) };
 
-    let roller = FixedWindowRoller::builder().base(1).build(format_old_log(id, str).as_str(), 5).wrapped(ErrorKind::MsgLog).unwrap();
+    let roller = FixedWindowRoller::builder().base(1).build(format_old_log(id, str).as_str(), 5).unwrap();
 
     CompoundPolicy::new(Box::new(trigger), Box::new(roller))
 }
@@ -70,8 +70,7 @@ fn policy(id: u32, str: &str) -> CompoundPolicy {
 fn file_appender(id: u32, str: &str) -> Box<dyn Append> {
     Box::new(RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}")))
-        .build(format_log(id, str).as_str(), Box::new(policy(id, str)))
-        .wrapped_msg(ErrorKind::MsgLog, "Failed to create rolling file appender").unwrap())
+        .build(format_log(id, str).as_str(), Box::new(policy(id, str))).unwrap())
 }
 
 fn generate_log(id: u32) {
@@ -100,9 +99,9 @@ fn generate_log(id: u32) {
         .logger(Logger::builder().appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .logger(Logger::builder().appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
         .logger(Logger::builder().appender("view_transfer").build("atlas_view_transfer", LevelFilter::Debug))
-        .build(Root::builder().appender("file").build(LevelFilter::Debug), ).wrapped(ErrorKind::MsgLog).unwrap();
+        .build(Root::builder().appender("file").build(LevelFilter::Debug), ).unwrap();
 
-    let _handle = log4rs::init_config(config).wrapped(ErrorKind::MsgLog).unwrap();
+    let _handle = log4rs::init_config(config).unwrap();
 }
 
 pub fn main() {
@@ -211,8 +210,9 @@ fn main_(id: NodeId) {
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
                 let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
 
-                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&replica.hostname => addr),
-                                                           crate::addr!(&replica.hostname => replica_addr));
+                let (socket, host) = crate::addr!(&replica.hostname => addr);
+
+                let replica_p_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), replica_p_addr);
             }
@@ -221,7 +221,8 @@ fn main_(id: NodeId) {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
 
-                let client_addr = PeerAddr::new(crate::addr!(&other.hostname => addr));
+                let (socket, host) = crate::addr!(&other.hostname => addr);
+                let client_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), client_addr);
             }
@@ -306,8 +307,9 @@ fn client_async_main() {
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
                 let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
 
-                let replica_p_addr = PeerAddr::new_replica(crate::addr!(&replica.hostname => addr),
-                                                           crate::addr!(&replica.hostname => replica_addr));
+                let (socket, host) = crate::addr!(&replica.hostname => addr);
+
+                let replica_p_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), replica_p_addr);
             }
@@ -316,7 +318,8 @@ fn client_async_main() {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
 
-                let client_addr = PeerAddr::new(crate::addr!(&other.hostname => addr));
+                let (socket, host) = crate::addr!(&other.hostname => addr);
+                let client_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), client_addr);
             }
@@ -325,6 +328,7 @@ fn client_async_main() {
         };
 
         let sk = secret_keys.remove(id.into()).unwrap();
+
         let fut = setup_client(
             replicas_config.len(),
             id,

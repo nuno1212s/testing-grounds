@@ -7,7 +7,6 @@ mod serialize;
 mod metric;
 
 mod cop;
-mod local;
 mod common;
 mod os_statistics;
 mod bench;
@@ -24,18 +23,7 @@ fn custom_alloc_error_hook(layout: Layout) {
 }
 
 fn main() {
-    let is_local = std::env::var("LOCAL")
-        .map(|x| x == "1")
-        .unwrap_or(false);
-
-    println!("Starting local? {}", is_local);
-
-
     set_alloc_error_hook(custom_alloc_error_hook);
 
-    if is_local {
-        local::main()
-    } else {
-        cop::main()
-    }
+    cop::main()
 }

@@ -1,6 +1,7 @@
 use std::default::Default;
 use std::io::{Read, Write};
 use std::time::Duration;
+use anyhow::Context;
 
 use konst::{
     option::unwrap_or,
@@ -97,7 +98,9 @@ impl State {
 
 impl MonolithicState for State {
     fn serialize_state<W>(mut w: W, request: &Self) -> Result<()> where W: Write {
-        w.write_all(&MicrobenchmarkData::STATE).wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize state")
+        w.write_all(&MicrobenchmarkData::STATE)?;
+        
+        Ok(())
     }
 
     fn deserialize_state<R>(r: R) -> Result<Self> where R: Read, Self: Sized {
@@ -116,18 +119,19 @@ impl ApplicationData for MicrobenchmarkData {
 
         rq_msg.set_data(&request.inner);
 
-        capnp::serialize::write_message(w, &root)
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize request")
+        capnp::serialize::write_message(w, &root).context("Failed to serialize request")?;
+        
+        Ok(())
     }
 
     fn deserialize_request<R>(r: R) -> Result<Self::Request> where R: Read {
-        let reader = capnp::serialize::read_message(r, Default::default()).wrapped_msg(ErrorKind::CommunicationSerialize,
-                                                                                       "Failed to read message")?;
+        let reader = capnp::serialize::read_message(r, Default::default())
+            .context("Failed to deserialize request")?;
 
         let request_msg: messages_capnp::benchmark_request::Reader = reader.get_root()
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to read request message")?;
+            .context("Failed to read request message")?;
 
-        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from request message?");
+        let _data = request_msg.get_data().context("Failed to get data from request message?");
 
         Ok(Request {
             inner: Vec::from(MicrobenchmarkData::REQUEST)
@@ -142,17 +146,16 @@ impl ApplicationData for MicrobenchmarkData {
         rq_msg.set_data(&reply.inner);
 
         capnp::serialize::write_message(w, &root)
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to serialize reply")
+            .context("Failed to serialize reply")
     }
 
     fn deserialize_reply<R>(r: R) -> Result<Self::Reply> where R: Read {
-        let reader = capnp::serialize::read_message(r, Default::default()).wrapped_msg(ErrorKind::CommunicationSerialize,
-                                                                                       "Failed to read message")?;
+        let reader = capnp::serialize::read_message(r, Default::default()).context("Failed to deserialize reply message")?;
 
         let request_msg: messages_capnp::benchmark_reply::Reader = reader.get_root()
-            .wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to read reply message")?;
+            .context("Failed to read reply message")?;
 
-        let _data = request_msg.get_data().wrapped_msg(ErrorKind::CommunicationSerialize, "Failed to get data from reply message?");
+        let _data = request_msg.get_data().context("Failed to get data from reply message?");
 
         Ok(Reply {
             inner: Vec::from(MicrobenchmarkData::REPLY)
