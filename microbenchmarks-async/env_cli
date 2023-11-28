@@ -6,7 +6,7 @@ export VERBOSE=false
 export UPDATE_MAX_FDS=0
 
 export NUM_CLIENTS=10
-export CLIENT_GEN=3000
+export CLIENT_GEN=1000
 export NUM_REPLICAS=4
 export BATCH_SIZE=1024
 export MAX_BATCH_SIZE=49000

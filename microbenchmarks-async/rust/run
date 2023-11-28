@@ -84,7 +84,11 @@ exec_microbenchmarks() {
       wait $pid
     done
   else
-    exec ./target/release/microbenchmarks-async
+    if [ $ID -eq 0 ]; then
+    	exec heaptrack ./target/release/microbenchmarks-async
+    else
+    	exec ./target/release/microbenchmarks-async
+    fi
   fi
 }
 
