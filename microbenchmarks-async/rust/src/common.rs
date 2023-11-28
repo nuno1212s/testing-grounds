@@ -44,6 +44,7 @@ use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_smr_execution::SingleThreadedMonExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
+use atlas_view_transfer::config::ViewTransferConfig;
 use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
 use febft_pbft_consensus::bft::PBFTOrderProtocol;
@@ -243,7 +244,6 @@ async fn node_config(
 
 
     let node_config = NodeConfig {
-        id,
         tcp_config: tcp,
         client_pool_config: cp,
     };
@@ -327,14 +327,12 @@ pub async fn setup_client(
     let node = node_config(n, id, comm_stats).await;
 
     let conf = client::ClientConfig {
-        n,
-        f: 1,
         unordered_rq_mode: UnorderedClientMode::BFT,
         node,
         reconfiguration: reconf,
     };
 
-    Client::<ReconfProtocol, MicrobenchmarkData, ClientNetworking>::bootstrap::<OrderProtocol>(conf).await
+    Client::<ReconfProtocol, MicrobenchmarkData, ClientNetworking>::bootstrap::<OrderProtocol>(id, conf).await
 }
 
 pub async fn setup_replica(
@@ -371,8 +369,7 @@ pub async fn setup_replica(
 
     let watermark = get_watermark();
 
-    let op_config = PBFTConfig::new(node_id, None,
-                                    view, timeout_duration.clone(),
+    let op_config = PBFTConfig::new(timeout_duration.clone(),
                                     watermark, proposer_config);
 
     let st_config = StateTransferConfig {
@@ -387,16 +384,16 @@ pub async fn setup_replica(
         default_ongoing_capacity: watermark as usize,
     };
 
+    let vt_config = ViewTransferConfig {
+        timeout_duration,
+    };
+
     let service = Microbenchmark::new(id);
 
     let conf = ReplicaConfig::<ReconfProtocol, State, MicrobenchmarkData, OrderProtocol, DecisionLog,
         StateTransferProtocol, LogTransferProtocol, ViewTransferProt, ReplicaNetworking, Logging> {
         node,
-        view: SeqNo::ZERO,
         next_consensus_seq: SeqNo::ZERO,
-        id,
-        n,
-        f: 1,
         op_config,
         dl_config,
         lt_config,
@@ -404,7 +401,7 @@ pub async fn setup_replica(
         pl_config: (),
         p: Default::default(),
         reconfig_node: reconf_config,
-        vt_config: (),
+        vt_config,
     };
 
     let mon_conf = MonolithicStateReplicaConfig {

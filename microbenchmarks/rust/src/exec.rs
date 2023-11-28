@@ -4,8 +4,8 @@ use chrono::DateTime;
 use chrono::offset::Utc;
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
-use atlas_execution::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 use atlas_metrics::benchmarks::{BenchmarkHelperStore, Measurements};
+use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 
 use crate::serialize;
 
