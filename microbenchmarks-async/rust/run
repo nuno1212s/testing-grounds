@@ -85,7 +85,7 @@ exec_microbenchmarks() {
     done
   else
     if [ $ID -eq 0 ]; then
-    	exec heaptrack ./target/release/microbenchmarks-async
+    	exec ./target/release/microbenchmarks-async
     else
     	exec ./target/release/microbenchmarks-async
     fi
