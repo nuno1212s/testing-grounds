@@ -9,25 +9,27 @@ use std::time::Duration;
 use intmap::IntMap;
 use konst::primitive::{parse_u128, parse_u32, parse_usize};
 use konst::unwrap_ctx;
+use pki_types::CertificateDer;
 use regex::Regex;
-use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
-use rustls::server::AllowAnyAuthenticatedClient;
+use rustls::{ClientConfig, pki_types, RootCertStore, ServerConfig};
+use rustls::pki_types::PrivateKeyDer;
 use rustls_pemfile::{Item, read_one};
 
 use atlas_client::client;
 use atlas_client::client::Client;
 use atlas_client::client::unordered_client::UnorderedClientMode;
+use atlas_comm_mio::{ByteStubType, MIOTCPNode};
+use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::error::*;
 use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::ordering::SeqNo;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
-use atlas_communication::config::{ClientPoolConfig, MioConfig, NodeConfig, TcpConfig, TlsConfig};
-use atlas_communication::mio_tcp::MIOTcpNode;
-use atlas_core::ordering_protocol::permissioned::VTMsg;
-use atlas_core::serialize::{ClientServiceMsg, Service};
-use atlas_core::smr::networking::NodeWrap;
+use atlas_communication::{NetworkManagement, NodeInputStub, NodeStubController};
+use atlas_communication::byte_stub::ByteNetworkController;
+use atlas_communication::config::ClientPoolConfig;
+use atlas_core::serialize::NoProtocol;
 use atlas_decision_log::config::DecLogConfig;
 use atlas_decision_log::Log;
 use atlas_decision_log::serialize::LogSerialization;
@@ -37,26 +39,31 @@ use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
 use atlas_persistent_log::stateful_logs::monolithic_state::MonStatePersistentLog;
-use atlas_reconfiguration::ReconfigurableNodeProtocol;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use atlas_reconfiguration::message::{NodeTriple, ReconfData};
 use atlas_reconfiguration::network_reconfig::NetworkInfo;
+use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
+use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
+use atlas_smr_core::networking::{ReplicaNodeWrapper, RType, SMRReplicaNetworkNode};
+use atlas_smr_core::serialize::{Service, SMRSysMsg, StateSys};
+use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
+use atlas_smr_replica::server::{Exec, Replica};
 use atlas_view_transfer::config::ViewTransferConfig;
 use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
-use febft_pbft_consensus::bft::PBFTOrderProtocol;
 use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
+use febft_pbft_consensus::bft::PBFTOrderProtocol;
 use febft_pbft_consensus::bft::sync::view::ViewInfo;
 use febft_state_transfer::CollabStateTransfer;
 use febft_state_transfer::config::StateTransferConfig;
 use febft_state_transfer::message::serialize::CSTMsg;
 
 use crate::exec::Microbenchmark;
-use crate::serialize::{MicrobenchmarkData, State};
+use crate::serialize::{MicrobenchmarkData, Request, State};
 
 #[macro_export]
 macro_rules! addr {
@@ -203,7 +210,7 @@ async fn node_config(
     n: usize,
     id: NodeId,
     comm_stats: Option<Arc<CommStats>>,
-) -> MioConfig {
+) -> (MIOConfig, ClientPoolConfig) {
     let first_cli = NodeId::from(1000u32);
 
     let mio_worker_count = std::env::var("MIO_WORKER_COUNT").unwrap_or("1".to_string()).parse::<usize>().unwrap();
@@ -235,58 +242,97 @@ async fn node_config(
         client_concurrent_connections: 1,
     };
 
-    let cp = ClientPoolConfig {
-        batch_size,
-        clients_per_pool,
-        batch_timeout_micros: batch_timeout as u64,
-        batch_sleep_micros: batch_sleep as u64,
+    let cp = ClientPoolConfig::new(batch_size, 100, clients_per_pool, batch_timeout as u64, batch_sleep as u64, 100);
+
+    let mio_cfg = MIOConfig {
+        tcp_configs: tcp,
+        epoll_worker_count: mio_worker_count as u32,
     };
 
-
-    let node_config = NodeConfig {
-        tcp_config: tcp,
-        client_pool_config: cp,
-    };
-
-    let mio_cfg = MioConfig {
-        node_config,
-        worker_count: mio_worker_count,
-    };
-
-    mio_cfg
+    (mio_cfg, cp)
 }
 
 /// Set up the data handles so we initialize the networking layer
 pub type ReconfigurationMessage = ReconfData;
-pub type OrderProtocolMessage = PBFTConsensus<MicrobenchmarkData>;
-pub type StateTransferMessage = CSTMsg<State>;
-pub type DecLogMsg = LogSerialization<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage>;
-pub type LogTransferMessage = LTMsg<MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg>;
+
+/// In the case of SMR messages, we want the type that is going to be ordered to include just the actual
+/// SMR Ordered Request Type, so we can use the same type for the ordering protocol
+/// This type, for SMR is [atlas_smr_core::serialize::SMRReq]
+///
+/// These protocols are only going to be used for the ordered requests, so they only have to know about the ordered requests
+/// In further parts, we can utilize [MicrobenchmarkData] directly as it requires a [D: ApplicationData], instead of just [SerType]
+pub type OrderProtocolMessage = PBFTConsensus<SMRReq<MicrobenchmarkData>>;
+pub type DecLogMsg = LogSerialization<SMRReq<MicrobenchmarkData>, OrderProtocolMessage, OrderProtocolMessage>;
+pub type LogTransferMessage = LTMsg<SMRReq<MicrobenchmarkData>, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg>;
 pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
 
+/// The state transfer also requires wrapping in order to keep the [atlas_communication::serialization::Serializable] type
+/// out of the state transfer protocol (and all others for that matter) for further flexibility
+/// Therefore, we have to wrap the [atlas_smr_core::serialize::StateSys] type in order to get the [atlas_communication::serialization::Serializable] trait
+///
+pub type StateTransferMessage = CSTMsg<State>;
+pub type SerStateTransferMessage = StateSys<StateTransferMessage>;
+
+
+/// This type is the protocol type responsible for all SMR messages including unordered ones, so it already knows about [atlas_smr_application::ApplicationData]
+pub type ProtocolDataType = Service<MicrobenchmarkData, OrderProtocolMessage, LogTransferMessage, ViewTransferMessage>;
 
 /// Set up the networking layer with the data handles we have
-pub type Network<S> = MIOTcpNode<NetworkInfo, ReconfData, S>;
-pub type Serv = Service<MicrobenchmarkData, OrderProtocolMessage, StateTransferMessage,
-    LogTransferMessage, ViewTransferMessage>;
-pub type ReplicaNetworking = NodeWrap<Network<Serv>, MicrobenchmarkData, OrderProtocolMessage,
-    StateTransferMessage, LogTransferMessage, ViewTransferMessage, NetworkInfo, ReconfData>;
-pub type ClientNetworking = Network<ClientServiceMsg<MicrobenchmarkData>>;
+///
+/// In the networking level, we utilize the type which wraps [atlas_smr_application::ApplicationData]
+/// and provides the [atlas_communication::serialization::Serializable] type required
+/// for the network layer.
+///
+/// For that, we use [atlas_smr_core::serialize::SMRSysMsg]
+
+/// Replica stub things
+pub type IncomingStub = NodeInputStub<ReconfigurationMessage, ProtocolDataType, SerStateTransferMessage, SMRSysMsg<MicrobenchmarkData>>;
+pub type StubController = NodeStubController<ByteStubType, ReconfigurationMessage, ProtocolDataType, SerStateTransferMessage, SMRSysMsg<MicrobenchmarkData>>;
+
+pub type ByteNetworkLayer = MIOTCPNode<NetworkInfo, IncomingStub, StubController>;
+
+pub type ReplicaNode = ReplicaNodeWrapper<ByteStubType, ByteNetworkLayer, NetworkInfo, ReconfigurationMessage, MicrobenchmarkData, OrderProtocolMessage,
+    LogTransferMessage, ViewTransferMessage, StateTransferMessage>;
+
+pub type ProtocolNetwork = <ReplicaNode as SMRReplicaNetworkNode<NetworkInfo, ReconfigurationMessage, MicrobenchmarkData, OrderProtocolMessage,
+    LogTransferMessage, ViewTransferMessage, StateTransferMessage>>::ProtocolNode;
+
+pub type StateTransferNetwork = <ReplicaNode as SMRReplicaNetworkNode<NetworkInfo, ReconfigurationMessage, MicrobenchmarkData, OrderProtocolMessage,
+    LogTransferMessage, ViewTransferMessage, StateTransferMessage>>::StateTransferNode;
+
+pub type AppNetwork = <ReplicaNode as SMRReplicaNetworkNode<NetworkInfo, ReconfigurationMessage, MicrobenchmarkData, OrderProtocolMessage,
+    LogTransferMessage, ViewTransferMessage, StateTransferMessage>>::ApplicationNode;
+
+pub type ReconfigurationNode = <ReplicaNode as SMRReplicaNetworkNode<NetworkInfo, ReconfigurationMessage, MicrobenchmarkData, OrderProtocolMessage,
+    LogTransferMessage, ViewTransferMessage, StateTransferMessage>>::ReconfigurationNode;
+
+/// Client network node stuff
+
+pub type CLIIncomingStub = NodeInputStub<ReconfigurationMessage, NoProtocol, NoProtocol, SMRSysMsg<MicrobenchmarkData>>;
+pub type CLIStubController = NodeStubController<ByteStubType, ReconfigurationMessage, NoProtocol, NoProtocol, SMRSysMsg<MicrobenchmarkData>>;
+
+pub type CLIByteNetworkLayer = MIOTCPNode<NetworkInfo, CLIIncomingStub, CLIStubController>;
+
+pub type ClientNode = CLINodeWrapper<ByteStubType, CLIByteNetworkLayer, NetworkInfo, ReconfigurationMessage, MicrobenchmarkData>;
+
+pub type ClientNetwork = <ClientNode as SMRClientNetworkNode<NetworkInfo, ReconfigurationMessage, MicrobenchmarkData>>::AppNode;
 
 /// Set up the persistent logging type with the existing data handles
 pub type Logging = MonStatePersistentLog<State, MicrobenchmarkData, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg, StateTransferMessage>;
 
 /// Set up the protocols with the types that have been built up to here
-pub type ReconfProtocol = ReconfigurableNodeProtocol;
-pub type OrderProtocol = PBFTOrderProtocol<MicrobenchmarkData, ReplicaNetworking>;
-pub type DecisionLog = Log<MicrobenchmarkData, OrderProtocol, ReplicaNetworking, Logging>;
-pub type LogTransferProtocol = CollabLogTransfer<MicrobenchmarkData, OrderProtocol, DecisionLog, ReplicaNetworking, Logging>;
-pub type StateTransferProtocol = CollabStateTransfer<State, ReplicaNetworking, Logging>;
-pub type ViewTransferProt = SimpleViewTransferProtocol<OrderProtocol, ReplicaNetworking>;
+pub type ReconfProtocol = ReconfigurableNodeProtocolHandle;
+pub type OrderProtocol = PBFTOrderProtocol<SMRReq<MicrobenchmarkData>, ProtocolNetwork>;
+pub type DecisionLog = Log<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, Exec<MicrobenchmarkData>>;
+pub type LogTransferProtocol = CollabLogTransfer<SMRReq<MicrobenchmarkData>, OrderProtocol, DecisionLog, ProtocolNetwork, Logging, Exec<MicrobenchmarkData>>;
+pub type ViewTransferProt = SimpleViewTransferProtocol<OrderProtocol, ProtocolNetwork>;
+pub type StateTransferProtocol = CollabStateTransfer<State, StateTransferNetwork, Logging>;
+
 pub type SMRReplica = MonReplica<ReconfProtocol, SingleThreadedMonExecutor, State, Microbenchmark,
     OrderProtocol, DecisionLog, StateTransferProtocol, LogTransferProtocol,
-    ViewTransferProt, ReplicaNetworking, Logging>;
-pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetworking>;
+    ViewTransferProt, ReplicaNode, Logging>;
+
+pub type SMRClient = Client<ReconfProtocol, MicrobenchmarkData, ClientNetwork>;
 
 pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap<PublicKey>, node_type: NodeType) -> Result<ReconfigurableNetworkConfig> {
     let own_addr = addrs.get(id.0 as u64).cloned().unwrap();
@@ -324,7 +370,7 @@ pub async fn setup_client(
 ) -> Result<SMRClient> {
     let reconf = setup_reconf(id, sk, addrs, pk, NodeType::Client)?;
 
-    let node = node_config(n, id, comm_stats).await;
+    let (node, client) = node_config(n, id, comm_stats).await;
 
     let conf = client::ClientConfig {
         unordered_rq_mode: UnorderedClientMode::BFT,
@@ -332,7 +378,7 @@ pub async fn setup_client(
         reconfiguration: reconf,
     };
 
-    Client::<ReconfProtocol, MicrobenchmarkData, ClientNetworking>::bootstrap::<OrderProtocol>(id, conf).await
+    client::bootstrap_client::<ReconfProtocol, MicrobenchmarkData, ClientNode, OrderProtocol>(id, conf).await
 }
 
 pub async fn setup_replica(
@@ -348,7 +394,7 @@ pub async fn setup_replica(
 
     let reconf_config = setup_reconf(id, sk, addrs, pk, NodeType::Replica)?;
 
-    let (node, global_batch_size, global_batch_timeout) = {
+    let ((node, client_pool), global_batch_size, global_batch_timeout) = {
         let n = node_config(n, id, comm_stats);
         let b = get_global_batch_size();
         let timeout = get_global_batch_timeout();
@@ -391,7 +437,7 @@ pub async fn setup_replica(
     let service = Microbenchmark::new(id);
 
     let conf = ReplicaConfig::<ReconfProtocol, State, MicrobenchmarkData, OrderProtocol, DecisionLog,
-        StateTransferProtocol, LogTransferProtocol, ViewTransferProt, ReplicaNetworking, Logging> {
+        StateTransferProtocol, LogTransferProtocol, ViewTransferProt, ReplicaNode, Logging> {
         node,
         next_consensus_seq: SeqNo::ZERO,
         op_config,
@@ -501,22 +547,13 @@ pub fn get_watermark() -> u32 {
     unwrap_ctx!(res)
 }
 
-fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
+fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<CertificateDer<'static>> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
             Item::X509Certificate(cert) => {
-                certs.push(Certificate(cert));
-            }
-            Item::RSAKey(_) => {
-                panic!("Key given in place of a certificate")
-            }
-            Item::PKCS8Key(_) => {
-                panic!("Key given in place of a certificate")
-            }
-            Item::ECKey(_) => {
-                panic!("Key given in place of a certificate")
+                certs.push(cert);
             }
             _ => {
                 panic!("Key given in place of a certificate")
@@ -528,22 +565,22 @@ fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificat
 }
 
 #[inline]
-fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
+fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKeyDer<'static>> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
-            Item::RSAKey(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Pkcs1Key(rsa) => {
+                certs.push(PrivateKeyDer::Pkcs1(rsa))
             }
-            Item::PKCS8Key(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Pkcs8Key(rsa) => {
+                certs.push(PrivateKeyDer::Pkcs8(rsa))
             }
-            Item::ECKey(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Sec1Key(rsa) => {
+                certs.push(PrivateKeyDer::Sec1(rsa))
             }
             _ => {
-                panic!("Key given in place of a certificate")
+                panic!("Certificate given in place of a key")
             }
         }
     }
@@ -552,7 +589,7 @@ fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
 }
 
 #[inline]
-fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
+fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKeyDer<'static> {
     read_private_keys_from_file(file).pop().unwrap()
 }
 
@@ -568,7 +605,7 @@ async fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
 
             let certs = read_certificates_from_file(&mut file);
 
-            root_store.add(&certs[0]).expect("Failed to put root store");
+            root_store.add(certs[0].clone()).expect("Failed to put root store");
 
             certs
         };
@@ -598,15 +635,10 @@ async fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
         };
 
         // create server conf
-        let auth = AllowAnyAuthenticatedClient::new(root_store);
         let cfg = ServerConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .with_client_cert_verifier(Arc::new(auth))
+            .with_no_client_auth()
             .with_single_cert(chain, sk)
-            .expect("Failed to make cfg");
+            .expect("Failed to make server config for TLS");
 
         tx.send(cfg).unwrap();
     });
@@ -627,7 +659,7 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
             read_certificates_from_file(&mut file)
         };
 
-        root_store.add(&certs[0]).unwrap();
+        root_store.add(certs[0].clone()).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -654,14 +686,8 @@ async fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
         };
 
         // create server conf
-        let auth = AllowAnyAuthenticatedClient::new(root_store);
-
         let cfg = ServerConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .with_client_cert_verifier(Arc::new(auth))
+            .with_no_client_auth()
             .with_single_cert(chain, sk)
             .expect("Failed to make cfg");
 
@@ -683,7 +709,7 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
             read_certificates_from_file(&mut file)
         };
 
-        root_store.add(&certs[0]).unwrap();
+        root_store.add(certs[0].clone()).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -709,12 +735,8 @@ async fn get_client_config(id: NodeId) -> ClientConfig {
         };
 
         let cfg = ClientConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_safe_default_protocol_versions()
-            .unwrap()
             .with_root_certificates(root_store)
-            .with_single_cert(chain, sk)
+            .with_client_auth_cert(chain, sk)
             .expect("bad cert/key");
 
         tx.send(cfg).unwrap();
@@ -736,7 +758,7 @@ async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
             read_certificates_from_file(&mut file)
         };
 
-        root_store.add(&certs[0]).unwrap();
+        root_store.add(certs[0].clone()).unwrap();
 
         // configure our cert chain and secret key
         let sk = {
@@ -762,12 +784,8 @@ async fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
         };
 
         let cfg = ClientConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_safe_default_protocol_versions()
-            .unwrap()
             .with_root_certificates(root_store)
-            .with_single_cert(chain, sk)
+            .with_client_auth_cert(chain, sk)
             .expect("bad cert/key");
 
         tx.send(cfg).unwrap();

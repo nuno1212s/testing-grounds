@@ -7,13 +7,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.75"
-thiserror = "1.0.50"
+anyhow = "1.0"
+thiserror = "1.0"
 serde = "*"
 regex = "1"
 intmap = "2.0.0"
-rustls = "0.21.0"
-rustls-pemfile = "1.0.2"
+rustls = "0.22.2"
+rustls-pemfile = "2.0.0"
 futures = "0.3"
 oneshot = "0.1"
 num_cpus = "1"
@@ -34,9 +34,12 @@ procinfo = "0.4.2"
 
 atlas-common = { path = "../../../Atlas/Atlas-Common" }
 atlas-communication = { path = "../../../Atlas/Atlas-Communication" }
+atlas-comm-mio = { path = "../../../Atlas/Atlas-Comm-MIO" }
 atlas-smr-application = { path = "../../../Atlas/Atlas-SMR-Application" }
 atlas-core = { path = "../../../Atlas/Atlas-Core" }
 atlas-smr-replica = { path = "../../../Atlas/Atlas-SMR-Replica" }
+atlas-smr-core = { path = "../../../Atlas/Atlas-SMR-Core" }
+atlas-logging-core = { path = "../../../Atlas/Atlas-Logging-Core" }
 atlas-client = { path = "../../../Atlas/Atlas-Client" }
 atlas-metrics = { path = "../../../Atlas/Atlas-Metrics" }
 atlas-persistent-log = { path = "../../../Atlas/Atlas-Persistent-Log" }
