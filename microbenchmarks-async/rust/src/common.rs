@@ -26,9 +26,9 @@ use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::ordering::SeqNo;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_common::threadpool;
-use atlas_communication::{NetworkManagement, NodeInputStub, NodeStubController};
-use atlas_communication::byte_stub::ByteNetworkController;
+use atlas_communication::{NodeInputStub, NodeStubController};
 use atlas_communication::config::ClientPoolConfig;
+use atlas_communication::reconfiguration::NodeInfo;
 use atlas_core::serialize::NoProtocol;
 use atlas_decision_log::config::DecLogConfig;
 use atlas_decision_log::Log;
@@ -40,17 +40,17 @@ use atlas_metrics::benchmarks::CommStats;
 use atlas_metrics::InfluxDBArgs;
 use atlas_persistent_log::stateful_logs::monolithic_state::MonStatePersistentLog;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
-use atlas_reconfiguration::message::{NodeTriple, ReconfData};
+use atlas_reconfiguration::message::ReconfData;
 use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
+use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
 use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
-use atlas_smr_core::networking::{ReplicaNodeWrapper, RType, SMRReplicaNetworkNode};
 use atlas_smr_core::serialize::{Service, SMRSysMsg, StateSys};
 use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
+use atlas_smr_replica::server::Exec;
 use atlas_smr_replica::server::monolithic_server::MonReplica;
-use atlas_smr_replica::server::{Exec, Replica};
 use atlas_view_transfer::config::ViewTransferConfig;
 use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
@@ -63,7 +63,7 @@ use febft_state_transfer::config::StateTransferConfig;
 use febft_state_transfer::message::serialize::CSTMsg;
 
 use crate::exec::Microbenchmark;
-use crate::serialize::{MicrobenchmarkData, Request, State};
+use crate::serialize::{MicrobenchmarkData, State};
 
 #[macro_export]
 macro_rules! addr {
@@ -287,7 +287,7 @@ pub type ProtocolDataType = Service<MicrobenchmarkData, OrderProtocolMessage, Lo
 
 /// Replica stub things
 pub type IncomingStub = NodeInputStub<ReconfigurationMessage, ProtocolDataType, SerStateTransferMessage, SMRSysMsg<MicrobenchmarkData>>;
-pub type StubController = NodeStubController<ByteStubType, ReconfigurationMessage, ProtocolDataType, SerStateTransferMessage, SMRSysMsg<MicrobenchmarkData>>;
+pub type StubController = NodeStubController<NetworkInfo, ByteStubType, ReconfigurationMessage, ProtocolDataType, SerStateTransferMessage, SMRSysMsg<MicrobenchmarkData>>;
 
 pub type ByteNetworkLayer = MIOTCPNode<NetworkInfo, IncomingStub, StubController>;
 
@@ -309,7 +309,7 @@ pub type ReconfigurationNode = <ReplicaNode as SMRReplicaNetworkNode<NetworkInfo
 /// Client network node stuff
 
 pub type CLIIncomingStub = NodeInputStub<ReconfigurationMessage, NoProtocol, NoProtocol, SMRSysMsg<MicrobenchmarkData>>;
-pub type CLIStubController = NodeStubController<ByteStubType, ReconfigurationMessage, NoProtocol, NoProtocol, SMRSysMsg<MicrobenchmarkData>>;
+pub type CLIStubController = NodeStubController<NetworkInfo, ByteStubType, ReconfigurationMessage, NoProtocol, NoProtocol, SMRSysMsg<MicrobenchmarkData>>;
 
 pub type CLIByteNetworkLayer = MIOTCPNode<NetworkInfo, CLIIncomingStub, CLIStubController>;
 
@@ -344,9 +344,9 @@ pub fn setup_reconf(id: NodeId, sk: KeyPair, addrs: IntMap<PeerAddr>, pk: IntMap
 
         let boostrap_addr = addrs.get(boostrap_node as u64).cloned().unwrap();
 
-        let boostrap_pk = pk.get(boostrap_node as u64).unwrap().pk_bytes().to_vec();
+        let boostrap_pk = pk.get(boostrap_node as u64).unwrap().clone();
 
-        known_nodes.push(NodeTriple::new(boostrap_node_id, boostrap_pk, boostrap_addr, NodeType::Replica));
+        known_nodes.push(NodeInfo::new(boostrap_node_id, NodeType::Replica, boostrap_pk, boostrap_addr));
     }
 
     println!("Known nodes: {:?}", known_nodes);

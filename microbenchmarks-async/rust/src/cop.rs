@@ -69,20 +69,21 @@ fn policy(id: u32, str: &str) -> CompoundPolicy {
 
 fn file_appender(id: u32, str: &str) -> Box<dyn Append> {
     Box::new(RollingFileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new("{l} {d} - {M} - {m}{n}")))
         .build(format_log(id, str).as_str(), Box::new(policy(id, str))).unwrap())
 }
 
 fn generate_log(id: u32) {
     let console_appender = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} {d} - {m}{n}"))).build();
+        .encoder(Box::new(PatternEncoder::new("{l} {d} - {M} - {m}{n}"))).build();
 
     let config = Config::builder()
+        .appender(Appender::builder().build("file", file_appender(id, "")))
         .appender(Appender::builder().build("comm", file_appender(id, "_comm")))
+        .appender(Appender::builder().build("mio_comm", file_appender(id, "_mio_comm")))
         .appender(Appender::builder().build("reconfig", file_appender(id, "_reconfig")))
         .appender(Appender::builder().build("common", file_appender(id, "_common")))
         .appender(Appender::builder().build("consensus", file_appender(id, "_consensus")))
-        .appender(Appender::builder().build("file", file_appender(id, "")))
         .appender(Appender::builder().build("log_transfer", file_appender(id, "_log_transfer")))
         .appender(Appender::builder().build("state_transfer", file_appender(id, "_state_transfer")))
         .appender(Appender::builder().build("decision_log", file_appender(id, "_decision_log")))
@@ -91,6 +92,7 @@ fn generate_log(id: u32) {
         .appender(Appender::builder().filter(Box::new(ThresholdFilter::new(LevelFilter::Warn))).build("console", Box::new(console_appender)))
 
         .logger(Logger::builder().appender("comm").build("atlas_communication", LevelFilter::Debug))
+        .logger(Logger::builder().appender("mio_comm").build("atlas_comm_mio", LevelFilter::Debug))
         .logger(Logger::builder().appender("common").build("atlas_common", LevelFilter::Debug))
         .logger(Logger::builder().appender("reconfig").build("atlas_reconfiguration", LevelFilter::Debug))
         .logger(Logger::builder().appender("log_transfer").build("atlas_log_transfer", LevelFilter::Debug))
@@ -99,7 +101,7 @@ fn generate_log(id: u32) {
         .logger(Logger::builder().appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .logger(Logger::builder().appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
         .logger(Logger::builder().appender("view_transfer").build("atlas_view_transfer", LevelFilter::Debug))
-        .build(Root::builder().appender("file").build(LevelFilter::Debug), ).unwrap();
+        .build(Root::builder().appenders(vec!["file", "console"]).build(LevelFilter::Info), ).unwrap();
 
     let _handle = log4rs::init_config(config).unwrap();
 }
