@@ -49,6 +49,10 @@ impl Trigger for InitTrigger {
 
         Ok(self.has_been_triggered.compare_exchange(false, true, Relaxed, Relaxed).is_ok())
     }
+
+    fn is_pre_process(&self) -> bool {
+        false
+    }
 }
 
 fn format_old_log(id: u32, str: &str) -> String {
@@ -101,7 +105,7 @@ fn generate_log(id: u32) {
         .logger(Logger::builder().appender("consensus").build("febft_pbft_consensus", LevelFilter::Debug))
         .logger(Logger::builder().appender("state_transfer").build("febft_state_transfer", LevelFilter::Debug))
         .logger(Logger::builder().appender("view_transfer").build("atlas_view_transfer", LevelFilter::Debug))
-        .build(Root::builder().appenders(vec!["file", "console"]).build(LevelFilter::Info), ).unwrap();
+        .build(Root::builder().appenders(vec!["file", "console"]).build(LevelFilter::Debug), ).unwrap();
 
     let _handle = log4rs::init_config(config).unwrap();
 }
@@ -147,6 +151,8 @@ pub fn main() {
                                                with_metrics(atlas_core::metric::metrics()),
                                                with_metrics(atlas_communication::metric::metrics()),
                                                with_metrics(atlas_smr_replica::metric::metrics()),
+                                               with_metrics(atlas_smr_core::metric::metrics()),
+                                               with_metrics(atlas_smr_execution::metric::metrics()),
                                                with_metrics(atlas_log_transfer::metrics::metrics()),
                                                with_metrics(febft_state_transfer::metrics::metrics()),
                                                with_metrics(atlas_view_transfer::metrics::metrics()),
