@@ -270,7 +270,7 @@ async fn node_config(
             sync_client_config: client_config_replica,
             sync_server_config: server_config_replica,
         },
-        replica_concurrent_connections: 1,
+        replica_concurrent_connections: 2,
         client_concurrent_connections: 1,
     };
 

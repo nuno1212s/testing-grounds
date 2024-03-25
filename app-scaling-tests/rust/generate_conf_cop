@@ -5,9 +5,9 @@ cd config || exit
 
 echo "$BATCH_SIZE" > batch.config
 
-#REPLICAS=("10.0.10.1" "10.0.10.2" "10.0.10.3" "10.0.10.4")
+REPLICAS=("192.168.70.221" "192.168.70.222" "192.168.70.223" "192.168.70.224" "192.168.70.225" "192.168.70.226" "192.168.70.227" "192.168.70.228")
 
-REPLICAS=("127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1")
+#REPLICAS=("127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1")
 
 #REPLICAS_SAFE_CLUSTER_IPS="127.0.0.1 127.0.0.1 127.0.0.1 127.0.0.1"
 
@@ -15,7 +15,7 @@ REPLICAS=("127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1" "127.0.0.1
 #CLIENT_MACHINES="10.11.12.5 192.168.70.16"
 
 #1gbe
-CLIENT_MACHINES="127.0.0.1"
+CLIENT_MACHINES="192.168.70.225"
 #CLIENT_MACHINES=("10.0.10.5" "10.0.10.6" "10.0.10.7")
 
 #rm -f replicas.config
@@ -51,7 +51,6 @@ if [[ $LINE_COUNT =~ ^[0-9]+$ ]] && [[ $LINE_COUNT -ge $CLIENT_GEN ]]; then
 
   for value in "${CLIENT_MACHINES[@]}"
   do
-    echo "$value"
     if [[ "$value" =~ $(head -n 1 clients.config | awk '{print $3}') ]]; then
       echo "clients.config already exists and has $LINE_COUNT lines, not generating new clients"
 

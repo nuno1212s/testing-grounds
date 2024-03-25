@@ -19,13 +19,6 @@ mod workload_gen;
 // #[cfg(not(target_env = "msvc"))]
 // #[global_allocator]
 // static GLOBAL: Jemalloc = Jemalloc;
-
-fn custom_alloc_error_hook(layout: Layout) {
-    panic!("allocation error: {:?} bytes", layout.size())
-}
-
 fn main() {
-    set_alloc_error_hook(custom_alloc_error_hook);
-
     cop::main()
 }

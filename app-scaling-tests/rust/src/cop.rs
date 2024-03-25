@@ -253,7 +253,7 @@ pub fn main() {
             vec![
                 with_metrics(atlas_communication::metric::metrics()),
                 with_metrics(atlas_client::metric::metrics()),
-                with_metric_level(MetricLevel::Info),
+                with_metric_level(MetricLevel::Trace),
             ],
             influx_db_config(NodeId::from(first_id)),
         );

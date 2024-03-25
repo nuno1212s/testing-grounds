@@ -16,7 +16,7 @@ const ZIPF_CONSTANT: f64 = 0.1;
 
 pub const NUM_KEYS: usize = 128000;
 const INSERT_OPS: u32 = 0;
-const READ_OPS: u32 = 1;
+const READ_OPS: u32 = 20;
 const REMOVE_OPS: u32 = 0;
 const UPDATE_OPS: u32 = 1;
 

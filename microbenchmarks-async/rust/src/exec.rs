@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::DateTime;
 use chrono::offset::Utc;
@@ -66,7 +66,7 @@ impl Application<State> for Microbenchmark {
     }
 
     fn unordered_execution(&self, state: &State, request: Request<Self, State>) -> Reply<Self, State> {
-        todo!()
+        serialize::Reply::new(MicrobenchmarkData::REPLY)
     }
 
     fn update(&self, state: &mut State, request: Request<Self, State>) -> Reply<Self, State> {
