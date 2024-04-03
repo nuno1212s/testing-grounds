@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use log::info;
+use tracing::info;
 use rand::distributions::Distribution;
 use rand_core::SeedableRng;
 use rand_xoshiro::SplitMix64;

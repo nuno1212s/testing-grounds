@@ -1,177 +1,48 @@
 use std::env;
 use std::env::args;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use chrono::offset::Utc;
 use intmap::IntMap;
 use konst::primitive::parse_usize;
-use log::LevelFilter;
-use log4rs::append::console::ConsoleAppender;
-use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::Trigger;
-use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-use log4rs::append::rolling_file::{LogFile, RollingFileAppender};
-use log4rs::append::Append;
-use log4rs::config::{Appender, Logger, Root};
-use log4rs::encode::pattern::PatternEncoder;
-use log4rs::filter::threshold::ThresholdFilter;
-use log4rs::Config;
-use rand::distributions::Alphanumeric;
-use semaphores::RawSemaphore;
+use tracing::Level;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
+use tracing_subscriber::FmtSubscriber;
 
-use atlas_client::client::ordered_client::Ordered;
-use atlas_client::client::unordered_client::Unordered;
-use atlas_client::concurrent_client::ConcurrentClient;
+use atlas_common::{async_runtime as rt, channel, init, InitConfig};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
-use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
-use atlas_common::{async_runtime as rt, channel, init, InitConfig};
-use atlas_metrics::{with_metric_level, with_metrics, MetricLevel};
-use crate::client::run_client;
+use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
 
+use crate::client::run_client;
 use crate::common::*;
-use crate::serialize::{BERequest, MicrobenchmarkData};
 use crate::workload_gen::{generate_key_pool, Generator, NUM_KEYS};
 
-#[derive(Debug)]
-pub struct InitTrigger {
-    has_been_triggered: AtomicBool,
-}
+fn generate_log(id: u32) -> Vec<WorkerGuard> {
+    let host_folder = format!("./logs/log_{}", id);
 
-impl Trigger for InitTrigger {
-    fn trigger(&self, file: &LogFile) -> anyhow::Result<bool> {
-        if file.len_estimate() == 0 {
-            println!("Not triggering rollover because file is empty");
+    let debug_file = tracing_appender::rolling::minutely(host_folder.clone(), format!("atlas_debug_{}.log", id));
+    let warn_file = tracing_appender::rolling::daily(host_folder, format!("atlas_{}.log", id));
 
-            self.has_been_triggered.store(true, Relaxed);
-            return Ok(false);
-        }
+    let (debug_file_nb, guard_1) = tracing_appender::non_blocking(debug_file);
+    let (warn_file_nb, guard_2) = tracing_appender::non_blocking(warn_file);
+    let (console_nb, guard_3) = tracing_appender::non_blocking(std::io::stdout());
 
-        Ok(self
-            .has_been_triggered
-            .compare_exchange(false, true, Relaxed, Relaxed)
-            .is_ok())
-    }
+    let debug_file_nb = debug_file_nb.with_min_level(Level::DEBUG);
+    let warn_file_nb = warn_file_nb.with_max_level(Level::INFO);
+    let console_nb = console_nb.with_max_level(Level::INFO);
 
-    fn is_pre_process(&self) -> bool {
-        false
-    }
-}
+    let all_files = debug_file_nb
+        .and(warn_file_nb)
+        .and(console_nb);
 
-fn format_old_log(id: u32, str: &str) -> String {
-    format!("./logs/log_{}/old/febft{}.log.{}", id, str, "{}")
-}
+    tracing_subscriber::fmt()
+        .json()
+        .with_writer(all_files)
+        .init();
 
-fn format_log(id: u32, str: &str) -> String {
-    format!("./logs/log_{}/febft{}.log", id, str)
-}
-
-fn policy(id: u32, str: &str) -> CompoundPolicy {
-    let trigger = InitTrigger {
-        has_been_triggered: AtomicBool::new(false),
-    };
-
-    let roller = FixedWindowRoller::builder()
-        .base(1)
-        .build(format_old_log(id, str).as_str(), 5)
-        .unwrap();
-
-    CompoundPolicy::new(Box::new(trigger), Box::new(roller))
-}
-
-fn file_appender(id: u32, str: &str) -> Box<dyn Append> {
-    Box::new(
-        RollingFileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new("{l} {d} - {M} - {m}{n}")))
-            .build(format_log(id, str).as_str(), Box::new(policy(id, str)))
-            .unwrap(),
-    )
-}
-
-fn generate_log(id: u32) {
-    let console_appender = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} {d} - {M} - {m}{n}")))
-        .build();
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("file", file_appender(id, "")))
-        .appender(Appender::builder().build("comm", file_appender(id, "_comm")))
-        .appender(Appender::builder().build("mio_comm", file_appender(id, "_mio_comm")))
-        .appender(Appender::builder().build("reconfig", file_appender(id, "_reconfig")))
-        .appender(Appender::builder().build("common", file_appender(id, "_common")))
-        .appender(Appender::builder().build("consensus", file_appender(id, "_consensus")))
-        .appender(Appender::builder().build("log_transfer", file_appender(id, "_log_transfer")))
-        .appender(Appender::builder().build("state_transfer", file_appender(id, "_state_transfer")))
-        .appender(Appender::builder().build("decision_log", file_appender(id, "_decision_log")))
-        .appender(Appender::builder().build("replica", file_appender(id, "_replica")))
-        .appender(Appender::builder().build("view_transfer", file_appender(id, "_view_transfer")))
-        .appender(
-            Appender::builder()
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Warn)))
-                .build("console", Box::new(console_appender)),
-        )
-        .logger(
-            Logger::builder()
-                .appender("comm")
-                .build("atlas_communication", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("mio_comm")
-                .build("atlas_comm_mio", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("common")
-                .build("atlas_common", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("reconfig")
-                .build("atlas_reconfiguration", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("log_transfer")
-                .build("atlas_log_transfer", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("decision_log")
-                .build("atlas_decision_log", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("replica")
-                .build("atlas_smr_replica", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("consensus")
-                .build("febft_pbft_consensus", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("state_transfer")
-                .build("febft_state_transfer", LevelFilter::Debug),
-        )
-        .logger(
-            Logger::builder()
-                .appender("view_transfer")
-                .build("atlas_view_transfer", LevelFilter::Debug),
-        )
-        .build(
-            Root::builder()
-                .appenders(vec!["file", "console"])
-                .build(LevelFilter::Debug),
-        )
-        .unwrap();
-
-    let _handle = log4rs::init_config(config).unwrap();
+    vec![guard_1, guard_2, guard_3]
 }
 
 pub fn main() {
@@ -182,13 +53,13 @@ pub fn main() {
             .unwrap_or(String::from("2"))
             .as_str(),
     )
-    .unwrap();
+        .unwrap();
     let async_threads = parse_usize(
         std::env::var("ASYNC_THREADS")
             .unwrap_or(String::from("2"))
             .as_str(),
     )
-    .unwrap();
+        .unwrap();
 
     let id: u32 = std::env::var("ID")
         .iter()
@@ -203,7 +74,7 @@ pub fn main() {
             .next()
             .unwrap();
 
-        generate_log(id);
+        let _guard = generate_log(id);
 
         let conf = InitConfig {
             //If we are the client, we want to have many threads to send stuff to replicas
@@ -390,7 +261,7 @@ fn client_async_main() {
     for i in 0..client_count {
         let id = NodeId::from(first_id + i);
 
-        generate_log(id.0 as u32);
+        let _guard = generate_log(id.0 as u32);
 
         let addrs = {
             let mut addrs = IntMap::new();
@@ -448,11 +319,11 @@ fn client_async_main() {
     for _i in 0..client_count {
         clients.push(rt::block_on(rx.recv()).unwrap());
     }
-    
+
     let mut handles = Vec::with_capacity(client_count as usize);
     let (keypool, value) = generate_key_pool(NUM_KEYS);
     let generator = Arc::new(Generator::new(keypool, NUM_KEYS.try_into().unwrap()));
-    
+
     // Get one client to run on this thread
     let our_client = clients.pop();
 
@@ -478,7 +349,7 @@ fn client_async_main() {
     }
 }
 
-fn sk_stream() -> impl Iterator<Item = KeyPair> {
+fn sk_stream() -> impl Iterator<Item=KeyPair> {
     std::iter::repeat_with(|| {
         // only valid for ed25519!
         let buf = [0; 32];

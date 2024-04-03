@@ -1,5 +1,5 @@
 [package]
-name = "microbenchmarks-async"
+name = "app-scaling-tests"
 version = "0.1.0"
 authors = ["Nuno Neto <up201703898@fc.up.pt>"]
 edition = "2021"
@@ -33,8 +33,9 @@ chrono = "0.4"
 mimalloc = { version = "*", default-features = false }
 fastrand = "1.7.0"
 semaphores = { version = "0.1.2", git = "https://github.com/nuno1212s/Semaphores" }
-log = "0.4"
-log4rs = { version = "1.2.0", features = ["all_components"] }
+tracing = "*"
+tracing-subscriber = { version ="*", features = ["std", "registry", "fmt", "json"] }
+tracing-appender = {version ="*"}
 bincode = {version =  "2.0.0-rc.3", features = ["serde", "alloc"] }
 
 mprober-lib = "0.1.7"
