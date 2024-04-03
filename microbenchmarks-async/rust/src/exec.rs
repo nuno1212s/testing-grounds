@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::DateTime;
 use chrono::offset::Utc;
@@ -24,7 +24,7 @@ struct ExecData {
 pub struct Microbenchmark {
     id: NodeId,
     reply: Arc<Vec<u8>>,
-    exec_data: RefCell<ExecData>,
+    exec_data: Mutex<ExecData>,
     measurement_interval: usize,
 }
 
@@ -52,7 +52,7 @@ impl Microbenchmark {
         Self {
             id: id.clone(),
             reply,
-            exec_data: RefCell::new(ExecData::new(id)),
+            exec_data: Mutex::new(ExecData::new(id)),
             measurement_interval: MicrobenchmarkData::get_measurement_interval(),
         }
     }
@@ -66,13 +66,13 @@ impl Application<State> for Microbenchmark {
     }
 
     fn unordered_execution(&self, state: &State, request: Request<Self, State>) -> Reply<Self, State> {
-        todo!()
+        serialize::Reply::new(MicrobenchmarkData::REPLY)
     }
 
     fn update(&self, state: &mut State, request: Request<Self, State>) -> Reply<Self, State> {
         let reply = serialize::Reply::new(MicrobenchmarkData::REPLY);
 
-        let mut data = self.exec_data.borrow_mut();
+        let mut data = self.exec_data.lock().unwrap();
 
         // increase iter count
         data.iterations += 1;
@@ -136,7 +136,7 @@ impl Application<State> for Microbenchmark {
     ) -> BatchReplies<serialize::Reply> {
         let batch_len = batch.len();
 
-        let mut data = self.exec_data.borrow_mut();
+        let mut data = self.exec_data.lock().unwrap();
         let meta = batch.take_meta();
 
         let mut reply_batch = BatchReplies::with_capacity(batch.len());

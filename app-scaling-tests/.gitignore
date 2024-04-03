@@ -1,0 +1,6 @@
+/env
+/env_id
+/env_cli
+/env_replica
+/*.vim
+os_stats

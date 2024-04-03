@@ -75,7 +75,7 @@ exec_microbenchmarks() {
 
   if [ $ID -ge 1000 ]; then
     for i in $(seq 0 "$(expr "$NUM_CLIENTS" - 1)"); do
-      exec ./target/release/microbenchmarks-async "$(expr $ID + $i)" &
+      exec ./target/release/app-scaling-tests "$(expr $ID + $i)" &
       PID1=$!
       PIDS+=("$PID1")
     done
@@ -85,9 +85,9 @@ exec_microbenchmarks() {
     done
   else
     if [ $ID -eq 0 ]; then
-    	exec ./target/release/microbenchmarks-async
+    	exec ./target/release/app-scaling-tests
     else
-    	exec ./target/release/microbenchmarks-async
+    	exec ./target/release/app-scaling-tests
     fi
   fi
 }

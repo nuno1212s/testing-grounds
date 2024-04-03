@@ -5,8 +5,8 @@ authors = ["Nuno Neto <up201703898@fc.up.pt>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.75"
-thiserror = "1.0.50"
+anyhow = "1.0"
+thiserror = "1.0"
 serde = "*"
 regex = "1"
 intmap = "2.0.0"
