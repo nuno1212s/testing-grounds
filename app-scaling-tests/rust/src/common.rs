@@ -45,6 +45,7 @@ use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
 use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
 use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
+use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use atlas_smr_core::serialize::{SMRSysMsg, Service, StateSys};
 use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
@@ -437,7 +438,7 @@ pub type Logging = MonStatePersistentLog<
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocolHandle;
-pub type OrderProtocol = PBFTOrderProtocol<SMRReq<MicrobenchmarkData>, ProtocolNetwork>;
+pub type OrderProtocol = PBFTOrderProtocol<SMRReq<MicrobenchmarkData>, RequestPreProcessor<SMRReq<MicrobenchmarkData>>, ProtocolNetwork>;
 pub type DecisionLog =
     Log<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, Exec<MicrobenchmarkData>>;
 pub type LogTransferProtocol = CollabLogTransfer<
