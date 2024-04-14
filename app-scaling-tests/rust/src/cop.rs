@@ -7,6 +7,7 @@ use konst::primitive::parse_usize;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 use atlas_common::{async_runtime as rt, channel, init, InitConfig};
