@@ -10,6 +10,7 @@ use semaphores::RawSemaphore;
 use atlas_client::client::ordered_client::Ordered;
 use atlas_client::client::unordered_client::Unordered;
 use atlas_client::concurrent_client::ConcurrentClient;
+use crate::CANCELED;
 
 use crate::common::{get_concurrent_rqs, SMRClient};
 use crate::serialize::{BERequest, MicrobenchmarkData};
@@ -32,6 +33,10 @@ pub(super) fn run_client(client: SMRClient, generator: Arc<Generator>, value: Ar
     let op_sampler = OpStandard::default();
 
     for _ in 0..op_count {
+        
+        if CANCELED.load(std::sync::atomic::Ordering::Relaxed) {
+            break;
+        }
 
         let key = generator.get_key_zipf(&mut rand);
         let value = value.clone();
