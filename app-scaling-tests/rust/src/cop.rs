@@ -15,6 +15,7 @@ use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
+use crate::CANCELED;
 
 use crate::client::run_client;
 use crate::common::*;
@@ -222,7 +223,7 @@ fn main_(id: NodeId) {
     };
 
     // run forever
-    replica.run().unwrap();
+    replica.run(Some(CANCELED.clone())).unwrap();
 }
 
 fn client_async_main() {

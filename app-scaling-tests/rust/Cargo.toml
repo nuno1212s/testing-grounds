@@ -38,8 +38,10 @@ tracing-subscriber = { version ="*", features = ["std", "registry", "fmt", "json
 tracing-appender = {version ="*"}
 bincode = {version =  "2.0.0-rc.3", features = ["serde", "alloc"] }
 
-mprober-lib = "0.1.7"
-procinfo = "0.4.2"
+mprober-lib = "0.1"
+procinfo = "0.4"
+ctrlc = "*"
+lazy_static = "*"
 
 atlas-common = { path = "../../../Atlas/Atlas-Common" }
 atlas-communication = { path = "../../../Atlas/Atlas-Communication" }
