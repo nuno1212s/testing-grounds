@@ -3,6 +3,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -70,7 +71,11 @@ use crate::serialize::{MicrobenchmarkData, State};
 #[macro_export]
 macro_rules! addr {
     ($h:expr => $a:expr) => {{
-        let addr: ::std::net::SocketAddr = $a.parse().unwrap();
+        let server : Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
+        .expect("Unable to resolve domain")
+        .collect();
+
+        let addr: ::std::net::SocketAddr = server.into_iter().next().expect("Resolved domain has no corresponding IPs?");
         (addr, String::from($h))
     }}
 }

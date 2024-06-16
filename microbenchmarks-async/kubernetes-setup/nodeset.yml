@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlas
+  namespace: atlas
+spec:
+  serviceName: "atlas-service"
+  replicas: 4  # Set the desired number of replicas (nodes) here
+  selector:
+    matchLabels:
+      app: atlas
+  template:
+    metadata:
+      labels:
+        app: atlas
+    spec:
+      containers:
+        - name: atlas-container
+          image: hello-world:latest
+          ports:
+            - containerPort: 10000
+              name: node-port
+          env:
+            - name: PEER_DISCOVERY
+              value: "p2p-service.default.svc.cluster.local"
+          volumeMounts:
+            - name: atlas-storage
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: atlas-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: atlas

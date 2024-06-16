@@ -218,7 +218,7 @@ fn main_(id: NodeId) {
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
                 let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
 
-                let (socket, host) = crate::addr!(&replica.hostname => addr);
+                let (socket, host) = crate::addr!(&replica.hostname => &addr);
 
                 let replica_p_addr = PeerAddr::new(socket, host);
 
@@ -229,7 +229,7 @@ fn main_(id: NodeId) {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
 
-                let (socket, host) = crate::addr!(&other.hostname => addr);
+                let (socket, host) = crate::addr!(&other.hostname => &addr);
                 let client_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), client_addr);
@@ -315,7 +315,7 @@ fn client_async_main() {
                 let addr = format!("{}:{}", replica.ipaddr, replica.portno);
                 let replica_addr = format!("{}:{}", replica.ipaddr, replica.rep_portno.unwrap());
 
-                let (socket, host) = crate::addr!(&replica.hostname => addr);
+                let (socket, host) = crate::addr!(&replica.hostname => &addr);
 
                 let replica_p_addr = PeerAddr::new(socket, host);
 
@@ -326,7 +326,7 @@ fn client_async_main() {
                 let id = NodeId::from(other.id);
                 let addr = format!("{}:{}", other.ipaddr, other.portno);
 
-                let (socket, host) = crate::addr!(&other.hostname => addr);
+                let (socket, host) = crate::addr!(&other.hostname => &addr);
                 let client_addr = PeerAddr::new(socket, host);
 
                 addrs.insert(id.into(), client_addr);
