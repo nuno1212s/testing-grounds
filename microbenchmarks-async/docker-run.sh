@@ -1,0 +1,1 @@
+docker run --env-file ./docker_env --add-host=host.docker.internal:host-gateway --env ID=0 --env RUST_BACKTRACE=1 -v ./rust/config:/usr/app/config/ -v ./rust/ca-root:/usr/app/ca-root/ microbenchmarks

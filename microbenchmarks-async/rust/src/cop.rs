@@ -31,7 +31,7 @@ use atlas_common::peer_addr::PeerAddr;
 use atlas_metrics::{MetricLevel, with_metric_level, with_metrics};
 
 use crate::common::*;
-use crate::serialize::{MicrobenchmarkData, Request};
+use crate::serialize::{MicrobenchmarkData, Request, REQUEST, REQUEST_SIZE, VERBOSE};
 
 #[derive(Debug)]
 pub struct InitTrigger {
@@ -266,7 +266,7 @@ fn main_(id: NodeId) {
     };
 
     // run forever
-    replica.run().unwrap();
+    replica.run(None).unwrap();
 }
 
 fn client_async_main() {
@@ -406,7 +406,7 @@ fn run_client(mut client: SMRClient) {
     println!("Warm up...");
 
     let request = Arc::new({
-        let mut r = vec![0; MicrobenchmarkData::REQUEST_SIZE];
+        let mut r = vec![0; *REQUEST_SIZE];
         r
     });
 
@@ -425,18 +425,18 @@ fn run_client(mut client: SMRClient) {
         //Only allow concurrent_rqs per client at the network
         semaphore.acquire();
 
-        if MicrobenchmarkData::VERBOSE {
+        if *VERBOSE {
             println!("{:?} // Sending req {}...", concurrent_client.id(), req);
         }
 
         let sem_clone = semaphore.clone();
 
-        concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST), Box::new(move |reply| {
+        concurrent_client.update_callback::<Ordered>(Request::new(Arc::clone(&*REQUEST)), Box::new(move |reply| {
 
             //Release another request for this client
             sem_clone.release();
 
-            if MicrobenchmarkData::VERBOSE {
+            if *VERBOSE {
                 if req % 1000 == 0 {
                     println!("{} // {} operations sent!", id, req);
                 }
@@ -466,7 +466,7 @@ fn run_client(mut client: SMRClient) {
     for req in iterator {
         semaphore.acquire();
 
-        if MicrobenchmarkData::VERBOSE {
+        if *VERBOSE {
             print!("Sending req {}...", req);
         }
 
@@ -474,12 +474,12 @@ fn run_client(mut client: SMRClient) {
 
         let sem_clone = semaphore.clone();
 
-        concurrent_client.update_callback::<Ordered>(Request::new(MicrobenchmarkData::REQUEST),
+        concurrent_client.update_callback::<Ordered>(Request::new(Arc::clone(&*REQUEST)),
                                                      Box::new(move |reply| {
                                                          //Release another request for this client
                                                          sem_clone.release();
 
-                                                         if MicrobenchmarkData::VERBOSE {
+                                                         if *VERBOSE {
                                                              if req % 1000 == 0 {
                                                                  println!("{} // {} operations sent!", id, req);
                                                              }

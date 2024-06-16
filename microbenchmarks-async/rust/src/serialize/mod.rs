@@ -1,5 +1,7 @@
 use std::default::Default;
 use std::io::{Read, Write};
+use std::iter;
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Context;
 
@@ -11,6 +13,7 @@ use konst::{
     },
     unwrap_ctx,
 };
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 use atlas_common::error::*;
@@ -19,22 +22,20 @@ use atlas_smr_application::state::monolithic_state::MonolithicState;
 
 pub struct MicrobenchmarkData;
 
+lazy_static!(  
+        pub static ref REQUEST_SIZE: usize = std::env::var("REQUEST_SIZE").unwrap().parse().unwrap();
+        pub static ref REPLY_SIZE: usize = std::env::var("REPLY_SIZE").unwrap().parse().unwrap();
+        pub static ref STATE_SIZE: usize = std::env::var("STATE_SIZE").unwrap().parse().unwrap();
+    
+        pub static ref REQUEST: Arc<[u8]> = Arc::from(iter::repeat(0u8).take(*REQUEST_SIZE).collect::<Vec<u8>>());
+    
+        pub static ref REPLY: Arc<[u8]> = Arc::from(iter::repeat(0u8).take(*REPLY_SIZE).collect::<Vec<u8>>());
+    
+        pub static ref STATE: Arc<[u8]> = Arc::from(iter::repeat(0u8).take(*STATE_SIZE).collect::<Vec<u8>>());
+    
+        pub static ref VERBOSE : bool = std::env::var("VERBOSE").unwrap().parse().unwrap();
+);
 impl MicrobenchmarkData {
-    pub const REQUEST_SIZE: usize = {
-        let result = parse_usize(env!("REQUEST_SIZE"));
-        unwrap_ctx!(result)
-    };
-
-    pub const REPLY_SIZE: usize = {
-        let result = parse_usize(env!("REPLY_SIZE"));
-        unwrap_ctx!(result)
-    };
-
-    pub const STATE_SIZE: usize = {
-        let result = parse_usize(env!("STATE_SIZE"));
-        unwrap_ctx!(result)
-    };
-
     pub fn get_measurement_interval() -> usize {
         std::env::var("MEASUREMENT_INTERVAL")
             .map(|s| s.parse().unwrap())
@@ -52,59 +53,50 @@ impl MicrobenchmarkData {
             .map(|s| s.parse().unwrap())
             .unwrap_or(0))
     }
-
-    pub const VERBOSE: bool = {
-        let result = parse_bool(unwrap_or!(option_env!("VERBOSE"), "false"));
-        unwrap_ctx!(result)
-    };
-
-    pub(crate) const REQUEST: [u8; Self::REQUEST_SIZE] = [0; Self::REQUEST_SIZE];
-    pub(crate) const REPLY: [u8; Self::REPLY_SIZE] = [0; Self::REPLY_SIZE];
-    pub(crate) const STATE: [u8; Self::STATE_SIZE] = [0; Self::STATE_SIZE];
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Request {
-    inner: Vec<u8>,
+    inner: Arc<[u8]>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Reply {
-    inner: Vec<u8>,
+    inner: Arc<[u8]>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
-    inner: Vec<u8>,
+    inner: Arc<[u8]>,
 }
 
 impl Request {
-    pub fn new(inner: [u8; MicrobenchmarkData::REQUEST_SIZE]) -> Self {
-        Self { inner: Vec::from(inner) }
+    pub fn new(inner: Arc<[u8]>) -> Self {
+        Self { inner }
     }
 }
 
 impl Reply {
-    pub fn new(inner: [u8; MicrobenchmarkData::REPLY_SIZE]) -> Self {
-        Self { inner: Vec::from(inner) }
+    pub fn new(inner: Arc<[u8]>) -> Self {
+        Self { inner }
     }
 }
 
 impl State {
-    pub fn new(inner: [u8; MicrobenchmarkData::STATE_SIZE]) -> Self {
-        Self { inner: Vec::from(inner) }
+    pub fn new(inner: Arc<[u8]>) -> Self {
+        Self { inner }
     }
 }
 
 impl MonolithicState for State {
     fn serialize_state<W>(mut w: W, request: &Self) -> Result<()> where W: Write {
-        w.write_all(&MicrobenchmarkData::STATE)?;
-        
+        w.write_all(&**STATE)?;
+
         Ok(())
     }
 
     fn deserialize_state<R>(r: R) -> Result<Self> where R: Read, Self: Sized {
-        Ok(State { inner: Vec::from(MicrobenchmarkData::STATE) })
+        Ok(State { inner: Arc::clone(&*STATE) })
     }
 }
 
@@ -120,7 +112,7 @@ impl ApplicationData for MicrobenchmarkData {
         rq_msg.set_data(&request.inner);
 
         capnp::serialize::write_message(w, &root).context("Failed to serialize request")?;
-        
+
         Ok(())
     }
 
@@ -134,7 +126,7 @@ impl ApplicationData for MicrobenchmarkData {
         let _data = request_msg.get_data().context("Failed to get data from request message?");
 
         Ok(Request {
-            inner: Vec::from(MicrobenchmarkData::REQUEST)
+            inner: Arc::clone(&*REQUEST)
         })
     }
 
@@ -158,7 +150,7 @@ impl ApplicationData for MicrobenchmarkData {
         let _data = request_msg.get_data().context("Failed to get data from reply message?");
 
         Ok(Reply {
-            inner: Vec::from(MicrobenchmarkData::REPLY)
+            inner: Arc::clone(&*REPLY)
         })
     }
 }
