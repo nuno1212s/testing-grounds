@@ -3,6 +3,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -123,6 +124,10 @@ pub struct ConfigEntry {
 pub fn parse_config(path: &str) -> Option<Vec<ConfigEntry>> {
     let re = Regex::new("([^ ]+)").ok()?;
 
+    println!("Opening file : {:?}", path);
+    let path_parsed = Path::new(path);
+    println!("path_parsed: {:?}", path_parsed.canonicalize());
+    
     let file = File::open(path).ok()?;
     let mut file = BufReader::new(file);
 

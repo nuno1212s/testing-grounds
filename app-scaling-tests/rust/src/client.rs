@@ -28,14 +28,20 @@ pub(super) fn run_client(client: SMRClient, generator: Arc<Generator>, value: Ar
 
     let mut rand = SplitMix64::seed_from_u64((6453 + (id * 1242)).into());
 
-    info!("Starting client {:?}", concurrent_client.id());
+    info!("Starting client {:?} with {} operations to perform", concurrent_client.id(), op_count);
 
     let op_sampler = OpStandard::default();
 
-    for _ in 0..op_count {
+    let client_id = concurrent_client.id();
+
+    for op_id in 0..op_count {
         
         if CANCELED.load(std::sync::atomic::Ordering::Relaxed) {
             break;
+        }
+
+        if MicrobenchmarkData::VERBOSE {
+            info!("{:?} // Sending request {}.", concurrent_client.id(), op_id);
         }
 
         let key = generator.get_key_zipf(&mut rand);
@@ -60,6 +66,10 @@ pub(super) fn run_client(client: SMRClient, generator: Arc<Generator>, value: Ar
                         request,
                         Box::new(move |reply| {
                             sem_clone.release();
+
+                            if MicrobenchmarkData::VERBOSE {
+                                info!("{:?} // Received reply for request {}.", client_id, op_id);
+                            }
                         }),
                     )
                     .expect("Failed to send unordered request");
@@ -70,6 +80,10 @@ pub(super) fn run_client(client: SMRClient, generator: Arc<Generator>, value: Ar
                         request,
                         Box::new(move |reply| {
                             sem_clone.release();
+
+                            if MicrobenchmarkData::VERBOSE {
+                                info!("{:?} // Received reply for request {}.", client_id, op_id);
+                            }
                         }),
                     )
                     .expect("Failed to send ordered request");
@@ -85,9 +99,9 @@ pub(super) fn run_client(client: SMRClient, generator: Arc<Generator>, value: Ar
 
     let ops_done = MicrobenchmarkData::get_ops_number() / 2;
 
-    println!("{:?} // Done.", concurrent_client.id());
+    info!("{:?} // Done.", concurrent_client.id());
 
-    println!(
+    info!(
         "{:?} // Test done in {:?}. ({} ops/s)",
         concurrent_client.id(),
         time_passed,

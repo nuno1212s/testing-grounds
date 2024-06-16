@@ -1,9 +1,7 @@
 #![feature(alloc_error_hook)]
 
-use std::alloc::{set_alloc_error_hook, Layout};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use tracing::warn;
 
 mod exec;
 mod metric;

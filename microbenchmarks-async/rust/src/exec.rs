@@ -10,7 +10,7 @@ use atlas_metrics::benchmarks::{BenchmarkHelperStore, Measurements};
 use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 
 use crate::serialize;
-use crate::serialize::{MicrobenchmarkData, State};
+use crate::serialize::{MicrobenchmarkData, REPLY, REPLY_SIZE, State, STATE};
 
 struct ExecData {
     max_tp: f32,
@@ -45,7 +45,7 @@ impl Microbenchmark {
     pub fn new(id: NodeId) -> Self {
         let reply = Arc::new((0..)
             .into_iter()
-            .take(MicrobenchmarkData::REPLY_SIZE)
+            .take(*REPLY_SIZE)
             .map(|x| (x & 0xff) as u8)
             .collect());
 
@@ -62,15 +62,15 @@ impl Application<State> for Microbenchmark {
     type AppData = MicrobenchmarkData;
 
     fn initial_state() -> Result<serialize::State> {
-        Ok(serialize::State::new(MicrobenchmarkData::STATE))
+        Ok(serialize::State::new(Arc::clone(&*STATE)))
     }
 
     fn unordered_execution(&self, state: &State, request: Request<Self, State>) -> Reply<Self, State> {
-        serialize::Reply::new(MicrobenchmarkData::REPLY)
+        serialize::Reply::new(Arc::clone(&*REPLY))
     }
 
     fn update(&self, state: &mut State, request: Request<Self, State>) -> Reply<Self, State> {
-        let reply = serialize::Reply::new(MicrobenchmarkData::REPLY);
+        let reply = serialize::Reply::new(Arc::clone(&*REPLY));
 
         let mut data = self.exec_data.lock().unwrap();
 
@@ -143,7 +143,7 @@ impl Application<State> for Microbenchmark {
 
         for update in batch.into_inner() {
             let (peer_id, sess, opid, _req) = update.into_inner();
-            reply_batch.add(peer_id, sess, opid, serialize::Reply::new(MicrobenchmarkData::REPLY));
+            reply_batch.add(peer_id, sess, opid, serialize::Reply::new(Arc::clone(&*REPLY)));
         }
 
         data.batch_count += 1.0;
