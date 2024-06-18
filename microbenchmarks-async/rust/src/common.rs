@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::iter;
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -215,6 +215,10 @@ pub fn influx_db_config(id: NodeId) -> InfluxDBArgs {
     }
 }
 
+fn get_bind_addr() -> Option<SocketAddr> {
+    std::env::var("HOST_BIND_ADDR").map(|addr| addr.parse().unwrap()).ok()
+}
+
 const BOOSTRAP_NODES: [u32; 4] = [0, 1, 2, 3];
 
 async fn node_config(
@@ -243,6 +247,7 @@ async fn node_config(
     };
 
     let tcp = TcpConfig {
+        bind_addrs: get_bind_addr().map(|addr| vec![addr]),
         network_config: TlsConfig {
             async_client_config: client_config,
             async_server_config: server_config,

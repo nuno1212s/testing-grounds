@@ -1,0 +1,85 @@
+version: "3"
+services:
+  replica-0:
+    image: microbenchmarks
+    build:
+      context: ../../../
+      dockerfile: testing-grounds/microbenchmarks-async/Dockerfile
+    ports:
+      - "10000:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ../rust/docker-config:/usr/app/config
+      - ../rust/ca-root:/usr/app/ca-root
+      - ./logs:/usr/app/logs
+    env_file:
+      - ../docker_env
+    environment:
+      ID: 0
+    restart: no
+    networks:
+      - atlas_network
+  replica-1:
+    image: microbenchmarks
+    build:
+      context: ../../../
+      dockerfile: testing-grounds/microbenchmarks-async/Dockerfile
+    ports:
+      - "10001:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ../rust/docker-config:/usr/app/config
+      - ../rust/ca-root:/usr/app/ca-root
+      - ./logs:/usr/app/logs
+    env_file:
+      - ../docker_env
+    environment:
+      ID: 1
+    restart: no
+    networks:
+      - atlas_network
+  replica-2:
+    image: microbenchmarks
+    build:
+      context: ../../../
+      dockerfile: testing-grounds/microbenchmarks-async/Dockerfile
+    ports:
+      - "10002:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ../rust/docker-config:/usr/app/config
+      - ../rust/ca-root:/usr/app/ca-root
+      - ./logs:/usr/app/logs
+    env_file:
+      - ../docker_env
+    environment:
+      ID: 2
+    restart: no
+    networks:
+      - atlas_network
+  replica-3:
+    image: microbenchmarks
+    build:
+      context: ../../../
+      dockerfile: testing-grounds/microbenchmarks-async/Dockerfile
+    ports:
+      - "10003:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ../rust/docker-config:/usr/app/config
+      - ../rust/ca-root:/usr/app/ca-root
+      - ./logs:/usr/app/logs
+    env_file:
+      - ../docker_env
+    environment:
+      ID: 3
+    restart: no
+    networks:
+      - atlas_network
+networks:
+  atlas_network:
+    driver: bridge

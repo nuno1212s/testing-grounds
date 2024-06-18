@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: atlas-container
-          image: hello-world:latest
+          image: crccheck/hello-world:latest
           ports:
             - containerPort: 10000
               name: node-port
@@ -34,4 +34,4 @@ spec:
         resources:
           requests:
             storage: 1Gi
-        storageClassName: atlas
+        storageClassName: standard
