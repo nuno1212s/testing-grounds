@@ -19,7 +19,7 @@
 **/*.dbmdl
 **/*.jfm
 **/charts
-**/docker-compose*
+microbenchmarks-compose
 **/target
 compose.yaml
 Dockerfile

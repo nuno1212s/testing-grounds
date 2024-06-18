@@ -1,27 +1,28 @@
 apiVersion: v1
+
 kind: PersistentVolume
 metadata:
-  name: pv-0001
+  name: atlas-2
 spec:
   capacity:
     storage: 1Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: atlas
+  storageClassName: standard
   hostPath:
-    path: /mnt/data/pv-0001
+    path: /data/atlas-0
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: pv-0002
+  name: atlas-1
 spec:
   capacity:
     storage: 1Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: atlas
+  storageClassName: standard
   hostPath:
-    path: /mnt/data/pv-0002
+    path: /data/atlas-0
