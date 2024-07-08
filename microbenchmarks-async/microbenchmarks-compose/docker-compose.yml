@@ -80,6 +80,27 @@ services:
     restart: no
     networks:
       - atlas_network
+  client-1:
+    image: microbenchmarks
+    build:
+      context: ../../../
+      dockerfile: testing-grounds/microbenchmarks-async/Dockerfile
+    ports:
+      - "10004:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ../rust/docker-config:/usr/app/config
+      - ../rust/ca-root:/usr/app/ca-root
+      - ./logs:/usr/app/logs
+    env_file:
+      - ../docker_env
+    environment:
+      ID: 1000
+      CLIENT: 1
+    restart: no
+    networks:
+      - atlas_network
 networks:
   atlas_network:
     driver: bridge

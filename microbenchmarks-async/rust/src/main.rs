@@ -1,15 +1,17 @@
 #![feature(alloc_error_hook)]
 
-use std::alloc::{Layout, set_alloc_error_hook};
+use std::alloc::Layout;
 
-mod exec;
-mod serialize;
-mod metric;
+use atlas_common::{init, InitConfig};
+use atlas_default_configs::runtime_settings::RunTimeSettings;
 
-mod cop;
+mod client;
 mod common;
-mod os_statistics;
-mod bench;
+mod config;
+mod exec;
+mod metric;
+mod replica;
+mod serialize;
 
 // #[cfg(not(target_env = "msvc"))]
 // use tikv_jemallocator::Jemalloc;
@@ -23,7 +25,29 @@ fn custom_alloc_error_hook(layout: Layout) {
 }
 
 fn main() {
-    set_alloc_error_hook(custom_alloc_error_hook);
+    let is_client = std::env::var("CLIENT")
+        .map(|x| x == "1")
+        .unwrap_or(false);
 
-    cop::main()
+    let runtime_config = atlas_default_configs::get_runtime_configuration().expect("Failed to get runtime configurations");
+
+    let RunTimeSettings {
+        threadpool_threads,
+        async_runtime_threads
+    } = runtime_config;
+
+    let conf = InitConfig {
+        //If we are the client, we want to have many threads to send stuff to replicas
+        threadpool_threads,
+        async_threads: async_runtime_threads,
+    };
+    
+    let _guard = unsafe { init(conf).unwrap() };
+    
+    if !is_client {
+        replica::run_replica();
+    } else {
+        client::client_main();
+    }
+    
 }
