@@ -1,0 +1,2 @@
+threadpool_threads=4
+asyncruntime_threads=4
