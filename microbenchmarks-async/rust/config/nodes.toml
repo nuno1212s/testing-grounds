@@ -1,0 +1,13 @@
+bootstrap_nodes = [
+    { node_id = 0, ip = "127.0.0.1", port = 10000, hostname = "srv0", node_type = "Replica" },
+    { node_id = 1, ip = "127.0.0.1", port = 10001, hostname = "srv1", node_type = "Replica" },
+    { node_id = 2, ip = "127.0.0.1", port = 10002, hostname = "srv2", node_type = "Replica" },
+    { node_id = 3, ip = "127.0.0.1", port = 10003, hostname = "srv3", node_type = "Replica" },
+]
+
+[own_node]
+node_id = 0
+ip = "127.0.0.1"
+port = 10000
+hostname = "srv0"
+node_type = "Replica"
