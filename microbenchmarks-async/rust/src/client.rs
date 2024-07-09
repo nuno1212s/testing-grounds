@@ -1,6 +1,6 @@
-use crate::common::{ClientNode, ReconfProtocol, SMRClient, BFT};
+use crate::common::{ClientNode, ReconfProtocol, SMRClient, BFT, generate_log};
 use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config};
-use crate::serialize::{MicrobenchmarkData, Request, REQUEST, REQUEST_SIZE, VERBOSE};
+use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
 use atlas_client::client;
 use atlas_client::client::ordered_client::Ordered;
 use atlas_client::client::unordered_client::UnorderedClientMode;
@@ -13,6 +13,8 @@ use chrono::Utc;
 use semaphores::RawSemaphore;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use config::File;
+use config::FileFormat::Toml;
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
@@ -27,14 +29,19 @@ pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
 
 pub(super) fn client_main() {
     let benchmark = read_benchmark_config().expect("Failed to load benchmark config");
-    
+
     setup_and_run_client(benchmark);
 }
 
 fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
     let reconfig_config = get_reconfig_config().unwrap();
-
     let node_id = reconfig_config.node_id;
+
+    let influx = atlas_default_configs::influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), Some(node_id)).unwrap();
+
+    setup_metrics(influx.into());
+    
+    let _log_guard = generate_log(node_id.0);
 
     let (network_conf, pool_config) = get_network_configurations(node_id).unwrap();
 
@@ -50,7 +57,7 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
         ClientNode,
         BFT,
     >(node_id, client_cfg))
-    .unwrap();
+        .unwrap();
 
     run_client(client, benchmark_config)
 }

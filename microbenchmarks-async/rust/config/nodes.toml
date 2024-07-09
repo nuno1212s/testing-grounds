@@ -6,8 +6,6 @@ bootstrap_nodes = [
 ]
 
 [own_node]
-node_id = 0
-ip = "127.0.0.1"
 port = 10000
 hostname = "srv0"
 node_type = "Replica"

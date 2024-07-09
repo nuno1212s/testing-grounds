@@ -17,6 +17,11 @@ services:
       - ../docker_env
     environment:
       ID: 0
+      OWN_NODE__NODE_ID: 0
+      OWN_NODE__IP: "replica-0"
+      OWN_NODE__HOSTNAME: "srv-0"
+      OWN_NODE__NODE_TYPE: "Replica"
+      RUST_BACKTRACE: full
     restart: no
     networks:
       - atlas_network
@@ -37,6 +42,11 @@ services:
       - ../docker_env
     environment:
       ID: 1
+      OWN_NODE__NODE_ID: 1
+      OWN_NODE__IP: "replica-1"
+      OWN_NODE__HOSTNAME: "srv-1"
+      OWN_NODE__NODE_TYPE: "Replica"
+      RUST_BACKTRACE: full
     restart: no
     networks:
       - atlas_network
@@ -57,6 +67,12 @@ services:
       - ../docker_env
     environment:
       ID: 2
+      NODE_ID: 2
+      OWN_NODE__NODE_ID: 2
+      OWN_NODE__IP: "replica-2"
+      OWN_NODE__HOSTNAME: "srv-2"
+      OWN_NODE__NODE_TYPE: "Replica"
+      RUST_BACKTRACE: full
     restart: no
     networks:
       - atlas_network
@@ -77,10 +93,16 @@ services:
       - ../docker_env
     environment:
       ID: 3
+      NODE_ID: 3
+      OWN_NODE__NODE_ID: 3
+      OWN_NODE__IP: "replica-3"
+      OWN_NODE__HOSTNAME: "srv-3"
+      OWN_NODE__NODE_TYPE: "Replica"
+      RUST_BACKTRACE: full
     restart: no
     networks:
       - atlas_network
-  client-1:
+  client-0:
     image: microbenchmarks
     build:
       context: ../../../
@@ -97,7 +119,12 @@ services:
       - ../docker_env
     environment:
       ID: 1000
+      OWN_NODE__NODE_ID: 1000
+      OWN_NODE__IP: "client-0"
+      OWN_NODE__HOSTNAME: "cli-0"
+      OWN_NODE__NODE_TYPE: "Client"
       CLIENT: 1
+      RUST_BACKTRACE: full
     restart: no
     networks:
       - atlas_network
