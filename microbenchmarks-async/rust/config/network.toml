@@ -2,9 +2,9 @@ worker_count = 8
 
 [tcp_conns]
 replica_concurrent_connections = 4
-client_concurrent_connection = 2
+client_concurrent_connections = 2
 
-[client_pool_config]
+[pool_config]
 batch_limit = 1024
 per_client_bound = 128
 clients_per_pool = 1000

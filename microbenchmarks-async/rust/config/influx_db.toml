@@ -1,4 +1,4 @@
-ip = ""
-db_name = ""
-user = ""
+ip = "http://localhost:8086"
+db_name = "atlas"
+user = "admin"
 password = ""

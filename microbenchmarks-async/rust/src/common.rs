@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+use tracing::Level;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 use atlas_client::client::Client;
 use atlas_comm_mio::{ByteStubType, MIOTCPNode};
 use atlas_communication::{NodeInputStub, NodeStubController};
@@ -251,4 +255,32 @@ impl OrderProtocolTolerance for BFT {
     fn get_f_for_n(n: usize) -> usize {
         return (n - 1) / 3;
     }
+}
+
+pub fn generate_log(id: u32) -> Vec<WorkerGuard> {
+    let host_folder = format!("./logs/log_{}", id);
+
+    let debug_file = tracing_appender::rolling::minutely(host_folder.clone(), format!("atlas_debug_{}.log", id));
+    let warn_file = tracing_appender::rolling::hourly(host_folder, format!("atlas_{}.log", id));
+
+    let (debug_file_nb, guard_1) = tracing_appender::non_blocking(debug_file);
+    let (warn_file_nb, guard_2) = tracing_appender::non_blocking(warn_file);
+    let (console_nb, guard_3) = tracing_appender::non_blocking(std::io::stdout());
+
+    let debug_file_nb = debug_file_nb;
+    let warn_file_nb = warn_file_nb.with_max_level(Level::INFO);
+    let console_nb = console_nb.with_max_level(Level::WARN);
+
+    let all_files = debug_file_nb
+        .and(warn_file_nb)
+        .and(console_nb);
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        //.with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        .json()
+        .with_writer(all_files)
+        .init();
+
+    vec![guard_1, guard_2, guard_3]
 }
