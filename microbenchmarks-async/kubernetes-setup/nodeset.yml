@@ -1,11 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas
+  labels:
+    app: atlas
+spec:
+  ports:
+    - port: 10000
+      name: node-port
+  clusterIP: None
+  selector:
+    app: atlas
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atlas-storage
+  labels:
+    app: atlas
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: atlas
-  namespace: atlas
 spec:
-  serviceName: "atlas-service"
+  serviceName: atlas
   replicas: 4  # Set the desired number of replicas (nodes) here
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: OrderedReady
   selector:
     matchLabels:
       app: atlas
@@ -14,24 +43,52 @@ spec:
       labels:
         app: atlas
     spec:
+      affinity:
+
       containers:
         - name: atlas-container
-          image: crccheck/hello-world:latest
+          image: "nukino/atlas-microbenchmarks:v0.0.2"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "4Gi"
           ports:
             - containerPort: 10000
               name: node-port
           env:
             - name: PEER_DISCOVERY
               value: "p2p-service.default.svc.cluster.local"
+            - name: OWN_NODE__NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OWN_NODE__IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: OWN_NODE__NODE_TYPE
+              value: "Replica"
+            - name: OWN_NODE__HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: INFLUX_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas
+                  key: influx-password
           volumeMounts:
             - name: atlas-storage
-              mountPath: /data
-  volumeClaimTemplates:
-    - metadata:
-        name: atlas-storage
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
-        storageClassName: standard
+              mountPath: /usr/app/logs
+            - name: config-volume
+              mountPath: /usr/app/config
+              readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: config-volume
+          configMap:
+            name: atlas-replicas-config-map
+        - name: atlas-storage
+          persistentVolumeClaim:
+            claimName: atlas-storage
