@@ -62,7 +62,7 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
     run_client(client, benchmark_config)
 }
 
-fn run_client(mut client: SMRClient, benchmark_config: BenchmarkConfig) {
+fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     let concurrent_rqs = benchmark_config.concurrent_rqs();
 
     let id = u32::from(client.id());
