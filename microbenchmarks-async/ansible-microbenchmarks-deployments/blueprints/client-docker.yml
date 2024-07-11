@@ -1,0 +1,19 @@
+  client-${nodeId}:
+    image: nukino/atlas-microbenchmarks:${version}
+    ports:
+      - "${nodePort}:10000"
+    extra_hosts: # for linux hosts since version 20.10
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./config:/usr/app/config
+      - ./ca-root:/usr/app/ca-root
+    env_file:
+      - ./docker_env
+    environment:
+      ID: ${nodeId}
+      OWN_NODE__NODE_ID: ${nodeId}
+      OWN_NODE__IP: "client-${nodeId}"
+      OWN_NODE__HOSTNAME: "cli-${nodeId}"
+      OWN_NODE__NODE_TYPE: "Client"
+      CLIENT: 1
+    restart: no

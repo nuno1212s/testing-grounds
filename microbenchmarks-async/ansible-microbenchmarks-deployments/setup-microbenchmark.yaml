@@ -1,0 +1,28 @@
+- hosts: all
+  become: yes
+  vars:
+    clients:
+      - 100
+      - 200
+      - 400
+      - 800
+    replicas:
+      - 4
+      - 8
+      - 16
+      - 32
+    request_size:
+      - 0
+      - 128
+      - 1024
+      - 4096
+    test-runs: 10
+    local_config_location: "../rust/docker-config"
+    working_dir: "~/atlas-microbenchmarks"
+  tasks:
+    - name: Setup configurations
+      copy:
+        src: "{{ local_config_location }}"
+        dest: "{{ working_dir }}/config"
+        recurse: yes
+    - name: Clone docker compose files to machines
