@@ -33,7 +33,7 @@ fn allocate_client(
         {
             nodes
                 .range(last_allocated_node.clone()..)
-                .next()
+                .nth(1)
                 .map(|(node, _)| node.clone())
                 .unwrap_or_else(|| {
                     nodes
@@ -54,7 +54,7 @@ fn allocate_client(
             meets_restrictions(true, &next_node_round, restrictions, current_state)
         }) {
             current_state.last_allocated_node = Some(next_node_round.clone());
-            
+
             return next_node_round;
         }
 
