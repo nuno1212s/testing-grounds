@@ -47,7 +47,7 @@ spec:
 
       containers:
         - name: atlas-container
-          image: "nukino/atlas-microbenchmarks:v0.0.2"
+          image: "nukino/atlas-microbenchmarks:v0.0.3"
           resources:
             requests:
               cpu: "4"
@@ -83,12 +83,18 @@ spec:
             - name: config-volume
               mountPath: /usr/app/config
               readOnly: true
+            - name: ca-root-volume
+              mountPath: /usr/app/ca-root
+              readOnly: true
       imagePullSecrets:
         - name: regcred
       volumes:
         - name: config-volume
           configMap:
             name: atlas-replicas-config-map
+        - name: ca-root-volume
+          configMap:
+            name: atlas-ca-root
         - name: atlas-storage
           persistentVolumeClaim:
             claimName: atlas-storage
