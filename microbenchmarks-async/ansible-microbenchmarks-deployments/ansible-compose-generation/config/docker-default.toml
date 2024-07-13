@@ -1,0 +1,4 @@
+docker_compose_base = "../blueprints/base-docker.yml"
+docker_compose_replica = "../blueprints/replica-docker.yml"
+docker_compose_client = "../blueprints/client-docker.yml"
+output_directory = "../generated"

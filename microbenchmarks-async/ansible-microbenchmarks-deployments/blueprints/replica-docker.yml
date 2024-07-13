@@ -1,5 +1,5 @@
   replica-${nodeId}:
-    image: nukino/atlas-microbenchmarks:${version}
+    image: ${image}:${version}
     ports:
       - "${nodePort}:10000"
     extra_hosts: # for linux hosts since version 20.10
@@ -12,7 +12,7 @@
     environment:
       ID: ${nodeId}
       OWN_NODE__NODE_ID: ${nodeId}
-      OWN_NODE__IP: "replica-${nodeId}"
+      OWN_NODE__IP: "${machineIp}"
       OWN_NODE__HOSTNAME: "srv-${nodeId}"
       OWN_NODE__NODE_TYPE: "Replica"
     restart: unless-stopped
