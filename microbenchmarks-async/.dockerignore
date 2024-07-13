@@ -27,10 +27,9 @@ Dockerfile
 **/npm-debug.log
 **/secrets.dev.yaml
 **/values.dev.yaml
-*/ca-root
-*/config
-*/config-cop
-*/logs
+**/ca-root
+**/config*
+**/logs
 */PERSISTENT_DB_NodeId(.*)
 */bin
 */LICENSE
