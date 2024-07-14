@@ -1,16 +1,11 @@
-use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
-
-use chrono::offset::Utc;
-use chrono::DateTime;
+use std::sync::Arc;
 
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
-use atlas_metrics::benchmarks::{BenchmarkHelperStore, Measurements};
 use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 
 use crate::serialize;
-use crate::serialize::{MicrobenchmarkData, State, REPLY, REPLY_SIZE, STATE};
+use crate::serialize::{MicrobenchmarkData, REPLY, State, STATE};
 
 pub struct Microbenchmark {
     id: NodeId,
@@ -18,7 +13,7 @@ pub struct Microbenchmark {
 
 impl Microbenchmark {
     pub fn new(id: NodeId) -> Self {
-        Self { id: id.clone() }
+        Self { id }
     }
 }
 
@@ -38,17 +33,14 @@ impl Application<State> for Microbenchmark {
     }
 
     fn update(&self, _state: &mut State, _request: Request<Self, State>) -> Reply<Self, State> {
-        let reply = serialize::Reply::new(Arc::clone(&*REPLY));
-        reply
+        serialize::Reply::new(Arc::clone(&*REPLY))
     }
 
     fn update_batch(
         &self,
         _state: &mut State,
-        mut batch: UpdateBatch<serialize::Request>,
+        batch: UpdateBatch<serialize::Request>,
     ) -> BatchReplies<serialize::Reply> {
-        let batch_len = batch.len();
-
         let mut reply_batch = BatchReplies::with_capacity(batch.len());
 
         for update in batch.into_inner() {

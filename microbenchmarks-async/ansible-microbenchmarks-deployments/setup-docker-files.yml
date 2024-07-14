@@ -1,0 +1,23 @@
+- hosts: all
+  become: true
+  vars:
+    working_dir: "/home/{{ ansible_user }}/atlas-microbenchmarks"
+    replica_docker_file: "docker-compose-replica.yml"
+    client_docker_file: "docker-compose-client.yml"
+    replica_docker_files: "generated/{{inventory_hostname}}-docker-compose.yml"
+    client_docker_files: "generated/{{inventory_hostname}}-cli-docker-compose.yml"
+  tasks:
+    - name: Setup replica docker files.
+      copy:
+        src: "{{ replica_docker_files }}"
+        dest: "{{ working_dir }}/{{ replica_docker_file }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+    - name: Setup client docker files.
+      copy:
+        src: "{{ client_docker_files }}"
+        dest: "{{ working_dir }}/{{ client_docker_file }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'

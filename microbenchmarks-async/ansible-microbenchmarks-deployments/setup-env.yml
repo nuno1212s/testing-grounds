@@ -1,5 +1,14 @@
 - hosts: all
   become: true
+  vars:
+    local_working_dir: "../rust/"
+    local_config_location: "{{local_working-dir}}/docker-config"
+    local_ca_root_location: "{{local_working_dir}}/ca-root"
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks"
+    docker_username: "nukino"
+  vars_prompt:
+    - name: docker_password
+      prompt: Enter the docker password
   tasks:
     - name: Install aptitude
       apt:
@@ -36,3 +45,5 @@
           - docker-compose-plugin
         state: latest
         update_cache: true
+    - name: Login to docker
+      shell: "docker login -u {{ docker_username }} -p {{ docker_password }}"

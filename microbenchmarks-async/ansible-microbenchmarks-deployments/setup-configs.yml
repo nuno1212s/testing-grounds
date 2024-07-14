@@ -1,0 +1,54 @@
+- hosts: all
+  become: true
+  vars:
+    local_working_dir: "../rust/"
+    local_config_location: "{{local_working_dir}}/docker-config"
+    local_ca_root_location: "{{local_working_dir}}/ca-root"
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks"
+  tasks:
+    - name: Clear current state
+      file:
+        path: "{{ working_dir }}"
+        state: absent
+    - name: Create working directory
+      file:
+        path: "{{ working_dir }}"
+        state: directory
+        mode: '0755'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+    - name: Transfer CA-ROOT
+      copy:
+        src: "./ca-root.zip"
+        dest: "{{ working_dir }}/ca-root.zip"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+    - name: Unzip CA-ROOT
+      shell: unzip ca-root.zip
+      args:
+        chdir: "{{ working_dir }}"
+    - name: Create config directory
+      file:
+        path: "{{ working_dir }}/config"
+        state: directory
+        mode: '0755'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
+    - name: Setup configurations
+      copy:
+        src: "{{ local_config_location }}/"
+        dest: "{{ working_dir }}/config/"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        directory_mode:
+        mode: '0755'
+      tags:
+        - dircontent
+    - name: Create logs directory
+      file:
+        path: "{{ working_dir }}/logs"
+        state: directory
+        mode: '0755'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'

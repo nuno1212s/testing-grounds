@@ -17,12 +17,10 @@
       - 1024
       - 4096
     test-runs: 10
-    local_config_location: "../rust/docker-config"
-    working_dir: "~/atlas-microbenchmarks"
   tasks:
-    - name: Setup configurations
-      copy:
-        src: "{{ local_config_location }}"
-        dest: "{{ working_dir }}/config"
-        recurse: yes
-    - name: Clone docker compose files to machines
+    - name: Generate docker compose files
+      local_action:
+        module: shell
+        cmd: cargo run -- --replica-count {{replicas}} --client-count {{clients}} --request_size {{request_size}} --reply-size {{request_size}} round-robin
+      args:
+        chdir: ansible-compose-generation
