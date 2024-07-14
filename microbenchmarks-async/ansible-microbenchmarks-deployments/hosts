@@ -1,8 +1,8 @@
-[workers]
-worker1 ansible_host=theia221 ansible_user=nneto
-worker2 ansible_host=theia222 ansible_user=nneto
-worker3 ansible_host=theia223 ansible_user=nneto
-worker4 ansible_host=theia224 ansible_user=nneto
-worker5 ansible_host=theia225 ansible_user=nneto
-worker6 ansible_host=theia226 ansible_user=nneto
-worker7 ansible_host=theia227 ansible_user=nneto
+[theia_cluster]
+theia221 ansible_host=theia221 ansible_user=nneto
+theia222 ansible_host=theia222 ansible_user=nneto
+theia223 ansible_host=theia223 ansible_user=nneto
+theia224 ansible_host=theia224 ansible_user=nneto
+theia225 ansible_host=theia225 ansible_user=nneto
+theia226 ansible_host=theia226 ansible_user=nneto
+theia227 ansible_host=theia227 ansible_user=nneto
