@@ -40,7 +40,7 @@ fn docker_name_for(node: &str, is_client: bool) -> String {
 }
 
 impl<T> DockerComposeWriter<T> {
-    pub fn new(formatter: T) -> anyhow::Result<Self> {
+    pub fn new(formatter: T, cluster: &Vec<MachineConfig>) -> anyhow::Result<Self> {
         let config = config::Config::builder()
             .add_source(config::File::new("config/docker-default.toml", Toml))
             .add_source(config::File::new("config/docker-local.toml", Toml).required(false))
@@ -60,7 +60,7 @@ impl<T> DockerComposeWriter<T> {
             std::fs::create_dir_all(&output_files_dir)?;
         }
 
-        Ok(Self {
+        let mut docker_compose_writer = Self {
             base_docker_compose: read_path_to_string(docker_base_file)?,
             replica_docker_compose: read_path_to_string(replica_docker_file)?,
             client_docker_compose: read_path_to_string(client_docker_file)?,
@@ -68,11 +68,42 @@ impl<T> DockerComposeWriter<T> {
             formatter,
             files_for_replicas: Default::default(),
             files_for_clients: Default::default(),
-        })
+        };
+
+        for node in cluster {
+            docker_compose_writer.files_for_replicas
+                .entry(node.name().clone())
+                .or_insert_with(|| {
+                    let file_name = docker_name_for(node.name(), false);
+                    let file_path = docker_compose_writer.output_files_dir.join(file_name);
+                    let file = File::create(file_path).expect("Cannot create file");
+                    let mut writer = BufWriter::new(file);
+                    
+                    Self::write_initial_docker_compose(&docker_compose_writer.base_docker_compose, &mut writer).expect("Failed to write initial docker compose");
+
+                    writer
+                });
+
+            docker_compose_writer.files_for_clients
+                .entry(node.name().clone())
+                .or_insert_with(|| {
+                    let file_name = docker_name_for(node.name(), true);
+                    let file_path = docker_compose_writer.output_files_dir.join(file_name);
+                    let file = File::create(file_path).expect("Cannot create file");
+                    let mut writer = BufWriter::new(file);
+
+                    Self::write_initial_docker_compose(&docker_compose_writer.base_docker_compose, &mut writer).expect("Failed to write initial docker compose");
+
+                    writer
+                });
+        }
+
+
+        Ok(docker_compose_writer)
     }
 
-    fn write_initial_docker_compose(&self, file: &mut BufWriter<File>) -> anyhow::Result<()> {
-        file.write_all(self.base_docker_compose.as_bytes())?;
+    fn write_initial_docker_compose(base_docker_compose: &String, file: &mut BufWriter<File>) -> anyhow::Result<()> {
+        file.write_all(base_docker_compose.as_bytes())?;
 
         Ok(())
     }

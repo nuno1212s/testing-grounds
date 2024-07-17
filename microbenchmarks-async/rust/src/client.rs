@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use config::File;
 use config::FileFormat::Toml;
+use tracing::{debug, info, trace};
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
@@ -56,8 +57,9 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
         MicrobenchmarkData,
         ClientNode,
         BFT,
-    >(node_id, client_cfg))
-        .unwrap();
+    >(node_id, client_cfg)).unwrap();
+    
+    info!("Client initialized!");
 
     run_client(client, benchmark_config)
 }
@@ -67,7 +69,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
     let id = u32::from(client.id());
 
-    println!("Warm up...");
+    info!("Warm up...");
 
     let concurrent_client = ConcurrentClient::from_client(client, concurrent_rqs).unwrap();
 
@@ -84,7 +86,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         semaphore.acquire();
 
         if *VERBOSE {
-            println!("{:?} // Sending req {}...", concurrent_client.id(), req);
+            trace!("{:?} // Sending req {}...", concurrent_client.id(), req);
         }
 
         let sem_clone = semaphore.clone();
@@ -98,10 +100,10 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
                     if *VERBOSE {
                         if req % 1000 == 0 {
-                            println!("{} // {} operations sent!", id, req);
+                            trace!("{} // {} operations sent!", id, req);
                         }
 
-                        println!(" sent!");
+                        trace!(" sent!");
                     }
                 }),
             )
@@ -117,7 +119,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         }
     }
 
-    println!(
+    info!(
         "Executing experiment for {} ops",
         benchmark_config.ops_number() / 2
     );
@@ -132,7 +134,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         semaphore.acquire();
 
         if *VERBOSE {
-            print!("Sending req {}...", req);
+            trace!("Sending req {}...", req);
         }
 
         let last_send_instant = Utc::now();
@@ -148,10 +150,10 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
                     if *VERBOSE {
                         if req % 1000 == 0 {
-                            println!("{} // {} operations sent!", id, req);
+                            trace!("{} // {} operations sent!", id, req);
                         }
 
-                        println!(" sent!");
+                        trace!(" sent!");
                     }
                 }),
             )
@@ -171,9 +173,9 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
     let ops_done = benchmark_config.ops_number() / 2;
 
-    println!("{:?} // Done.", concurrent_client.id());
+    info!("{:?} // Done.", concurrent_client.id());
 
-    println!(
+    info!(
         "{:?} // Test done in {:?}. ({} ops/s)",
         concurrent_client.id(),
         time_passed,

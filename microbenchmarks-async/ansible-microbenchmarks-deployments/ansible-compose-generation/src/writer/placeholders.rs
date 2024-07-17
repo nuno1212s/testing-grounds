@@ -5,6 +5,7 @@ use getset::Getters;
 use linked_hash_map::LinkedHashMap;
 use serde::Deserialize;
 use std::collections::HashMap;
+use crate::TestRunScenario;
 
 #[derive(Deserialize, Getters, Clone, Debug)]
 pub struct RegisteredPlaceHoldersConfig {
@@ -32,6 +33,18 @@ pub fn build_placeholders_for_machine(
         (if is_client { "Client" } else { "Replica" }).to_string(),
     );
     placeholders.insert("nodePort".to_string(), format!("{}", config.base_port() as usize + node));
+
+    placeholders
+}
+
+fn build_placeholders_from_test_scenario(
+    test_run_scenario: &TestRunScenario,
+) -> HashMap<String, String> {
+    let mut placeholders = HashMap::new();
+
+    placeholders.insert("replySize".to_string(), format!("{}", test_run_scenario.request_size()));
+    placeholders.insert("requestSize".to_string(), format!("{}", test_run_scenario.reply_size()));
+    placeholders.insert("stateSize".to_string(), format!("{}", test_run_scenario.state_size()));
 
     placeholders
 }
@@ -66,9 +79,17 @@ pub(crate) struct ReplaceFormatter {
 }
 
 impl ReplaceFormatter {
-    pub(crate) fn new() -> anyhow::Result<Self> {
-        let placeholders = parse_placeholder_config()?;
+    pub(crate) fn new(test_run_scenario: &TestRunScenario) -> anyhow::Result<Self> {
+        let mut placeholders = parse_placeholder_config()?;
 
+        build_placeholders_from_test_scenario(test_run_scenario)
+            .into_iter()
+            .for_each(|(key, value)| {
+                placeholders.placeholders.insert(key, value);
+            });
+        
+        println!("Registered (fixed) placeholders: {:?}", placeholders.placeholders());
+        
         Ok(Self {
             replace_placeholders: placeholders,
         })

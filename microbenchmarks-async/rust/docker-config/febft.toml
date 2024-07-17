@@ -4,4 +4,4 @@ watermark = 150
 [proposer_config]
 target_batch_size = 1024
 max_batch_size = 2048
-batch_timeout = 1000
+batch_timeout = 500

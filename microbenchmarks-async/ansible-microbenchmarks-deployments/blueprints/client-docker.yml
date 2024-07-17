@@ -7,13 +7,17 @@
     volumes:
       - ./config:/usr/app/config
       - ./ca-root:/usr/app/ca-root
-    env_file:
-      - ./docker_env
+      - ./logs:/usr/app/logs
     environment:
       ID: ${nodeId}
       OWN_NODE__NODE_ID: ${nodeId}
       OWN_NODE__IP: "${machineIp}"
       OWN_NODE__HOSTNAME: "cli-${nodeId}"
       OWN_NODE__NODE_TYPE: "Client"
+      REPLY_SIZE: "${replySize}"
+      REQUEST_SIZE: "${requestSize}"
+      STATE_SIZE: "${stateSize}"
       CLIENT: 1
+      RUST_LOG: "${rustlog}"
+      VERBOSE: "false"
     restart: no

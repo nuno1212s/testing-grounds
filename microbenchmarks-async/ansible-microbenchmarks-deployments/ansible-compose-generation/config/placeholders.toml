@@ -1,3 +1,4 @@
 [placeholders]
-  version = "v0.0.3"
+  version = "v0.0.5"
   image = "nukino/atlas-microbenchmarks"
+  rustLog = "DEBUG,febft_pbft_consensus=INFO,atlas_comm_mio=WARN,atlas_communication=WARN,atlas_smr_core=DEBUG,atlas_smr_core::request_pre_processing=WARN,atlas_core::timeouts=WARN,hyper=WARN,atlas_metrics=WARN"

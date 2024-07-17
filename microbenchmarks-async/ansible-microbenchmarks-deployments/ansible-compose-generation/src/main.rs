@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use clap::{Parser, Subcommand};
-use getset::{CopyGetters, Getters};
+use getset::{CopyGetters, Getters, MutGetters};
 
 use crate::config::{MachineConfig, MachineRestrictions};
 use crate::writer::docker_compose::DockerComposeWriter;
@@ -58,11 +58,11 @@ pub struct TestRunScenario {
     allocator: AllocatorType,
 }
 /// The current state of allocations in the system.
-#[derive(Getters)]
+#[derive(Getters, MutGetters)]
 struct AllocatedState {
-    #[get = "pub"]
+    #[getset(get = "pub", get_mut = "pub")]
     last_allocated_node: Option<String>,
-    #[get = "pub"]
+    #[getset(get = "pub", get_mut = "pub")]
     cluster_state: BTreeMap<String, NodeState>,
 }
 
@@ -128,10 +128,11 @@ fn main() {
         .map(|node| (node.name().clone(), node.clone()))
         .collect();
 
-    let formatter = ReplaceFormatter::new().expect("Failed to initialize placeholder replacer");
+    let formatter = ReplaceFormatter::new(&test_config)
+        .expect("Failed to initialize placeholder replacer");
 
     let mut doc_writer =
-        DockerComposeWriter::new(formatter).expect("Failed to initialize docker compose writer");
+        DockerComposeWriter::new(formatter, cluster_config.machine_list()).expect("Failed to initialize docker compose writer");
 
     for replica_id in 0..test_config.replica_count() {
         let node =

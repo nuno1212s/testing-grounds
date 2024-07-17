@@ -1,9 +1,9 @@
 machine_list = [
-    { name = "theia221", machine_ip = "theia221.dcc.fc.up.pt" },
-    { name = "theia222", machine_ip = "theia222.dcc.fc.up.pt" },
-    { name = "theia223", machine_ip = "theia223.dcc.fc.up.pt" },
-    { name = "theia224", machine_ip = "theia224.dcc.fc.up.pt" },
-    { name = "theia225", machine_ip = "theia225.dcc.fc.up.pt" },
-    { name = "theia226", machine_ip = "theia226.dcc.fc.up.pt" },
-    { name = "theia227", machine_ip = "theia227.dcc.fc.up.pt" },
+    { name = "theia221", machine_ip = "192.168.70.221", restrictions = { max_clients = 0, max_replicas = 10000 } },
+    { name = "theia222", machine_ip = "192.168.70.222", restrictions = { max_clients = 0, max_replicas = 10000 } },
+    { name = "theia223", machine_ip = "192.168.70.223", restrictions = { max_clients = 0, max_replicas = 10000 } },
+    { name = "theia224", machine_ip = "192.168.70.224", restrictions = { max_clients = 0, max_replicas = 10000 } },
+    { name = "theia225", machine_ip = "192.168.70.225" },
+    { name = "theia226", machine_ip = "192.168.70.226" },
+    { name = "theia227", machine_ip = "192.168.70.227" },
 ]
