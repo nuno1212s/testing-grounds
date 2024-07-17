@@ -1,0 +1,17 @@
+- hosts: all
+  become: true
+  vars:
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks"
+    replica_docker_file: "docker-compose-replica.yml"
+    client_docker_file: "docker-compose-client.yml"
+    replica_docker_files: "{{ working_dir }}/{{replica_docker_file}}"
+    client_docker_files: "{{ working_dir }}/{{client_docker_file}}"
+  tasks:
+    - name: Down clients
+      shell: "docker compose -f \"{{client_docker_file}}\" down"
+      args:
+        chdir: "{{ working_dir }}"
+    - name: Stop replicas
+      shell: "docker compose -f \"{{replica_docker_file}}\" down"
+      args:
+        chdir: "{{ working_dir }}"

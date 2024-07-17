@@ -27,9 +27,11 @@ fn allocate_client(
     let nodes = current_state.cluster_state();
 
     let mut iterations = 0;
-
+    
+    let mut current_node = current_state.last_allocated_node().clone();
+    
     loop {
-        let next_node_round = if let Some(last_allocated_node) = current_state.last_allocated_node()
+        let next_node_round = if let Some(last_allocated_node) = current_node.clone()
         {
             nodes
                 .range(last_allocated_node.clone()..)
@@ -50,6 +52,10 @@ fn allocate_client(
                 .clone()
         };
 
+        println!("client next_node_round: {}, iterations {}", next_node_round, iterations);
+        
+        current_node = Some(next_node_round.clone());
+        
         if restrictions.is_some_and(|restrictions| {
             meets_restrictions(true, &next_node_round, restrictions, current_state)
         }) {
@@ -74,13 +80,16 @@ fn allocate_replica(
 
     let mut iterations = 0;
 
+    let mut current_node = current_state.last_allocated_node().clone();
+    
     loop {
-        let next_node_round = if let Some(last_allocated_node) = current_state.last_allocated_node()
+        let next_node_round = if let Some(last_allocated_node) = current_node.clone()
         {
             nodes
                 .range(last_allocated_node.clone()..)
                 .nth(1)
                 .map(|(node, _)| node.clone())
+                .clone()
                 .unwrap_or_else(|| {
                     nodes
                         .first_key_value()
@@ -96,9 +105,13 @@ fn allocate_replica(
                 .clone()
         };
 
+        current_node = Some(next_node_round.clone());
+
+        println!("replica next_node_round: {}, iterations {}", next_node_round, iterations);
+        
         if restrictions.is_none()
             || restrictions.is_some_and(|restrictions| {
-            meets_restrictions(true, &next_node_round, restrictions, current_state)
+            meets_restrictions(false, &next_node_round, restrictions, current_state)
         })
         {
             current_state.last_allocated_node = Some(next_node_round.clone());
@@ -108,7 +121,7 @@ fn allocate_replica(
 
         iterations += 1;
 
-        if iterations >= nodes.len() {
+        if iterations >= nodes.len() * 2 {
             panic!("Cannot allocate on any node");
         }
     }

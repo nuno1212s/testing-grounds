@@ -3,7 +3,6 @@ use std::default::Default;
 use std::io::{Read, Write};
 use std::iter;
 use std::sync::Arc;
-use std::time::Duration;
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,7 @@ lazy_static! {
         Arc::from(iter::repeat(0u8).take(*REPLY_SIZE).collect::<Vec<u8>>());
     pub static ref STATE: Arc<[u8]> =
         Arc::from(iter::repeat(0u8).take(*STATE_SIZE).collect::<Vec<u8>>());
-    pub static ref VERBOSE: bool = std::env::var("VERBOSE").unwrap().parse().unwrap();
+    pub static ref VERBOSE: bool = std::env::var("VERBOSE").unwrap_or(String::from("false")).parse().unwrap();
 }
 
 #[derive(Serialize, Deserialize, Clone)]
