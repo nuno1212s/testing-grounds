@@ -33,10 +33,10 @@ ansible-playbook -i hosts setup-configs.yml
 #REQUEST_SIZE=(0 128 1024 4096)
 
 REPLICA_COUNTS=(4)
-CLIENT_COUNTS=(6)
+CLIENT_COUNTS=(3)
 REQUEST_SIZE=(0)
 
-TEST_RUNS=5
+TEST_RUNS=1
 
 echo "Preparing test executions with configurations:"
 echo "Replica counts: ${REPLICA_COUNTS[*]}"
