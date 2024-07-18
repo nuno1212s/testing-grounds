@@ -1,9 +1,9 @@
-worker_count = 8
+worker_count = 4
 bind_addr = [{ ip = "0.0.0.0", port = 10000 }]
 
 [tcp_conns]
-replica_concurrent_connections = 4
-client_concurrent_connections = 2
+replica_concurrent_connections = 2
+client_concurrent_connections = 1
 
 [pool_config]
 batch_limit = 1024

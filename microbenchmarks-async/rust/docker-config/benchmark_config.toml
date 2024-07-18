@@ -1,3 +1,3 @@
-concurrent_rqs=100
-ops_number=100_000
+concurrent_rqs=200
+ops_number=1_000_000
 request_sleep_millis=0
