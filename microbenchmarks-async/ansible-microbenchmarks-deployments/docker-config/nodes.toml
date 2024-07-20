@@ -1,0 +1,13 @@
+bootstrap_nodes = [
+    { node_id = 0, ip = "theia221.dcc.fc.up.pt", port = 10000, hostname = "srv0", node_type = "Replica" },
+    { node_id = 1, ip = "theia222.dcc.fc.up.pt", port = 10001, hostname = "srv1", node_type = "Replica" },
+    { node_id = 2, ip = "theia223.dcc.fc.up.pt", port = 10002, hostname = "srv2", node_type = "Replica" },
+    { node_id = 3, ip = "theia224.dcc.fc.up.pt", port = 10003, hostname = "srv3", node_type = "Replica" },
+]
+
+[own_node]
+#node_id = 0
+#ip = ""
+port = 10000
+#hostname = "srv0"
+#node_type = "Replica"

@@ -1,0 +1,19 @@
+---
+
+- hosts: replicas
+  become: true
+#  strategy: free
+  vars:
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks-bare-metal"
+    binary_file: "microbenchmarks"
+  tasks:
+    - name: Starting replicas
+      shell: "./{{binary_file}}"
+      args:
+        chdir: "{{working_dir}}"
+      environment:
+        ID: "{{node_id}}"
+        OWN_NODE__NODE_ID: "{{node_id}}"
+        OWN_NODE__IP: "{{machine_ip}}"
+        OWN_NODE__HOSTNAME: "srv-{{node_id}}"
+        OWN_NODE__NODE_TYPE: "Replica"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOCAL_WORKING_DIR="../rust"
+LOCAL_WORKING_DIR="./"
 #LOCAL_CONFIG_DIR="${LOCAL_WORKING_DIR}/config"
 LOCAL_CA_ROOT_DIR="${LOCAL_WORKING_DIR}/ca-root"
 ANSIBLE_COMPOSE_GENERATOR="ansible-compose-generation"
@@ -33,7 +33,7 @@ ansible-playbook -i hosts setup-configs.yml
 #REQUEST_SIZE=(0 128 1024 4096)
 
 REPLICA_COUNTS=(4)
-CLIENT_COUNTS=(3)
+CLIENT_COUNTS=(3 6 9)
 REQUEST_SIZE=(0)
 
 TEST_RUNS=1
