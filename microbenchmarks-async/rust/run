@@ -1,43 +1,10 @@
 #!/bin/bash
 
 main() {
-    generate_conf
     compile
     #delete_log
     select_test_name
     exec_microbenchmarks
-}
-
-delete_log() {
-  rm -rf ./log/
-}
-
-generate_conf() {
-    if [ $LOCAL -eq 1 ]; then
-        ./generate_conf_local || exit 1
-    else
-        ./generate_conf_cop || exit 1
-    fi
-
-    if [ ! -f ca-root/crt ]; then
-      echo "Missing ca certificates, generating them".
-      ./ca || exit 1
-    fi
-
-    if [ ! -f config/clients.config ]; then
-        echo Error: Missing config/clients.config! >&2
-        exit 1
-    fi
-
-    if [ ! -f config/replicas.config ]; then
-        echo Error: Missing config/replicas.config! >&2
-        exit 1
-    fi
-
-    if [ ! -f config/batch.config ]; then
-        echo Error: Missing config/batch.config! >&2
-        exit 1
-    fi
 }
 
 compile() {
