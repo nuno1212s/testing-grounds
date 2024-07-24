@@ -1,0 +1,35 @@
+- hosts: clients
+  become: true
+  gather_facts: no
+  vars:
+    config_zip_file: "config_clients.zip"
+    config_unzip_folder: "config_clients"
+    invidual_env_files: "individual-envs"
+    config_folder: "config"
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks-bare-metal"
+  tasks:
+    - name: Copy the configuration file
+      copy:
+        src: "{{config_zip_file}}"
+        dest: "{{working_dir}}/{{config_zip_file}}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+    - name: Unzip the configuration file
+      shell: unzip {{config_zip_file}}
+      args:
+        chdir: "{{working_dir}}"
+    - name: Move config to config folder
+      command: mv {{config_unzip_folder}} {{config_folder}}
+      args:
+        chdir: "{{working_dir}}"
+        removes: "{{config_unzip_folder}}"
+        creates: "{{config_folder}}"
+    - name: Copy the individual env file
+      copy:
+        src: "{{invidual_env_files}}/.{{item}}.env"
+        dest: "{{working_dir}}/.own_{{item}}.env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      with_items: "{{node_id}}"

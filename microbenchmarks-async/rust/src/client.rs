@@ -24,7 +24,7 @@ pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
             with_metrics(atlas_core::metric::metrics()),
             with_metrics(atlas_comm_mio::metrics::metrics()),
             with_metrics(atlas_client::metric::metrics()),
-            with_metric_level(MetricLevel::Debug),
+            with_metric_level(MetricLevel::Trace),
         ],
         influx_db_args,
     );

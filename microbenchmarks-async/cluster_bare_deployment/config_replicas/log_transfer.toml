@@ -1,0 +1,2 @@
+# Duration in micros for timeout of messages
+timeout_duration = 3_000_000
