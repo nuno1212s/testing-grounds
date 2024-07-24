@@ -9,9 +9,11 @@ compile() {
   echo "Compiling the project"
   cd ${CARGO_DIR} || exit
 
+  export RUSTFLAGS="-C target-cpu=native"
   cargo build --release
 
   cd "${LOCAL_WORKING_DIR}" || exit
+  rm ./microbenchmarks
   cp ${CARGO_DIR}/target/release/microbenchmarks-async ./microbenchmarks
 }
 

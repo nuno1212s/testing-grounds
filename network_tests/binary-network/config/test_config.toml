@@ -1,0 +1,5 @@
+node_count = 20
+concurrent_rqs_per_node=0
+messages_to_send= 10_000_000
+message_size=1024
+base_port=10000
