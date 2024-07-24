@@ -1,8 +1,8 @@
 - hosts: all
   become: true
+  gather_facts: no
   vars:
     bin_file: "microbenchmarks"
-    config_zip_file: "config.zip"
     ca_root_zip_file: "ca-root.zip"
     invidual_env_files: "individual-envs"
     working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks-bare-metal"
@@ -25,13 +25,6 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: '0755'
-    - name: Copy the configuration file
-      copy:
-        src: "{{config_zip_file}}"
-        dest: "{{working_dir}}/config.zip"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0755'
     - name: Copy the ca-root
       copy:
         src: "{{ca_root_zip_file}}"
@@ -39,10 +32,6 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: '0755'
-    - name: Unzip the configuration file
-      shell: unzip {{config_zip_file}}
-      args:
-        chdir: "{{working_dir}}"
     - name: Unzip the ca-root
       shell: unzip {{ca_root_zip_file}}
       args:
@@ -54,13 +43,6 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: '0755'
-    - name: Copy the individual env file
-      copy:
-        src: "{{invidual_env_files}}/.{{node_id}}.env"
-        dest: "{{working_dir}}/.own.env"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0755'
     - name: Copy the start script
       copy:
         src: "run.sh"
@@ -68,3 +50,4 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: '0755'
+

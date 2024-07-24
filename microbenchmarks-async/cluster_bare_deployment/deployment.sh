@@ -28,9 +28,12 @@ zip_folder() {
 
 compile
 
-zip_folder "config"
+zip_folder "config_clients"
+zip_folder "config_replicas"
 zip_folder "ca-root"
 
-ansible-playbook -i hosts setup-env.yml
+ansible-playbook -i hosts.yml setup-env.yml
+ansible-playbook -i hosts.yml setup-clients-env.yml
+ansible-playbook -i hosts.yml setup-replicas-env.yml
 
 #ansible-playbook -i hosts run-experiment.yml

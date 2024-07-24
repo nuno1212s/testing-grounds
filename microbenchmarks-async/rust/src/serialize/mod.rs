@@ -64,7 +64,7 @@ impl MonolithicState for State {
     where
         W: Write,
     {
-        w.write_all(&**STATE)?;
+        w.write_all(&STATE)?;
 
         Ok(())
     }
@@ -103,7 +103,7 @@ impl ApplicationData for MicrobenchmarkData {
     where
         R: Read,
     {
-        let reader = capnp::serialize::read_message(r, Default::default())
+        /*let reader = capnp::serialize::read_message(r, Default::default())
             .context("Failed to deserialize request")?;
 
         let request_msg: messages_capnp::benchmark_request::Reader = reader
@@ -112,7 +112,7 @@ impl ApplicationData for MicrobenchmarkData {
 
         let _data = request_msg
             .get_data()
-            .context("Failed to get data from request message?");
+            .context("Failed to get data from request message?");*/
 
         Ok(Request {
             inner: Arc::clone(&*REQUEST),
@@ -136,7 +136,7 @@ impl ApplicationData for MicrobenchmarkData {
     where
         R: Read,
     {
-        let reader = capnp::serialize::read_message(r, Default::default())
+        /*let reader = capnp::serialize::read_message(r, Default::default())
             .context("Failed to deserialize reply message")?;
 
         let request_msg: messages_capnp::benchmark_reply::Reader =
@@ -144,7 +144,7 @@ impl ApplicationData for MicrobenchmarkData {
 
         let _data = request_msg
             .get_data()
-            .context("Failed to get data from reply message?");
+            .context("Failed to get data from reply message?");*/
 
         Ok(Reply {
             inner: Arc::clone(&*REPLY),
