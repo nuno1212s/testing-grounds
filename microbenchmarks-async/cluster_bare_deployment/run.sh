@@ -1,6 +1,6 @@
 #!/bin/bash
 
 . .env
-. .own.env
+. ".own_${1}.env"
 
 ./microbenchmarks
