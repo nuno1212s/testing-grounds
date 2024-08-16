@@ -1,0 +1,12 @@
+- hosts: all
+  name: Run microbenchmarks
+  become: true
+  strategy: free
+  vars:
+    working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks-bare-metal"
+  tasks:
+    - name: Run microbenchmarks
+      shell: "./run.sh {{item}}"
+      args:
+        chdir: "{{working_dir}}"
+      with_items: "{{node_id}}"

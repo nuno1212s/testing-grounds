@@ -14,7 +14,9 @@ use themis_core::app::{Request};
 use themis_core::config::{Config, DEFAULT_CONFIG_PATH, load_from_paths};
 use themis_core::execute::Runtime;
 use tracing::Instrument;
-use crate::{os_statistics, variables};
+use atlas_metrics::metrics::metric_duration;
+use crate::{variables};
+use crate::metrics::CLIENT_LATENCY_ID;
 
 struct Context {
     config: Arc<Config>,
@@ -54,8 +56,9 @@ async fn do_requests<'a>(
             active_reqs += 1;
         }
         let _response = buffer.next().await.unwrap();
-        let millis = times.pop_front().unwrap().elapsed().as_millis() as u64;
-        ctx.latencies.fetch_add(millis);
+        let millis = times.pop_front().unwrap().elapsed();
+        metric_duration(CLIENT_LATENCY_ID, millis);
+        ctx.latencies.fetch_add(millis.as_millis() as u64);
         ctx.counter.fetch_add(1);
         active_reqs -= 1;
         i += 1;
@@ -156,8 +159,6 @@ pub fn start_clients(config: Config, first_id: u64, clients: u64) {
     tracing::info!("waiting for {} connected clients", clients);
     connected.wait();
     tracing::info!("go");
-
-    os_statistics::start_statistics_thread(first_id);
 
     loop {
         thread::sleep(Duration::from_secs(1));

@@ -1,4 +1,5 @@
 - hosts: clients
+  name: Setup clients environment
   become: true
   gather_facts: no
   vars:

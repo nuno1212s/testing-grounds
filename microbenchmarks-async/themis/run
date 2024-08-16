@@ -27,7 +27,7 @@ exec_microbenchmarks() {
     if [ $LOCAL -eq 1 ]; then
       CONFIG="config/local-config"
     else
-      CONFIG="config/cop-config"
+      CONFIG="config"
     fi
 
     if [ $CLIENT -eq 1 ]; then

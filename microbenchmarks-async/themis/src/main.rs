@@ -1,7 +1,7 @@
 mod app;
 mod client;
 mod variables;
-mod os_statistics;
+mod metrics;
 
 use std::sync::Arc;
 use std::{env, thread};
@@ -19,10 +19,14 @@ use themis_core::execute::Runtime;
 use themis_pbft::PBFT;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use atlas_common::InitConfig;
+use atlas_common::node_id::NodeId;
+use atlas_metrics::with_metrics;
 use crate::app::Microbenchmark;
 
 async fn setup(config: Arc<Config>) {
     let me: usize = config.get("id").expect("id");
+    
     let _keyfile: String = config
         .get(&format!("peers[{}].private_key", me))
         .expect("keyfile");
@@ -64,7 +68,6 @@ async fn setup(config: Arc<Config>) {
         let _metrics = spawn(start_server(port));
 
     info!("setup modules");
-    os_statistics::start_statistics_thread(me as u64);
 
     let state = try_join!(peers, clients, protocol, application);
     if let Err(e) = state {
@@ -83,7 +86,14 @@ struct Opts {
 
 fn main() {
     setup_logging();
-
+    
+    let init = InitConfig {
+        async_threads: 1,
+        threadpool_threads: 1,
+    };
+    
+    let _guard = unsafe { atlas_common::init(init) };
+    
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_ansi(atty::is(atty::Stream::Stdout))
@@ -94,6 +104,12 @@ fn main() {
     let mut config = load_from_paths(&configs).expect("load config");
     config.set("id", me).expect("set id");
 
+    let influx_cfg = atlas_default_configs::get_influx_configuration(Some(NodeId(me as u32))).expect("Failed to read influx config");
+
+    atlas_metrics::initialize_metrics(vec![
+        with_metrics(metrics::metrics()),
+    ], influx_cfg);
+    
     if client {
         log::info!("STARTING CLIENTS ");
 

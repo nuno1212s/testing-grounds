@@ -2,7 +2,7 @@ worker_count = 8
 
 [tcp_conns]
 replica_concurrent_connections = 4
-client_concurrent_connections = 2
+client_concurrent_connections = 4
 
 [pool_config]
 batch_limit = 1024
@@ -12,4 +12,4 @@ batch_timeout_micros = 250
 batch_sleep_micros = 250
 channel_size = 128
 
-bind_addr = [{ ip = "0.0.0.0", port = 10000 }]
+#bind_addr = [{ ip = "0.0.0.0", port = 10000 }]

@@ -1,4 +1,4 @@
-worker_count = 3
+worker_count = 6
 bind_addr = [{ ip = "0.0.0.0", port = 10000 }]
 
 [tcp_conns]

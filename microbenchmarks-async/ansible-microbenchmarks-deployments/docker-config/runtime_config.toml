@@ -1,2 +1,2 @@
-threadpool_threads=6
-async_runtime_threads=2
+threadpool_threads=32
+async_runtime_threads=1

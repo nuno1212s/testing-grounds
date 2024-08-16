@@ -27,12 +27,6 @@ pub fn state_size() -> usize {
     parse_usize(&*string).unwrap()
 }
 
-pub fn measurement_interval() -> usize {
-    let string = env::var("MEASUREMENT_INTERVAL").unwrap();
-
-    parse_usize(&*string).unwrap()
-}
-
 pub fn ops_number() -> u64 {
     let string = env::var("OPS_NUMBER").unwrap();
 

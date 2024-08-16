@@ -1,9 +1,11 @@
 - hosts: all
   become: true
   vars:
-    local_working_dir: "../rust/"
+    local_working_dir: "."
+    rust_dir: "../rust"
     local_config_location: "{{local_working_dir}}/docker-config"
-    local_ca_root_location: "{{local_working_dir}}/ca-root"
+    local_cli_config_location: "{{local_working_dir}}/docker-config-clients"
+    local_ca_root_location: "{{rust_dir}}/ca-root"
     working_dir: "/home/{{ansible_user}}/atlas-microbenchmarks"
   tasks:
     - name: Clear current state
@@ -35,10 +37,27 @@
         mode: '0755'
         owner: '{{ ansible_user }}'
         group: '{{ ansible_user }}'
+    - name: Create client config directory
+      file:
+        path: "{{ working_dir }}/config-client"
+        state: directory
+        mode: '0755'
+        owner: '{{ ansible_user }}'
+        group: '{{ ansible_user }}'
     - name: Setup configurations
       copy:
         src: "{{ local_config_location }}/"
         dest: "{{ working_dir }}/config/"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        directory_mode:
+        mode: '0755'
+      tags:
+        - dircontent
+    - name: Setup client configurations
+      copy:
+        src: "{{ local_cli_config_location }}/"
+        dest: "{{ working_dir }}/config-client/"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         directory_mode:

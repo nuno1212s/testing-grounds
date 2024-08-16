@@ -8,13 +8,13 @@
     client_docker_files: "{{ working_dir }}/{{client_docker_file}}"
   tasks:
     - name: Start replicas detached
-      shell: "docker compose -f \"{{replica_docker_file}}\" up -d"
+      shell: "docker compose -f \"{{replica_docker_file}}\" up -d --remove-orphans"
       args:
         chdir: "{{ working_dir }}"
       ignore_errors: yes
     # We start the clients attached since they
     - name: Start clients attached
-      shell: "docker compose -f \"{{client_docker_file}}\" up"
+      shell: "docker compose -f \"{{client_docker_file}}\" up --remove-orphans"
       args:
         chdir: "{{ working_dir }}"
       ignore_errors: yes

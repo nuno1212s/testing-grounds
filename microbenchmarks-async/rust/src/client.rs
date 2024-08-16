@@ -1,21 +1,30 @@
-use crate::common::{ClientNode, ReconfProtocol, SMRClient, BFT, generate_log};
-use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config};
-use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
-use atlas_client::client;
-use atlas_client::client::ordered_client::Ordered;
-use atlas_client::client::unordered_client::UnorderedClientMode;
-use atlas_client::client::ClientConfig;
-use atlas_client::concurrent_client::ConcurrentClient;
-use atlas_common::async_runtime;
-use atlas_default_configs::{get_network_configurations, get_reconfig_config};
-use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
-use chrono::Utc;
-use semaphores::RawSemaphore;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use chrono::Utc;
 use config::File;
 use config::FileFormat::Toml;
+use semaphores::RawSemaphore;
 use tracing::{debug, info, trace};
+
+use atlas_client::client;
+use atlas_client::client::ClientConfig;
+use atlas_client::client::ordered_client::Ordered;
+use atlas_client::client::unordered_client::UnorderedClientMode;
+use atlas_client::concurrent_client::ConcurrentClient;
+use atlas_comm_mio::config::MIOConfig;
+use atlas_common::async_runtime;
+use atlas_common::crypto::signature::KeyPair;
+use atlas_common::node_id::{NodeId, NodeType};
+use atlas_common::peer_addr::PeerAddr;
+use atlas_default_configs::{get_network_configurations, get_reconfig_config};
+use atlas_default_configs::settings::ReconfigurationConfig;
+use atlas_metrics::{InfluxDBArgs, MetricLevel, with_metric_level, with_metrics};
+use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
+
+use crate::common::{BFT, ClientNode, generate_log, ReconfProtocol, SMRClient};
+use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config, read_client_config};
+use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
@@ -33,17 +42,129 @@ pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
 pub(super) fn client_main() {
     let benchmark = read_benchmark_config().expect("Failed to load benchmark config");
 
-    setup_and_run_client(benchmark);
+    let client_config = read_client_config().expect("Failed to load client config");
+    
+    if client_config.clients_to_run() > 1 {
+        multi_client_main(benchmark, client_config.clients_to_run());
+    } else {
+        setup_and_run_client(benchmark);
+    }
+    
 }
 
-fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
-    let reconfig_config = get_reconfig_config().unwrap();
+fn build_reconfigurable_network(index: u16, node_id: NodeId, node_type: NodeType, base: ReconfigurableNetworkConfig) -> ReconfigurableNetworkConfig {
+    let mut network = base;
+
+    network.node_id = node_id;
+    network.key_pair = Arc::new(KeyPair::generate_key_pair().unwrap());
+
+    let current_addr = network.our_address.clone();
+    let mut current_socket = current_addr.socket().clone();
+
+    let current_port = current_addr.socket().port();
+
+    current_socket.set_port(current_port + index);
+
+    network.our_address = PeerAddr::new(current_socket, format!("{:?}-{}", node_type, node_id.0));
+
+    network
+}
+
+fn generate_network_config(index: u16, node_id: NodeId, network: MIOConfig) -> MIOConfig {
+    let mut tcp_configs = network.tcp_configs;
+
+    tcp_configs.network_config = atlas_default_configs::get_tls_config(node_id);
+
+    tcp_configs.bind_addrs = tcp_configs.bind_addrs.map(|addr| {
+        let sockets = addr.into_iter().map(|mut socket| {
+            let port = socket.port();
+            socket.set_port(port + index);
+
+            socket
+        }).collect();
+
+        sockets
+    });
+
+    MIOConfig {
+        epoll_worker_count: network.epoll_worker_count,
+        tcp_configs,
+    }
+}
+
+pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
+
+    let mut reconfig_config = get_reconfig_config().unwrap();
+
     let node_id = reconfig_config.node_id;
 
     let influx = atlas_default_configs::influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), Some(node_id)).unwrap();
 
     setup_metrics(influx.into());
+
+    let _log_guard = generate_log(node_id.0);
     
+    let (network_conf, pool_config) = get_network_configurations(node_id).unwrap();
+
+    let mut handles = Vec::new();
+    
+    for i in 0..client_count {
+        
+        let benchmark_config = benchmark.clone();
+        let reconfig_config = reconfig_config.clone();
+        let network_config = network_conf.clone();
+        
+        let join_handle = std::thread::spawn(move || {
+            let node_id = NodeId(node_id.0 + i as u32);
+            
+            setup_run_small_client(i, node_id, benchmark_config, reconfig_config, network_config);
+        });
+        
+        handles.push(join_handle);
+    }
+    
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+}
+
+fn setup_run_small_client(index: u16, node_id: NodeId, benchmark_config: BenchmarkConfig, base_reconfigurable_network: ReconfigurableNetworkConfig, mio_config: MIOConfig) {
+    let reconfigurable_network = build_reconfigurable_network(index, node_id, NodeType::Client, base_reconfigurable_network);
+
+    println!("Reconfigurable network: {:?}", reconfigurable_network);
+    
+    let network = generate_network_config(index, node_id, mio_config);
+    
+    println!("Network: {:?}", network);
+
+    let client_cfg = ClientConfig {
+        unordered_rq_mode: UnorderedClientMode::BFT,
+        node: network,
+        reconfiguration: reconfigurable_network,
+    };
+
+    let client = async_runtime::block_on(client::bootstrap_client::<
+        ReconfProtocol,
+        MicrobenchmarkData,
+        ClientNode,
+        BFT,
+    >(node_id, client_cfg)).unwrap();
+
+    info!("Client {:?} initialized!", node_id);
+
+    run_client(client, benchmark_config);
+}
+
+fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
+    let mut reconfig_config = get_reconfig_config().unwrap();
+    
+    let node_id = reconfig_config.node_id;
+
+    let influx = atlas_default_configs::influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), Some(node_id)).unwrap();
+
+    setup_metrics(influx.into());
+
     let _log_guard = generate_log(node_id.0);
 
     let (network_conf, pool_config) = get_network_configurations(node_id).unwrap();
@@ -60,7 +181,7 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
         ClientNode,
         BFT,
     >(node_id, client_cfg)).unwrap();
-    
+
     info!("Client initialized!");
 
     run_client(client, benchmark_config)

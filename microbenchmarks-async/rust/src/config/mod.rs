@@ -32,6 +32,7 @@ pub struct FeBFTProposerConfig {
     target_batch_size: u64,
     max_batch_size: u64,
     batch_timeout: u64,
+    processing_threads: u32,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -155,6 +156,7 @@ impl From<FeBFTConfig> for PBFTConfig {
                 target_batch_size: value.proposer_config.target_batch_size,
                 max_batch_size: value.proposer_config.max_batch_size,
                 batch_timeout: value.proposer_config.batch_timeout,
+                processing_threads: value.proposer_config.processing_threads,
             },
             watermark: value.watermark,
         }

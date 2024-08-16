@@ -1,0 +1,42 @@
+minions:
+  hosts:
+    minion1:
+      ansible_host: minion1
+      ansible_user: nneto
+      machine_ip: minion1.dcc.fc.up.pt
+      id: 1
+    minion2:
+      ansible_host: minion2
+      ansible_user: nneto
+      machine_ip: minion2.dcc.fc.up.pt
+      id: 2
+    minion3:
+      ansible_host: minion3
+      ansible_user: nneto
+      machine_ip: minion3.dcc.fc.up.pt
+      id: 3
+    minion4:
+      ansible_host: minion4
+      ansible_user: nneto
+      machine_ip: minion4.dcc.fc.up.pt
+      id: 4
+    minion5:
+      ansible_host: minion5
+      ansible_user: nneto
+      machine_ip: minion5.dcc.fc.up.pt
+      id: 5
+    minion6:
+      ansible_host: minion6
+      ansible_user: nneto
+      machine_ip: minion6.dcc.fc.up.pt
+      id: 6
+    minion7:
+      ansible_host: minion7
+      ansible_user: nneto
+      machine_ip: minion7.dcc.fc.up.pt
+      id: 7
+    minion8:
+      ansible_host: minion8
+      ansible_user: nneto
+      machine_ip: minion8.dcc.fc.up.pt
+      id: 8

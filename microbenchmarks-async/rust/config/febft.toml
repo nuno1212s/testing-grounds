@@ -2,6 +2,7 @@ timeout_duration = 3_000_000
 watermark = 150
 
 [proposer_config]
-target_batch_size = 1024
-max_batch_size = 2048
-batch_timeout = 3_000_000
+target_batch_size = 2048
+max_batch_size = 4096
+batch_timeout = 2500
+processing_threads = 1
