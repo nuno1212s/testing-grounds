@@ -18,11 +18,12 @@ import_env() {
     unset _JAVA_OPTIONS
     . ./env_id 2> /dev/null || die Error: No ID env file found: env_id
 
-    if [ $ID -ge 1000 ]; then
-      . ./env_cli 2>/dev/null || die Error: No environment file found: env
-    else
-      . ./env 2>/dev/null || die Error: No environment file found: env
-    fi
+    #if [ $ID -ge 1000 ]; then
+    #  . ./env_cli 2>/dev/null || die Error: No environment file found: env
+    #else
+    #  . ./env 2>/dev/null || die Error: No environment file found: env
+    #fi
+    . ./env 2>/dev/null || die Error: No environment file found: env
 
     case $1 in
         stop|compile|clean)
@@ -43,7 +44,7 @@ import_env() {
         *)
             die Usage: $0 '<clients|servers|stop|compile|clean>'
     esac
-    check_env
+    #check_env
 }
 
 check_env() {

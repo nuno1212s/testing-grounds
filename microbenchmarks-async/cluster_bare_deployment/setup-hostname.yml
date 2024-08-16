@@ -1,0 +1,15 @@
+- hosts: all
+  become: true
+  vars:
+    new_hostname: "minion"
+  tasks:
+    - name: Set the new hostname
+      hostname:
+        name: "{{ new_hostname }}{{id}}"
+
+    - name: Update /etc/hosts with the new hostname
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^(127\.0\.1\.1\s+).*'
+        line: "127.0.1.1       {{ new_hostname }}{{id}}"
+        state: present

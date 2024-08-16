@@ -35,5 +35,6 @@ zip_folder "ca-root"
 ansible-playbook -i hosts.yml setup-env.yml
 ansible-playbook -i hosts.yml setup-clients-env.yml
 ansible-playbook -i hosts.yml setup-replicas-env.yml
+#ansible-playbook -i hosts.yml run.yml
 
 #ansible-playbook -i hosts run-experiment.yml

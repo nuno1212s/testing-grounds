@@ -2,61 +2,15 @@
 
 main() {
     compile
-    #delete_log
-    select_test_name
     exec_microbenchmarks
 }
 
 compile() {
-    [ $COMPILE -eq 1 ] && ./compile
-}
-
-select_test_name() {
-  #Create a monotonically increasing ID which stores its previous state in a file
-  #This is used to generate unique test names, and should match across machines
-
-  FILE="config/previd${ID}"
-
-  #If the file previd doesn't exist, create it
-  if [ ! -f $FILE ]; then
-    echo 0 > $FILE
-  fi
-
-  #Read the previous ID from previd file
-  prev_id=$(cat $FILE)
-
-  #Increment the ID
-  new_id=$((prev_id+1))
-
-  #Write the new ID to the previd file
-  echo $new_id > $FILE
-
-  export INFLUX_EXTRA_TEST=$(printf "%05d" $new_id)
-
-  echo "Test label: ${INFLUX_EXTRA_TEST}"
+    [ "$COMPILE" -eq 1 ] && ./compile
 }
 
 exec_microbenchmarks() {
-
-  PIDS=()
-
-  if [ $ID -ge 1000 ]; then
-    for i in $(seq 0 "$(expr "$NUM_CLIENTS" - 1)"); do
-      exec ./target/release/microbenchmarks-async "$(expr $ID + $i)" &
-      PID1=$!
-      PIDS+=("$PID1")
-    done
-
-    for pid in ${PIDS[*]}; do
-      wait $pid
-    done
-  else
-    if [ $ID -eq 0 ]; then
-    	exec ./target/release/microbenchmarks-async
-    else
-    	exec ./target/release/microbenchmarks-async
-    fi
-  fi
+  exec ./target/release/microbenchmarks-async
 }
 
 main

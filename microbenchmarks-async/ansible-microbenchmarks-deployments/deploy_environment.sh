@@ -1,6 +1,7 @@
 #!/bin/bash
 
 LOCAL_WORKING_DIR="./"
+RUST_DIR="../rust"
 #LOCAL_CONFIG_DIR="${LOCAL_WORKING_DIR}/config"
 LOCAL_CA_ROOT_DIR="${LOCAL_WORKING_DIR}/ca-root"
 ANSIBLE_COMPOSE_GENERATOR="ansible-compose-generation"
@@ -16,7 +17,7 @@ echo "Zipping the ca-root directory"
 
 ANSIBLE_DIR=$(exec pwd)
 
-cd ${LOCAL_WORKING_DIR} || exit
+cd ${RUST_DIR} || exit
 
 rm -f "${ANSIBLE_DIR}"/ca-root.zip
 

@@ -1,27 +1,27 @@
 use std::path::PathBuf;
+
 use anyhow::anyhow;
-use crate::common::{generate_log, MonConfig, ReplicaConf, SMRReplica};
-use crate::config::ReplicaArgs;
-use crate::exec::Microbenchmark;
-use atlas_common::async_runtime;
-use atlas_default_configs::{get_network_configurations, get_reconfig_config};
-use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
-use atlas_smr_replica::server::monolithic_server::MonReplica;
 use clap::Parser;
 use config::File;
 use config::FileFormat::Toml;
-use tracing::{error, info, Level};
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt::writer::MakeWriterExt;
+use tracing::{error, info};
+
 use atlas_comm_mio::config::MIOConfig;
+use atlas_common::async_runtime;
 use atlas_common::ordering::SeqNo;
 use atlas_decision_log::config::DecLogConfig;
+use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_log_transfer::config::LogTransferConfig;
+use atlas_metrics::{InfluxDBArgs, MetricLevel, with_metric_level, with_metrics};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
+use atlas_smr_replica::server::monolithic_server::MonReplica;
 use atlas_view_transfer::config::ViewTransferConfig;
 use febft_pbft_consensus::bft::config::PBFTConfig;
 use febft_state_transfer::config::StateTransferConfig;
+
+use crate::common::{generate_log, MonConfig, ReplicaConf, SMRReplica};
+use crate::config::ReplicaArgs;
+use crate::exec::Microbenchmark;
 
 pub fn init_replica_config(
     reconf: ReconfigurableNetworkConfig,
@@ -52,6 +52,7 @@ pub fn init_replica_config(
         reconfig_node: reconf,
         vt_config: view_transfer_config,
         p: Default::default(),
+        preprocessor_threads: 3
     };
 
     Ok(conf)
