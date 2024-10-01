@@ -90,3 +90,7 @@ lto = true
 debug = false
 debug-assertions = false
 incremental = false
+
+[profile.profiling]
+inherits = "release"
+debug = true

@@ -18,11 +18,11 @@ lazy_static! {
     pub static ref REPLY_SIZE: usize = std::env::var("REPLY_SIZE").unwrap().parse().unwrap();
     pub static ref STATE_SIZE: usize = std::env::var("STATE_SIZE").unwrap().parse().unwrap();
     pub static ref REQUEST: Arc<[u8]> =
-        Arc::from(iter::repeat(0u8).take(*REQUEST_SIZE).collect::<Vec<u8>>());
+        Arc::from(iter::repeat_with(|| fastrand::u8(..)).take(*REQUEST_SIZE).collect::<Vec<u8>>());
     pub static ref REPLY: Arc<[u8]> =
-        Arc::from(iter::repeat(0u8).take(*REPLY_SIZE).collect::<Vec<u8>>());
+        Arc::from(iter::repeat_with(|| fastrand::u8(..)).take(*REPLY_SIZE).collect::<Vec<u8>>());
     pub static ref STATE: Arc<[u8]> =
-        Arc::from(iter::repeat(0u8).take(*STATE_SIZE).collect::<Vec<u8>>());
+        Arc::from(iter::repeat_with(|| fastrand::u8(..)).take(*STATE_SIZE).collect::<Vec<u8>>());
     pub static ref VERBOSE: bool = std::env::var("VERBOSE").unwrap_or(String::from("false")).parse().unwrap();
 }
 
@@ -84,18 +84,13 @@ impl ApplicationData for MicrobenchmarkData {
     type Request = Request;
     type Reply = Reply;
 
-    fn serialize_request<W>(w: W, request: &Self::Request) -> Result<()>
+    fn serialize_request<W>(mut w: W, request: &Self::Request) -> Result<()>
     where
         W: Write,
     {
-        let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
-
-        let mut rq_msg: messages_capnp::benchmark_request::Builder = root.init_root();
-
-        rq_msg.set_data(&request.inner);
-
-        capnp::serialize::write_message(w, &root).context("Failed to serialize request")?;
-
+        
+        w.write_all(&request.inner)?;
+        
         Ok(())
     }
 
@@ -119,17 +114,13 @@ impl ApplicationData for MicrobenchmarkData {
         })
     }
 
-    fn serialize_reply<W>(w: W, reply: &Self::Reply) -> Result<()>
+    fn serialize_reply<W>(mut w: W, reply: &Self::Reply) -> Result<()>
     where
         W: Write,
     {
-        let mut root = capnp::message::Builder::new(capnp::message::HeapAllocator::new());
-
-        let mut rq_msg: messages_capnp::benchmark_reply::Builder = root.init_root();
-
-        rq_msg.set_data(&reply.inner);
-
-        capnp::serialize::write_message(w, &root).context("Failed to serialize reply")
+        w.write_all(&reply.inner)?;
+        
+        Ok(())
     }
 
     fn deserialize_reply<R>(r: R) -> Result<Self::Reply>

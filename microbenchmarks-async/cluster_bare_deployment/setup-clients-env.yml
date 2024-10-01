@@ -1,6 +1,5 @@
 - hosts: clients
   name: Setup clients environment
-  become: true
   gather_facts: no
   vars:
     config_zip_file: "config_clients.zip"

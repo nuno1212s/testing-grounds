@@ -1,6 +1,5 @@
 - hosts: all
   name: Setup environment
-  become: true
   gather_facts: no
   vars:
     bin_file: "microbenchmarks"

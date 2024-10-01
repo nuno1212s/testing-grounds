@@ -1,6 +1,5 @@
 - hosts: replicas
   name: Setup replicas environment
-  become: true
   gather_facts: no
   vars:
     config_zip_file: "config_replicas.zip"

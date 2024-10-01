@@ -1,0 +1,8 @@
+[theia_cluster]
+tgpu1 ansible_host=t-gpu1 ansible_user=nneto
+tgpu2 ansible_host=t-gpu2 ansible_user=nneto
+tgpu3 ansible_host=t-gpu3 ansible_user=nneto
+tgpu4 ansible_host=t-gpu4 ansible_user=nneto
+tgpu5 ansible_host=t-gpu5 ansible_user=nneto
+tgpu6 ansible_host=t-gpu6 ansible_user=nneto
+tgpu7 ansible_host=t-gpu7 ansible_user=nneto
