@@ -504,7 +504,7 @@ pub fn setup_reconf(
     Ok(ReconfigurableNetworkConfig {
         node_id: id,
         node_type,
-        key_pair: sk,
+        key_pair: Arc::new(sk),
         our_address: own_addr,
         known_nodes,
     })
@@ -560,6 +560,7 @@ pub async fn setup_replica(
         target_batch_size: global_batch_size as u64,
         max_batch_size: global_batch_size as u64 * 2,
         batch_timeout: global_batch_timeout as u64,
+        processing_threads: 2,
     };
 
     let view = ViewInfo::new(SeqNo::ZERO, n, 1)?;
@@ -604,6 +605,7 @@ pub async fn setup_replica(
         p: Default::default(),
         reconfig_node: reconf_config,
         vt_config,
+        preprocessor_threads: 3
     };
 
     let mon_conf = MonolithicStateReplicaConfig {

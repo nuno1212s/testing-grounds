@@ -33,7 +33,7 @@ pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
             with_metrics(atlas_core::metric::metrics()),
             with_metrics(atlas_comm_mio::metrics::metrics()),
             with_metrics(atlas_client::metric::metrics()),
-            with_metric_level(MetricLevel::Trace),
+            with_metric_level(MetricLevel::Info),
         ],
         influx_db_args,
     );
@@ -203,7 +203,16 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     let mut ramp_up = 1000;
 
     let rq_sleep = Duration::from_millis(benchmark_config.request_sleep_millis() as u64);
-
+    
+    let sem_clone = semaphore.clone();
+    
+    let imm_callback = Arc::new(
+        move |_reply| {
+            //Release another request for this client
+            sem_clone.release();
+        }
+    );
+    
     for req in iterator {
         //Only allow concurrent_rqs per client at the network
         semaphore.acquire();
@@ -212,23 +221,11 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
             trace!("{:?} // Sending req {}...", concurrent_client.id(), req);
         }
 
-        let sem_clone = semaphore.clone();
-
         concurrent_client
-            .update_callback::<Ordered>(
+            .update_imm_callback::<Ordered>(
                 Request::new(Arc::clone(&*REQUEST)),
-                Box::new(move |reply| {
-                    //Release another request for this client
-                    sem_clone.release();
-
-                    if *VERBOSE {
-                        if req % 1000 == 0 {
-                            trace!("{} // {} operations sent!", id, req);
-                        }
-
-                        trace!(" sent!");
-                    }
-                }),
+                // I need to replace this
+                imm_callback.clone(),
             )
             .unwrap();
 
@@ -259,26 +256,12 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         if *VERBOSE {
             trace!("Sending req {}...", req);
         }
-
-        let last_send_instant = Utc::now();
-
-        let sem_clone = semaphore.clone();
-
+        
         concurrent_client
-            .update_callback::<Ordered>(
+            .update_imm_callback::<Ordered>(
                 Request::new(Arc::clone(&*REQUEST)),
-                Box::new(move |reply| {
-                    //Release another request for this client
-                    sem_clone.release();
-
-                    if *VERBOSE {
-                        if req % 1000 == 0 {
-                            trace!("{} // {} operations sent!", id, req);
-                        }
-
-                        trace!(" sent!");
-                    }
-                }),
+                // I need to replace this
+                imm_callback.clone(),
             )
             .unwrap();
 

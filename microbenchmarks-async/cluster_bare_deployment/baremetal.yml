@@ -1,0 +1,72 @@
+replicas:
+  hosts:
+    tgpu1:
+      ansible_host: t-gpu1
+      ansible_user: nneto
+      node_id: 0
+      machine_ip: 10.0.0.7
+    tgpu2:
+      ansible_host: t-gpu2
+      ansible_user: nneto
+      node_id: 1
+      machine_ip: 10.0.0.8
+    tgpu3:
+      ansible_host: t-gpu3
+      ansible_user: nneto
+      node_id: 2
+      machine_ip: 10.0.0.9
+    tgpu4:
+      ansible_host: t-gpu4
+      ansible_user: nneto
+      node_id: 3
+      machine_ip: 10.0.0.10
+clients:
+  hosts:
+    t-gpu5:
+      ansible_host: t-gpu5
+      ansible_user: nneto
+      node_id:
+        - 1000
+      machine_ip: 10.0.0.11
+    t-gpu6:
+      ansible_host: t-gpu6
+      ansible_user: nneto
+      node_id:
+        - 1011
+      machine_ip: 10.0.0.12
+    t-gpu7:
+      ansible_host: t-gpu7
+      ansible_user: nneto
+      node_id:
+        - 1021
+      machine_ip: 10.0.0.13
+    minion1:
+      ansible_host: minion1
+      ansible_user: nneto
+      node_id:
+        - 1031
+      machine_ip: 192.168.70.168
+    minion2:
+      ansible_host: minion2
+      ansible_user: nneto
+      node_id:
+        - 1041
+      machine_ip: 192.168.70.169
+    minion3:
+      ansible_host: minion3
+      ansible_user: nneto
+      node_id:
+        - 1051
+      machine_ip: 192.168.70.170
+    minion4:
+      ansible_host: minion4
+      ansible_user: nneto
+      node_id:
+        - 1061
+      machine_ip: 192.168.70.171
+    minion5:
+      ansible_host: minion5
+      ansible_user: nneto
+      node_id:
+        - 1071
+      machine_ip: 192.168.70.172
