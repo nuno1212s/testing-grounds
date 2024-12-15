@@ -5,7 +5,7 @@ use chrono::Utc;
 use config::File;
 use config::FileFormat::Toml;
 use semaphores::RawSemaphore;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 use atlas_client::client;
 use atlas_client::client::ClientConfig;
@@ -281,7 +281,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
     info!("{:?} // Done.", concurrent_client.id());
 
-    info!(
+    warn!(
         "{:?} // Test done in {:?}. ({} ops/s)",
         concurrent_client.id(),
         time_passed,
