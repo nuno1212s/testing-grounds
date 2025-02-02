@@ -52,9 +52,9 @@ pub type LogTransferMessage =
     LTMsg<SMRReq<MicrobenchmarkData>, OrderProtocolMessage, OrderProtocolMessage, DecLogMsg>;
 pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
 
-/// The state transfer also requires wrapping in order to keep the [atlas_communication::serialization::Serializable] type
+/// The state transfer also requires wrapping in order to keep the [atlas_communication::serialization::SerMsg] type
 /// out of the state transfer protocol (and all others for that matter) for further flexibility
-/// Therefore, we have to wrap the [atlas_smr_core::serialize::StateSys] type in order to get the [atlas_communication::serialization::Serializable] trait
+/// Therefore, we have to wrap the [atlas_smr_core::serialize::StateSys] type in order to get the [atlas_communication::serialization::SerMsg] trait
 ///
 pub type StateTransferMessage = CSTMsg<State>;
 pub type SerStateTransferMessage = StateSys<StateTransferMessage>;
@@ -66,7 +66,7 @@ pub type ProtocolDataType =
 /// Set up the networking layer with the data handles we have
 ///
 /// In the networking level, we utilize the type which wraps [atlas_smr_application::ApplicationData]
-/// and provides the [atlas_communication::serialization::Serializable] type required
+/// and provides the [atlas_communication::serialization::SerMsg] type required
 /// for the network layer.
 ///
 /// For that, we use [atlas_smr_core::serialize::SMRSysMsg]
