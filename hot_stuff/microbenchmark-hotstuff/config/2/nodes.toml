@@ -1,0 +1,16 @@
+bootstrap_nodes = [
+    { node_id = 0, ip = "localhost", port = 10000, hostname = "srv0", node_type = "Replica" },
+    { node_id = 1, ip = "localhost", port = 10001, hostname = "srv1", node_type = "Replica" },
+    { node_id = 2, ip = "localhost", port = 10002, hostname = "srv2", node_type = "Replica" },
+    { node_id = 3, ip = "localhost", port = 10003, hostname = "srv3", node_type = "Replica" },
+    #{ node_id = 4, ip = "theia225.dcc.fc.up.pt", port = 10000, hostname = "srv4", node_type = "Replica" },
+    #{ node_id = 5, ip = "theia226.dcc.fc.up.pt", port = 10000, hostname = "srv5", node_type = "Replica" },
+    #{ node_id = 6, ip = "theia227.dcc.fc.up.pt", port = 10000, hostname = "srv6", node_type = "Replica" },
+]
+
+[own_node]
+node_id=2
+port= 10002
+node_type="Replica"
+ip="localhost"
+hostname="srv2"

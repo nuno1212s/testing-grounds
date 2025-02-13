@@ -1,5 +1,5 @@
 [package]
-name = "microbenchmarks-async"
+name = "microbenchmark-hotstuff"
 version = "0.1.0"
 authors = ["Nuno Neto <up201703898@fc.up.pt>"]
 edition = "2021"
@@ -31,7 +31,6 @@ tracing-appender = { version = "*" }
 lazy_static = "1.4.0"
 
 mprober-lib = "0.1.7"
-procinfo = "0.4.2"
 
 atlas-common = { path = "../../../Atlas/Atlas-Common" }
 atlas-communication = { path = "../../../Atlas/Atlas-Communication" }
@@ -53,30 +52,12 @@ atlas-default-configs = { path = "../../../Atlas/Atlas-Tools/atlas-default-confi
 febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
 clap = { version = "4.5.8", features = ["derive"] }
 config = "0"
+threshold_crypto = { version = "0.4.0", git = "https://github.com/poanetwork/threshold_crypto" }
+log = "0.4.25"
 
-[dependencies.febft-pbft-consensus]
-path = "../../../febft/febft-pbft-consensus"
+[dependencies.hot-iron-oxide]
+path = "../../../hot-iron-oxide"
 features = ["serialize_serde"]
-#git = "https://github.com/nuno1212s/febft.git"
-#rev = "54e38aef8194302c6fcaa8a3d8d0a2d00727f518"
-#default-features = false
-#features = [
-#    "expose_impl",
-#    "async_runtime_tokio",
-#    "threadpool_rayon",
-#    "serialize_serde",
-#    "socket_tokio_tcp",
-#    "channel_flume_mpmc",
-#    "channel_sync_crossbeam",
-#    "channel_mixed_flume",
-#    "channel_mult_custom_dump",
-#    "crypto_signature_ring_ed25519",
-#    "crypto_hash_blake3_blake3",
-#    "collections_randomstate_fxhash"
-#]
-
-#[target.'cfg(not(target_env = "msvc"))'.dependencies]
-#tikv-jemallocator = "0.5"
 
 [build-dependencies.capnpc]
 version = "0.19"

@@ -1,0 +1,2 @@
+threadpool_threads=2
+async_runtime_threads=1
