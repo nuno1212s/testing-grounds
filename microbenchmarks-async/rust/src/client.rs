@@ -94,7 +94,7 @@ fn generate_network_config(index: u16, node_id: NodeId, network: MIOConfig) -> M
 
 pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
 
-    let mut reconfig_config = get_reconfig_config().unwrap();
+    let mut reconfig_config = get_reconfig_config("config/nodes.toml").unwrap();
 
     let node_id = reconfig_config.node_id;
 
@@ -157,7 +157,7 @@ fn setup_run_small_client(index: u16, node_id: NodeId, benchmark_config: Benchma
 }
 
 fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
-    let mut reconfig_config = get_reconfig_config().unwrap();
+    let mut reconfig_config = get_reconfig_config("config/nodes.toml").unwrap();
     
     let node_id = reconfig_config.node_id;
 
