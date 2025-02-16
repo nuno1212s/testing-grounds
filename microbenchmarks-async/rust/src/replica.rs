@@ -94,7 +94,7 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
 pub(super) fn run_replica() {
     let replica_args = ReplicaArgs::parse();
 
-    let reconfiguration_cfg = get_reconfig_config().unwrap();
+    let reconfiguration_cfg = get_reconfig_config("config/nodes.toml").unwrap();
     
     let node_id = reconfiguration_cfg.node_id;
     
