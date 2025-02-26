@@ -14,9 +14,9 @@ use atlas_smr_application::state::monolithic_state::MonolithicState;
 pub struct MicrobenchmarkData;
 
 lazy_static! {
-    pub static ref REQUEST_SIZE: usize = std::env::var("REQUEST_SIZE").unwrap().parse().unwrap();
-    pub static ref REPLY_SIZE: usize = std::env::var("REPLY_SIZE").unwrap().parse().unwrap();
-    pub static ref STATE_SIZE: usize = std::env::var("STATE_SIZE").unwrap().parse().unwrap();
+    pub static ref REQUEST_SIZE: usize = std::env::var("REQUEST_SIZE").unwrap_or("0".to_string()).parse().unwrap();
+    pub static ref REPLY_SIZE: usize = std::env::var("REPLY_SIZE").unwrap_or("0".to_string()).parse().unwrap();
+    pub static ref STATE_SIZE: usize = std::env::var("STATE_SIZE").unwrap_or("0".to_string()).parse().unwrap();
     pub static ref REQUEST: Arc<[u8]> = Arc::from(
         iter::repeat_with(|| fastrand::u8(..))
             .take(*REQUEST_SIZE)
