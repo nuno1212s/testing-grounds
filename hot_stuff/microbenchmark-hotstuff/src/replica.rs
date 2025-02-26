@@ -92,12 +92,14 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
 
 pub(super) fn run_replica(node_id: NodeId, hot_stuff_config: HotStuffConfig) {
     let replica_args = ReplicaArgs::parse();
-
+    
     let reconfiguration_cfg = get_reconfig_config(format!("config/{}/nodes.toml", node_id.0).as_str()).unwrap();
 
     let node_id = reconfiguration_cfg.node_id;
 
     info!("Initializing node with config {:?}", reconfiguration_cfg);
+    
+    let db_path = format!("storage/persistent-{0}", node_id.0);
 
     let (network_cfg, pool_config) = get_network_configurations(node_id).unwrap();
 
@@ -129,7 +131,7 @@ pub(super) fn run_replica(node_id: NodeId, hot_stuff_config: HotStuffConfig) {
         log_transfer,
         dec_log_config,
         view_transfer,
-        replica_args.db_path,
+        db_path.into(),
     )
     .unwrap();
 
