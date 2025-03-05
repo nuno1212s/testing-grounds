@@ -49,6 +49,7 @@ atlas-smr-execution = { path = "../../../Atlas/Atlas-SMR-Execution" }
 atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
 atlas-default-configs = { path = "../../../Atlas/Atlas-Tools/atlas-default-configs" }
+threshold-crypto-keygen = { path = "../../../Atlas/Atlas-Tools/threshold_crypto_keygen" }
 febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
 clap = { version = "4.5.8", features = ["derive"] }
 config = "0"
