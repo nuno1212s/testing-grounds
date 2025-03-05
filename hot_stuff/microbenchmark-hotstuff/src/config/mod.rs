@@ -1,6 +1,7 @@
 pub mod benchmark_configs;
 
 use atlas_common::error::*;
+use atlas_common::node_id::NodeId;
 use atlas_decision_log::config::DecLogConfig;
 use clap::Parser;
 use config::{Config, Source};
@@ -9,6 +10,7 @@ use hot_iron_oxide::crypto::QuorumInfo;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+use threshold_crypto_keygen::NodeKeyPair;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -44,6 +46,22 @@ pub struct ViewTransferConfig {
 pub struct StateTransferConfig {
     timeout_duration: u64,
 }
+
+pub fn parse_hotstuff_config(path: PathBuf) -> Result<HotStuffConfig> {
+    let NodeKeyPair {
+        private_key,
+        public_key,
+        public_key_set,
+        ..
+    } = threshold_crypto_keygen::parse_key_pair(path)?;
+
+    let quorum_info = QuorumInfo::new(private_key, public_key, public_key_set);
+
+    Ok(HotStuffConfig {
+        quorum: HotIronInitConfig { quorum_info },
+    })
+}
+
 pub fn generate_hotstuff_config(f: usize) -> Vec<HotStuffConfig> {
     let vec = QuorumInfo::initialize(f);
 
