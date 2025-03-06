@@ -68,15 +68,15 @@ fn main() {
 
         setup_metrics(influx.into());
         
-        let threshold_keys = Path::new("./threshold_crypto_keys/");
+        let threshold_keys = Path::new("./keys/");
 
         let _log_guard = generate_log(log_node_id.0);
         
-        (0..n).map(|node_id| {
+        (0.. u32::try_from(n).unwrap()).map(|node_id| {
             std::thread::Builder::new()
                 .name(format!("replica-{}", node_id))
                 .spawn({
-                    let node_id = NodeId(node_id as u32);
+                    let node_id = NodeId(node_id);
 
                     let node_key_path = threshold_keys.join(format!("node_{}.json", node_id.0));
                     
