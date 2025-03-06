@@ -1,2 +1,2 @@
-threadpool_threads=2
+threadpool_threads=8
 async_runtime_threads=1
