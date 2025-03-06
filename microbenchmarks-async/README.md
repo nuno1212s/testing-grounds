@@ -54,3 +54,19 @@ Especially the `nodes.toml` file, which contains a description of the network.
 ```bash 
 ./run servers
 ```
+
+## Run the clients
+
+Edit the environment variables to the correct ones, especially:
+
+```bash
+export OWN_NODE__NODE_TYPE=Client
+```
+
+Choose the amount of clients in `client_config.toml` file.
+
+Then run the clients:
+
+```bash
+./run clients
+```
