@@ -19,6 +19,7 @@ use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::peer_addr::PeerAddr;
 use atlas_default_configs::settings::ReconfigurationConfig;
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
+use atlas_default_configs::crypto::FolderPathConstructor;
 use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 
@@ -102,7 +103,7 @@ fn generate_network_config(index: u16, node_id: NodeId, network: MIOConfig) -> M
 }
 
 pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
-    let mut reconfig_config = get_reconfig_config(format!("config/{}/nodes.toml", 1000).as_str()).unwrap();
+    let mut reconfig_config = get_reconfig_config::<FolderPathConstructor>(Some(format!("config/{}/nodes.toml", 1000).as_str())).unwrap();
 
     let node_id = reconfig_config.node_id;
 
@@ -185,7 +186,7 @@ fn setup_run_small_client(
 }
 
 fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
-    let mut reconfig_config = get_reconfig_config(format!("config/{}/nodes.toml", 1000).as_str()).unwrap();
+    let mut reconfig_config = get_reconfig_config::<FolderPathConstructor>(Some(format!("config/{}/nodes.toml", 1000).as_str())).unwrap();
 
     let node_id = reconfig_config.node_id;
 

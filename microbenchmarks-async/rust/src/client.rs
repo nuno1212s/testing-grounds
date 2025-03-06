@@ -25,7 +25,7 @@ use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use crate::common::{BFT, ClientNode, generate_log, ReconfProtocol, SMRClient};
 use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config, read_client_config};
 use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
-use atlas_default_configs::crypto::FlattenedPathConstructor;
+use atlas_default_configs::crypto::{FlattenedPathConstructor, FolderPathConstructor};
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
@@ -95,7 +95,7 @@ fn generate_network_config(index: u16, node_id: NodeId, network: MIOConfig) -> M
 
 pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
 
-    let mut reconfig_config = get_reconfig_config("config/nodes.toml").unwrap();
+    let mut reconfig_config = get_reconfig_config::<FlattenedPathConstructor>(Some("config/nodes.toml")).unwrap();
 
     let node_id = reconfig_config.node_id;
 

@@ -14,6 +14,7 @@ use atlas_common::async_runtime;
 use atlas_common::node_id::NodeId;
 use atlas_common::ordering::SeqNo;
 use atlas_decision_log::config::DecLogConfig;
+use atlas_default_configs::crypto::FolderPathConstructor;
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_log_transfer::config::LogTransferConfig;
 use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
@@ -35,11 +36,8 @@ pub fn init_replica_config(
 ) -> atlas_common::error::Result<ReplicaConf> {
     let db_path = db_path.into_os_string().into_string();
 
-    let db_path = match db_path {
-        Ok(db) => db,
-        Err(_) => {
-            return Err(anyhow!("Failed to parse persistent log folder"));
-        }
+    let Ok(db_path) = db_path else {
+        return Err(anyhow!("Failed to parse persistent log folder"));
     };
 
     let conf = ReplicaConf {
@@ -92,13 +90,16 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
 
 pub(super) fn run_replica(node_id: NodeId, hot_stuff_config: HotStuffConfig) {
     let replica_args = ReplicaArgs::parse();
-    
-    let reconfiguration_cfg = get_reconfig_config(format!("config/{}/nodes.toml", node_id.0).as_str()).unwrap();
+
+    let reconfiguration_cfg = get_reconfig_config::<FolderPathConstructor>(Some(
+        format!("config/{}/nodes.toml", node_id.0).as_str(),
+    ))
+    .unwrap();
 
     let node_id = reconfiguration_cfg.node_id;
 
     info!("Initializing node with config {:?}", reconfiguration_cfg);
-    
+
     let db_path = format!("storage/persistent-{0}", node_id.0);
 
     let (network_cfg, pool_config) = get_network_configurations(node_id).unwrap();
