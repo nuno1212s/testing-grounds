@@ -10,6 +10,7 @@ use atlas_comm_mio::config::MIOConfig;
 use atlas_common::async_runtime;
 use atlas_common::ordering::SeqNo;
 use atlas_decision_log::config::DecLogConfig;
+use atlas_default_configs::crypto::FlattenedPathConstructor;
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_log_transfer::config::LogTransferConfig;
 use atlas_metrics::{InfluxDBArgs, MetricLevel, with_metric_level, with_metrics};
@@ -94,7 +95,7 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
 pub(super) fn run_replica() {
     let replica_args = ReplicaArgs::parse();
 
-    let reconfiguration_cfg = get_reconfig_config("config/nodes.toml").unwrap();
+    let reconfiguration_cfg = get_reconfig_config::<FlattenedPathConstructor>(Some("config/nodes.toml")).unwrap();
     
     let node_id = reconfiguration_cfg.node_id;
     

@@ -25,6 +25,7 @@ use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use crate::common::{BFT, ClientNode, generate_log, ReconfProtocol, SMRClient};
 use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config, read_client_config};
 use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
+use atlas_default_configs::crypto::FlattenedPathConstructor;
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
@@ -43,13 +44,13 @@ pub(super) fn client_main() {
     let benchmark = read_benchmark_config().expect("Failed to load benchmark config");
 
     let client_config = read_client_config().expect("Failed to load client config");
-    
+
     if client_config.clients_to_run() > 1 {
         multi_client_main(benchmark, client_config.clients_to_run());
     } else {
         setup_and_run_client(benchmark);
     }
-    
+
 }
 
 fn build_reconfigurable_network(index: u16, node_id: NodeId, node_type: NodeType, base: ReconfigurableNetworkConfig) -> ReconfigurableNetworkConfig {
@@ -103,39 +104,39 @@ pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
     setup_metrics(influx.into());
 
     let _log_guard = generate_log(node_id.0);
-    
+
     let (network_conf, pool_config) = get_network_configurations(node_id).unwrap();
 
     let mut handles = Vec::new();
-    
+
     for i in 0..client_count {
-        
+
         let benchmark_config = benchmark.clone();
         let reconfig_config = reconfig_config.clone();
         let network_config = network_conf.clone();
-        
+
         let join_handle = std::thread::spawn(move || {
             let node_id = NodeId(node_id.0 + i as u32);
-            
+
             setup_run_small_client(i, node_id, benchmark_config, reconfig_config, network_config);
         });
-        
+
         handles.push(join_handle);
     }
-    
+
     for handle in handles {
         handle.join().unwrap();
     }
-    
+
 }
 
 fn setup_run_small_client(index: u16, node_id: NodeId, benchmark_config: BenchmarkConfig, base_reconfigurable_network: ReconfigurableNetworkConfig, mio_config: MIOConfig) {
     let reconfigurable_network = build_reconfigurable_network(index, node_id, NodeType::Client, base_reconfigurable_network);
 
     println!("Reconfigurable network: {:?}", reconfigurable_network);
-    
+
     let network = generate_network_config(index, node_id, mio_config);
-    
+
     println!("Network: {:?}", network);
 
     let client_cfg = ClientConfig {
@@ -157,8 +158,7 @@ fn setup_run_small_client(index: u16, node_id: NodeId, benchmark_config: Benchma
 }
 
 fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
-    let mut reconfig_config = get_reconfig_config("config/nodes.toml").unwrap();
-    
+    let reconfig_config = get_reconfig_config::<FlattenedPathConstructor>(None).unwrap();
     let node_id = reconfig_config.node_id;
 
     let influx = atlas_default_configs::influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), Some(node_id)).unwrap();
@@ -203,16 +203,16 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     let mut ramp_up = 1000;
 
     let rq_sleep = Duration::from_millis(benchmark_config.request_sleep_millis() as u64);
-    
+
     let sem_clone = semaphore.clone();
-    
+
     let imm_callback = Arc::new(
         move |_reply| {
             //Release another request for this client
             sem_clone.release();
         }
     );
-    
+
     for req in iterator {
         //Only allow concurrent_rqs per client at the network
         semaphore.acquire();
@@ -256,7 +256,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         if *VERBOSE {
             trace!("Sending req {}...", req);
         }
-        
+
         concurrent_client
             .update_imm_callback::<Ordered>(
                 Request::new(Arc::clone(&*REQUEST)),

@@ -51,7 +51,7 @@ atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = 
 atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
 atlas-default-configs = { path = "../../../Atlas/Atlas-Tools/atlas-default-configs" }
 febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
-clap = { version = "4.5.8", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 config = "0"
 
 [dependencies.febft-pbft-consensus]
