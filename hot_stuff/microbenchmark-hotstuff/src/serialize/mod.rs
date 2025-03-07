@@ -1,42 +1,51 @@
-use anyhow::Context;
-use std::default::Default;
 use std::io::{Read, Write};
 use std::iter;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use atlas_common::error::*;
+use atlas_common::error::Result;
 use atlas_smr_application::serialize::ApplicationData;
 use atlas_smr_application::state::monolithic_state::MonolithicState;
 
 pub struct MicrobenchmarkData;
 
-lazy_static! {
-    pub static ref REQUEST_SIZE: usize = std::env::var("REQUEST_SIZE").unwrap_or("0".to_string()).parse().unwrap();
-    pub static ref REPLY_SIZE: usize = std::env::var("REPLY_SIZE").unwrap_or("0".to_string()).parse().unwrap();
-    pub static ref STATE_SIZE: usize = std::env::var("STATE_SIZE").unwrap_or("0".to_string()).parse().unwrap();
-    pub static ref REQUEST: Arc<[u8]> = Arc::from(
-        iter::repeat_with(|| fastrand::u8(..))
-            .take(*REQUEST_SIZE)
-            .collect::<Vec<u8>>()
-    );
-    pub static ref REPLY: Arc<[u8]> = Arc::from(
-        iter::repeat_with(|| fastrand::u8(..))
-            .take(*REPLY_SIZE)
-            .collect::<Vec<u8>>()
-    );
-    pub static ref STATE: Arc<[u8]> = Arc::from(
-        iter::repeat_with(|| fastrand::u8(..))
-            .take(*STATE_SIZE)
-            .collect::<Vec<u8>>()
-    );
-    pub static ref VERBOSE: bool = std::env::var("VERBOSE")
-        .unwrap_or(String::from("false"))
-        .parse()
-        .unwrap();
+macro_rules! build_rq_body {
+    ($rq_size: expr) => {
+        Arc::from(
+            iter::repeat_with(|| fastrand::u8(..))
+                .take($rq_size)
+                .collect::<Vec<u8>>(),
+        )
+    };
 }
+
+pub static REQUEST_SIZE: LazyLock<usize> = LazyLock::new(|| {
+    std::env::var("REQUEST_SIZE")
+        .map(|s| s.parse().unwrap())
+        .unwrap_or(0)
+});
+pub static STATE_SIZE: LazyLock<usize> = LazyLock::new(|| {
+    std::env::var("STATE_SIZE")
+        .map(|s| s.parse().unwrap())
+        .unwrap_or(0)
+});
+pub static REPLY_SIZE: LazyLock<usize> = LazyLock::new(|| {
+    std::env::var("REPLY_SIZE")
+        .map(|s| s.parse().unwrap())
+        .unwrap_or(0)
+});
+pub static REQUEST: LazyLock<Arc<[u8]>> = LazyLock::new(|| build_rq_body!(*REQUEST_SIZE));
+
+pub static REPLY: LazyLock<Arc<[u8]>> = LazyLock::new(|| build_rq_body!(*REPLY_SIZE));
+
+pub static STATE: LazyLock<Arc<[u8]>> = LazyLock::new(|| build_rq_body!(*STATE_SIZE));
+
+pub static VERBOSE: LazyLock<bool> = LazyLock::new(|| {
+    std::env::var("VERBOSE")
+        .map(|s| s.parse().unwrap())
+        .unwrap_or(false)
+});
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Request {
@@ -72,7 +81,7 @@ impl State {
 }
 
 impl MonolithicState for State {
-    fn serialize_state<W>(mut w: W, request: &Self) -> Result<()>
+    fn serialize_state<W>(mut w: W, _request: &Self) -> Result<()>
     where
         W: Write,
     {
@@ -81,7 +90,7 @@ impl MonolithicState for State {
         Ok(())
     }
 
-    fn deserialize_state<R>(r: R) -> Result<Self>
+    fn deserialize_state<R>(_r: R) -> Result<Self>
     where
         R: Read,
         Self: Sized,
@@ -105,7 +114,7 @@ impl ApplicationData for MicrobenchmarkData {
         Ok(())
     }
 
-    fn deserialize_request<R>(r: R) -> Result<Self::Request>
+    fn deserialize_request<R>(_r: R) -> Result<Self::Request>
     where
         R: Read,
     {
@@ -134,7 +143,7 @@ impl ApplicationData for MicrobenchmarkData {
         Ok(())
     }
 
-    fn deserialize_reply<R>(r: R) -> Result<Self::Reply>
+    fn deserialize_reply<R>(_r: R) -> Result<Self::Reply>
     where
         R: Read,
     {

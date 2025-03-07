@@ -1,15 +1,14 @@
 #![feature(alloc_error_hook)]
 
-use atlas_common::{init, InitConfig};
-use atlas_default_configs::runtime_settings::RunTimeSettings;
-use std::alloc::Layout;
-use std::path::{Path, PathBuf};
-use ::config::File;
-use ::config::FileFormat::Toml;
-use atlas_common::node_id::NodeId;
-use log::log;
 use crate::common::generate_log;
 use crate::replica::setup_metrics;
+use atlas_common::node_id::NodeId;
+use atlas_common::{init, InitConfig};
+use atlas_default_configs::runtime_settings::RunTimeSettings;
+use ::config::File;
+use ::config::FileFormat::Toml;
+use std::alloc::Layout;
+use std::path::Path;
 
 mod client;
 mod common;
@@ -25,10 +24,6 @@ mod serialize;
 // #[cfg(not(target_env = "msvc"))]
 // #[global_allocator]
 // static GLOBAL: Jemalloc = Jemalloc;
-
-fn custom_alloc_error_hook(layout: Layout) {
-    panic!("allocation error: {:?} bytes", layout.size())
-}
 
 fn main() {
     let is_client = std::env::var("CLIENT").map(|x| x == "1").unwrap_or(false);

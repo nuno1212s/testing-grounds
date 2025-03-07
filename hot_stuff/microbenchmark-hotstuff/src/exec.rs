@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use atlas_common::error::*;
+use atlas_common::error::Result;
 use atlas_common::node_id::NodeId;
 use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
 

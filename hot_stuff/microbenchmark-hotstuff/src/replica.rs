@@ -6,7 +6,7 @@ use config::File;
 use config::FileFormat::Toml;
 use tracing::{error, info};
 
-use crate::common::{generate_log, MonConfig, ReplicaConf, SMRReplica};
+use crate::common::{MonConfig, ReplicaConf, SMRReplica};
 use crate::config::{HotStuffConfig, ReplicaArgs};
 use crate::exec::Microbenchmark;
 use atlas_comm_mio::config::MIOConfig;

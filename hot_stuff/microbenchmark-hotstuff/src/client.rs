@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
 use config::File;
 use config::FileFormat::Toml;
 use semaphores::RawSemaphore;
-use tracing::{debug, info, trace, warn};
+use tracing::{info, trace, warn};
 
 use atlas_client::client;
 use atlas_client::client::ordered_client::Ordered;
@@ -17,9 +16,8 @@ use atlas_common::async_runtime;
 use atlas_common::crypto::signature::KeyPair;
 use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::peer_addr::PeerAddr;
-use atlas_default_configs::settings::ReconfigurationConfig;
-use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_default_configs::crypto::FolderPathConstructor;
+use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 

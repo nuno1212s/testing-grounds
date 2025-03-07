@@ -17,7 +17,6 @@ use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
 use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
 use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
-use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use atlas_smr_core::serialize::{SMRSysMsg, Service, StateSys};
 use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
