@@ -14,7 +14,7 @@ use atlas_common::async_runtime;
 use atlas_common::node_id::NodeId;
 use atlas_common::ordering::SeqNo;
 use atlas_decision_log::config::DecLogConfig;
-use atlas_default_configs::crypto::FolderPathConstructor;
+use atlas_default_configs::crypto::{FlattenedPathConstructor, FolderPathConstructor};
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_log_transfer::config::LogTransferConfig;
 use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
@@ -91,7 +91,7 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
 pub(super) fn run_replica(node_id: NodeId, hot_stuff_config: HotStuffConfig) {
     let replica_args = ReplicaArgs::parse();
 
-    let reconfiguration_cfg = get_reconfig_config::<FolderPathConstructor>(Some(
+    let reconfiguration_cfg = get_reconfig_config::<FlattenedPathConstructor>(Some(
         format!("config/{}/nodes.toml", node_id.0).as_str(),
     ))
     .unwrap();

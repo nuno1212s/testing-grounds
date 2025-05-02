@@ -28,7 +28,7 @@ use atlas_view_transfer::SimpleViewTransferProtocol;
 use febft_state_transfer::message::serialize::CSTMsg;
 use febft_state_transfer::CollabStateTransfer;
 use hot_iron_oxide::crypto::QuorumInfo;
-use hot_iron_oxide::messages::serialize::HotIronOxSer;
+use hot_iron_oxide::protocol::messages::serialize::HotIronOxSer;
 use hot_iron_oxide::HotIron;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
