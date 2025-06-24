@@ -1,0 +1,11 @@
+[own_node]
+node_id = 1000
+ip = "127.0.0.1"
+port = 12001
+
+bootstrap_nodes = [
+    { node_id = 0, ip = "127.0.0.1", port = 10000 },
+    { node_id = 1, ip = "127.0.0.1", port = 10001 },
+    { node_id = 2, ip = "127.0.0.1", port = 10002 },
+    { node_id = 3, ip = "127.0.0.1", port = 10003 },
+]
