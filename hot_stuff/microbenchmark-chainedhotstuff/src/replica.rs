@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use clap::Parser;
+use clap::{Args, Parser};
 use config::File;
 use config::FileFormat::Toml;
 use tracing::{error, info};

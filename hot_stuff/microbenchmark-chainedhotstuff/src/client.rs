@@ -21,7 +21,7 @@ use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_metrics::{with_metric_level, with_metrics, InfluxDBArgs, MetricLevel};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 
-use crate::common::{generate_log, ClientNode, ReconfProtocol, SMRClient, BFT};
+use crate::common::{generate_log_for_current_thread, ClientNode, ReconfProtocol, SMRClient, BFT};
 use crate::config::benchmark_configs::{
     read_benchmark_config, read_client_config, BenchmarkConfig,
 };
@@ -116,7 +116,7 @@ pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
 
     setup_metrics(influx.into());
 
-    let _log_guard = generate_log(node_id.0);
+    let _log_guard = generate_log_for_current_thread(node_id.0);
 
     let (network_conf, _pool_config) = get_network_configurations(node_id).unwrap();
 
@@ -202,7 +202,7 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
 
     setup_metrics(influx.into());
 
-    let _log_guard = generate_log(node_id.0);
+    let _log_guard = generate_log_for_current_thread(node_id.0);
 
     let (network_conf, _pool_config) = get_network_configurations(node_id).unwrap();
 

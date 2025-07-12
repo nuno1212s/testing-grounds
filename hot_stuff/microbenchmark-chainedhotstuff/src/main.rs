@@ -1,14 +1,17 @@
 #![feature(alloc_error_hook)]
 
-use crate::common::generate_log;
+use crate::common::{generate_global_log, generate_log_for_current_thread};
+use crate::config::ReplicaArgs;
 use crate::replica::setup_metrics;
-use atlas_common::node_id::NodeId;
-use atlas_common::{init, InitConfig};
-use atlas_default_configs::runtime_settings::RunTimeSettings;
 use ::config::File;
 use ::config::FileFormat::Toml;
+use atlas_common::node_id::NodeId;
+use atlas_common::{InitConfig, init};
+use atlas_default_configs::runtime_settings::RunTimeSettings;
+use clap::{Parser, Subcommand};
 use std::alloc::Layout;
 use std::path::Path;
+use tracing::info_span;
 
 mod client;
 mod common;
@@ -45,6 +48,8 @@ fn main() {
         threadpool_threads,
         async_threads: async_runtime_threads,
     };
+
+    let _guards = generate_global_log();
     
     let _guard = unsafe { init(conf).unwrap() };
 
@@ -59,30 +64,37 @@ fn main() {
             File::new("config/influx_db.toml", Toml),
             Some(log_node_id),
         )
-            .unwrap();
+        .unwrap();
 
         setup_metrics(influx.into());
-        
+
         let threshold_keys = Path::new("./keys/");
-
-        let _log_guard = generate_log(log_node_id.0);
         
-        (0.. u32::try_from(n).unwrap()).map(|node_id| {
-            std::thread::Builder::new()
-                .name(format!("replica-{}", node_id))
-                .spawn({
-                    let node_id = NodeId(node_id);
+        (0..u32::try_from(n).unwrap())
+            .map(|node_id| {
+                std::thread::Builder::new()
+                    .name(format!("replica-{}", node_id))
+                    .spawn({
+                        let node_id = NodeId(node_id);
 
-                    let node_key_path = threshold_keys.join(format!("node_{}.json", node_id.0));
-                    
-                    let node_key = config::parse_hotstuff_config(node_key_path)
-                        .expect("Failed to parse hotstuff config");
+                        let node_key_path = threshold_keys.join(format!("node_{}.json", node_id.0));
 
-                    move || replica::run_replica(node_id, node_key)
-                })
-                .expect("Failed to spawn replica thread")
-        }).collect::<Vec<_>>().into_iter().for_each(|handle| {
-            handle.join().expect("Failed to join replica thread");
-        });
+                        let node_key = config::parse_hotstuff_config(node_key_path)
+                            .expect("Failed to parse hotstuff config");
+
+                        let span = info_span!("NodeId", "{}", node_id.0);
+
+                        move || {
+                            let _log_guard = generate_log_for_current_thread(node_id.0);
+                            replica::run_replica(node_id, node_key);
+                        }
+                    })
+                    .expect("Failed to spawn replica thread")
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|handle| {
+                handle.join().expect("Failed to join replica thread");
+            });
     }
 }

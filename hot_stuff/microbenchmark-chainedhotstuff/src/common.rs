@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::any::Any;
 use crate::exec::Microbenchmark;
 use crate::serialize::{MicrobenchmarkData, State};
 use atlas_client::client::Client;
@@ -33,7 +34,11 @@ use hot_iron_oxide::HotIron;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{fmt, EnvFilter, Layer, Registry};
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::layer::SubscriberExt;
+use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use hot_iron_oxide::chained::IronChain;
 use hot_iron_oxide::chained::messages::serialize::IronChainSer;
 
@@ -182,7 +187,7 @@ pub type Logging = MonStatePersistentLog<
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocolHandle;
-pub type OrderProtocol = IronChain<SMRReq<MicrobenchmarkData>, ProtocolNetwork, QuorumInfo>;
+pub type OrderProtocol = IronChain<SMRReq<MicrobenchmarkData>, ProtocolNetwork, QuorumInfo, RequestPreProcessor<SMRReq<MicrobenchmarkData>>>;
 
 pub type DecisionLog =
     Log<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, Exec<MicrobenchmarkData>>;
@@ -254,29 +259,58 @@ impl OrderProtocolTolerance for BFT {
     }
 }
 
-pub fn generate_log(id: u32) -> Vec<WorkerGuard> {
+pub fn generate_global_log() -> Vec<WorkerGuard> {
+    let host_folder = "./logs";
+
+    let debug_file = tracing_appender::rolling::minutely(host_folder, "atlas_debug.log");
+
+    let (debug_file_nb, guard_1) = tracing_appender::non_blocking(debug_file);
+
+    let debug_file_nb = debug_file_nb;
+
+    let file_layer = fmt::layer()
+        .with_writer(debug_file_nb)
+        .json()
+        .with_filter(EnvFilter::from_default_env());
+    
+    tracing_subscriber::registry()
+        .with(file_layer)
+        .init();
+
+    vec![guard_1]
+}
+
+pub fn generate_log_for_current_thread(id: u32) -> Vec<Box<dyn Any>> {
     let host_folder = format!("./logs/log_{id}");
 
     let debug_file =
         tracing_appender::rolling::minutely(host_folder.clone(), format!("atlas_debug_{id}.log"));
-    let warn_file = tracing_appender::rolling::hourly(host_folder, format!("atlas_{id}.log"));
+    let warn_file = tracing_appender::rolling::hourly(host_folder.clone(), format!("atlas_{id}.log"));
+
+    let hotchain_file = tracing_appender::rolling::minutely(host_folder.clone(), format!("hotchain_{id}.log"));
 
     let (debug_file_nb, guard_1) = tracing_appender::non_blocking(debug_file);
     let (warn_file_nb, guard_2) = tracing_appender::non_blocking(warn_file);
-    let (console_nb, guard_3) = tracing_appender::non_blocking(std::io::stdout());
+    let (hotchain_file_nb, guard_4) = tracing_appender::non_blocking(hotchain_file);
+
+    let hotchain_file_nb = hotchain_file_nb.with_filter(|metadata| {
+        metadata.target().starts_with("hot_iron_oxide")
+    });
 
     let debug_file_nb = debug_file_nb;
     let warn_file_nb = warn_file_nb.with_max_level(Level::INFO);
-    let console_nb = console_nb.with_max_level(Level::WARN);
-
-    let all_files = debug_file_nb.and(warn_file_nb).and(console_nb);
-
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        //.with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
-        .json()
+    let all_files = debug_file_nb.and(warn_file_nb)
+        .and(hotchain_file_nb);
+    
+    let file_layer = fmt::layer()
         .with_writer(all_files)
-        .init();
+        .json()
+        .with_filter(EnvFilter::from_default_env());
 
-    vec![guard_1, guard_2, guard_3]
+    let subscriber = tracing_subscriber::registry()
+        .with(file_layer);
+
+    let guard = tracing::subscriber::set_default(subscriber);
+
+    vec![Box::new(guard_1), Box::new(guard_2), Box::new(guard_4), Box::new(guard)]
 }
