@@ -10,13 +10,14 @@ use atlas_communication::{NodeInputStub, NodeStubController};
 use atlas_core::ordering_protocol::OrderProtocolTolerance;
 use atlas_core::serialize::NoProtocol;
 use atlas_decision_log::serialize::LogSerialization;
-use atlas_decision_log::Log;
+use atlas_decision_log::{Boule};
 use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_persistent_log::stateful_logs::monolithic_state::MonStatePersistentLog;
 use atlas_reconfiguration::message::ReconfData;
 use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
+use atlas_smr_core::execution::{TExecutor, SMRExecWrapper, SMRExec};
 use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
 use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
 use atlas_smr_core::request_pre_processing::RequestPreProcessor;
@@ -25,7 +26,6 @@ use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
-use atlas_smr_replica::server::Exec;
 use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
 use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
@@ -41,7 +41,7 @@ pub type ReconfigurationMessage = ReconfData;
 
 /// In the case of SMR messages, we want the type that is going to be ordered to include just the actual
 /// SMR Ordered Request Type, so we can use the same type for the ordering protocol
-/// This type, for SMR is [atlas_smr_core::serialize::SMRReq]
+/// This type, for SMR is [SMRReq]
 ///
 /// These protocols are only going to be used for the ordered requests, so they only have to know about the ordered requests
 /// In further parts, we can utilize [MicrobenchmarkData] directly as it requires a [D: ApplicationData], instead of just [SerType]
@@ -54,8 +54,7 @@ pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
 
 /// The state transfer also requires wrapping in order to keep the [atlas_communication::serialization::SerMsg] type
 /// out of the state transfer protocol (and all others for that matter) for further flexibility
-/// Therefore, we have to wrap the [atlas_smr_core::serialize::StateSys] type in order to get the [atlas_communication::serialization::SerMsg] trait
-///
+/// Therefore, we have to wrap the [StateSys] type in order to get the [atlas_communication::serialization::SerMsg] trait
 pub type StateTransferMessage = CSTMsg<State>;
 pub type SerStateTransferMessage = StateSys<StateTransferMessage>;
 
@@ -69,7 +68,7 @@ pub type ProtocolDataType =
 /// and provides the [atlas_communication::serialization::SerMsg] type required
 /// for the network layer.
 ///
-/// For that, we use [atlas_smr_core::serialize::SMRSysMsg]
+/// For that, we use [SMRSysMsg]
 
 /// Replica stub things
 pub type IncomingStub = NodeInputStub<
@@ -187,15 +186,21 @@ pub type OrderProtocol = PBFTOrderProtocol<
     RequestPreProcessor<SMRReq<MicrobenchmarkData>>,
     ProtocolNetwork,
 >;
+
+/// Here we choose our executor implementation
+///
+pub type Executor = SingleThreadedMonExecutor<AppNetwork>;
+pub type ExecutorHandle = SMRExec<Executor, Microbenchmark, State>;
+
 pub type DecisionLog =
-    Log<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, Exec<MicrobenchmarkData>>;
+    Boule<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, ExecutorHandle>;
 pub type LogTransferProtocol = CollabLogTransfer<
     SMRReq<MicrobenchmarkData>,
     OrderProtocol,
     DecisionLog,
     ProtocolNetwork,
     Logging,
-    Exec<MicrobenchmarkData>,
+    ExecutorHandle
 >;
 pub type ViewTransferProt = SimpleViewTransferProtocol<OrderProtocol, ProtocolNetwork>;
 pub type StateTransferProtocol = CollabStateTransfer<State, StateTransferNetwork, Logging>;
@@ -227,7 +232,7 @@ pub type MonConfig = MonolithicStateReplicaConfig<
 
 pub type SMRReplica = MonReplica<
     ReconfProtocol,
-    SingleThreadedMonExecutor,
+    Executor,
     State,
     Microbenchmark,
     OrderProtocol,

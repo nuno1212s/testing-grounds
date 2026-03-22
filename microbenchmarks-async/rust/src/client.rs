@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
 use config::File;
 use config::FileFormat::Toml;
 use semaphores::RawSemaphore;
-use tracing::{debug, info, trace, warn};
+use tracing::{info, trace, warn};
 
 use atlas_client::client;
 use atlas_client::client::ClientConfig;
@@ -18,14 +17,13 @@ use atlas_common::crypto::signature::KeyPair;
 use atlas_common::node_id::{NodeId, NodeType};
 use atlas_common::peer_addr::PeerAddr;
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
-use atlas_default_configs::settings::ReconfigurationConfig;
 use atlas_metrics::{InfluxDBArgs, MetricLevel, with_metric_level, with_metrics};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 
 use crate::common::{BFT, ClientNode, generate_log, ReconfProtocol, SMRClient};
 use crate::config::benchmark_configs::{BenchmarkConfig, read_benchmark_config, read_client_config};
 use crate::serialize::{MicrobenchmarkData, Request, REQUEST, VERBOSE};
-use atlas_default_configs::crypto::{FlattenedPathConstructor, FolderPathConstructor};
+use atlas_default_configs::crypto::{FlattenedPathConstructor};
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(

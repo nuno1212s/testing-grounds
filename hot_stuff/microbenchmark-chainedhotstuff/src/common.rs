@@ -29,8 +29,6 @@ use atlas_view_transfer::SimpleViewTransferProtocol;
 use febft_state_transfer::message::serialize::CSTMsg;
 use febft_state_transfer::CollabStateTransfer;
 use hot_iron_oxide::crypto::QuorumInfo;
-use hot_iron_oxide::protocol::messages::serialize::HotIronOxSer;
-use hot_iron_oxide::HotIron;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
@@ -39,8 +37,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::layer::SubscriberExt;
 use atlas_smr_core::request_pre_processing::RequestPreProcessor;
-use hot_iron_oxide::chained::IronChain;
-use hot_iron_oxide::chained::messages::serialize::IronChainSer;
+use hot_iron_oxide::chained::{IronChain, IronChainSer};
 
 /// Set up the data handles so we initialize the networking layer
 pub type ReconfigurationMessage = ReconfData;

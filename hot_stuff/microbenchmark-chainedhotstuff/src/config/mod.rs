@@ -1,6 +1,6 @@
 pub mod benchmark_configs;
 
-use atlas_common::error::*;
+use atlas_common::error::Result;
 use atlas_decision_log::config::DecLogConfig;
 use clap::Parser;
 use config::{Config, Source};
@@ -77,7 +77,7 @@ pub fn parse_dec_log_conf<T>(source: T) -> Result<DecLogConfig>
 where
     T: Source + Send + Sync + 'static,
 {
-    let mut settings = config::Config::builder().add_source(source).build()?;
+    let settings = config::Config::builder().add_source(source).build()?;
 
     let dec_log_config: DecisionLogConfig = settings.try_deserialize()?;
 
@@ -90,7 +90,7 @@ pub fn parse_log_transfer_conf<T>(
 where
     T: Source + Send + Sync + 'static,
 {
-    let mut settings = Config::builder().add_source(source).build()?;
+    let settings = Config::builder().add_source(source).build()?;
 
     let lt_config: LogTransferConfig = settings.try_deserialize()?;
 

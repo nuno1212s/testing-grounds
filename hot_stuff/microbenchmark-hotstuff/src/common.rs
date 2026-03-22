@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use hot_iron_oxide::crypto::QuorumInfo;
 use crate::exec::Microbenchmark;
 use crate::serialize::{MicrobenchmarkData, State};
 use atlas_client::client::Client;
@@ -27,13 +28,11 @@ use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
 use febft_state_transfer::message::serialize::CSTMsg;
 use febft_state_transfer::CollabStateTransfer;
-use hot_iron_oxide::crypto::QuorumInfo;
-use hot_iron_oxide::protocol::messages::serialize::HotIronOxSer;
-use hot_iron_oxide::HotIron;
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::EnvFilter;
+use hot_iron_oxide::hot_iron::{HotIron, HotIronOxSer};
 
 /// Set up the data handles so we initialize the networking layer
 pub type ReconfigurationMessage = ReconfData;
