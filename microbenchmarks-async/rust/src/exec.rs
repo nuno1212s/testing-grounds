@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
-use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UpdateBatch};
+use atlas_core::execution::requests::{IncrementableUpdateBatch, ReplyBatch, UpdateBatch};
+use atlas_smr_application::app::{Application, Reply, Request};
 
 use crate::serialize;
 use crate::serialize::{MicrobenchmarkData, REPLY, State, STATE};
@@ -40,15 +41,15 @@ impl Application<State> for Microbenchmark {
         &self,
         _state: &mut State,
         batch: UpdateBatch<serialize::Request>,
-    ) -> BatchReplies<serialize::Reply> {
-        let mut reply_batch = BatchReplies::with_capacity(batch.len());
+    ) -> ReplyBatch<serialize::Reply> {
+        let mut reply_batch = ReplyBatch::new_with_cap(batch.len());
 
-        for update in batch.into_inner() {
-            let (peer_id, sess, opid, _req) = update.into_inner();
+        let (_, updates) = batch.into_inner();
+
+        for update in updates {
+            let (update_info, _request) = update.into_inner();
             reply_batch.add(
-                peer_id,
-                sess,
-                opid,
+                update_info,
                 serialize::Reply::new(Arc::clone(&*REPLY)),
             );
         }

@@ -1,49 +1,51 @@
 #![allow(dead_code)]
 
-use hot_iron_oxide::crypto::QuorumInfo;
-use crate::exec::Microbenchmark;
-use crate::serialize::{MicrobenchmarkData, State};
+use tracing::Level;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 use atlas_client::client::Client;
 use atlas_comm_mio::{ByteStubType, MIOTCPNode};
 use atlas_communication::{NodeInputStub, NodeStubController};
 use atlas_core::ordering_protocol::OrderProtocolTolerance;
 use atlas_core::serialize::NoProtocol;
 use atlas_decision_log::serialize::LogSerialization;
-use atlas_decision_log::Log;
+use atlas_decision_log::{Boule};
 use atlas_log_transfer::messages::serialize::LTMsg;
 use atlas_log_transfer::CollabLogTransfer;
 use atlas_persistent_log::stateful_logs::monolithic_state::MonStatePersistentLog;
 use atlas_reconfiguration::message::ReconfData;
 use atlas_reconfiguration::network_reconfig::NetworkInfo;
 use atlas_reconfiguration::ReconfigurableNodeProtocolHandle;
+use atlas_smr_core::execution::{TExecutor, SMRExecWrapper};
 use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
 use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
+use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use atlas_smr_core::serialize::{SMRSysMsg, Service, StateSys};
 use atlas_smr_core::SMRReq;
 use atlas_smr_execution::SingleThreadedMonExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
-use atlas_smr_replica::server::Exec;
 use atlas_view_transfer::message::serialize::ViewTransfer;
 use atlas_view_transfer::SimpleViewTransferProtocol;
+use febft_pbft_consensus::bft::message::serialize::PBFTConsensus;
+use febft_pbft_consensus::bft::PBFTOrderProtocol;
 use febft_state_transfer::message::serialize::CSTMsg;
 use febft_state_transfer::CollabStateTransfer;
-use tracing::Level;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::fmt::writer::MakeWriterExt;
-use tracing_subscriber::EnvFilter;
-use hot_iron_oxide::hot_iron::{HotIron, HotIronOxSer};
+
+use crate::exec::Microbenchmark;
+use crate::serialize::{MicrobenchmarkData, State};
 
 /// Set up the data handles so we initialize the networking layer
 pub type ReconfigurationMessage = ReconfData;
 
 /// In the case of SMR messages, we want the type that is going to be ordered to include just the actual
 /// SMR Ordered Request Type, so we can use the same type for the ordering protocol
-/// This type, for SMR is [atlas_smr_core::serialize::SMRReq]
+/// This type, for SMR is [SMRReq]
 ///
 /// These protocols are only going to be used for the ordered requests, so they only have to know about the ordered requests
 /// In further parts, we can utilize [MicrobenchmarkData] directly as it requires a [D: ApplicationData], instead of just [SerType]
-pub type OrderProtocolMessage = HotIronOxSer<SMRReq<MicrobenchmarkData>>;
+pub type OrderProtocolMessage = PBFTConsensus<SMRReq<MicrobenchmarkData>>;
 pub type DecLogMsg =
     LogSerialization<SMRReq<MicrobenchmarkData>, OrderProtocolMessage, OrderProtocolMessage>;
 pub type LogTransferMessage =
@@ -52,8 +54,7 @@ pub type ViewTransferMessage = ViewTransfer<OrderProtocolMessage>;
 
 /// The state transfer also requires wrapping in order to keep the [atlas_communication::serialization::SerMsg] type
 /// out of the state transfer protocol (and all others for that matter) for further flexibility
-/// Therefore, we have to wrap the [atlas_smr_core::serialize::StateSys] type in order to get the [atlas_communication::serialization::SerMsg] trait
-///
+/// Therefore, we have to wrap the [StateSys] type in order to get the [atlas_communication::serialization::SerMsg] trait
 pub type StateTransferMessage = CSTMsg<State>;
 pub type SerStateTransferMessage = StateSys<StateTransferMessage>;
 
@@ -67,7 +68,7 @@ pub type ProtocolDataType =
 /// and provides the [atlas_communication::serialization::SerMsg] type required
 /// for the network layer.
 ///
-/// For that, we use [atlas_smr_core::serialize::SMRSysMsg]
+/// For that, we use [SMRSysMsg]
 
 /// Replica stub things
 pub type IncomingStub = NodeInputStub<
@@ -180,17 +181,23 @@ pub type Logging = MonStatePersistentLog<
 
 /// Set up the protocols with the types that have been built up to here
 pub type ReconfProtocol = ReconfigurableNodeProtocolHandle;
-pub type OrderProtocol = HotIron<SMRReq<MicrobenchmarkData>, ProtocolNetwork, QuorumInfo>;
+pub type OrderProtocol = PBFTOrderProtocol<
+    SMRReq<MicrobenchmarkData>,
+    RequestPreProcessor<SMRReq<MicrobenchmarkData>>,
+    ProtocolNetwork,
+>;
+pub type Executor = SingleThreadedMonExecutor<AppNetwork>;
+pub type ExecutorHandle = SMRExecWrapper<<Executor as TExecutor<Microbenchmark, State>>::ExecutionHandle>;
 
 pub type DecisionLog =
-    Log<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, Exec<MicrobenchmarkData>>;
+    Boule<SMRReq<MicrobenchmarkData>, OrderProtocol, Logging, ExecutorHandle>;
 pub type LogTransferProtocol = CollabLogTransfer<
     SMRReq<MicrobenchmarkData>,
     OrderProtocol,
     DecisionLog,
     ProtocolNetwork,
     Logging,
-    Exec<MicrobenchmarkData>,
+    ExecutorHandle
 >;
 pub type ViewTransferProt = SimpleViewTransferProtocol<OrderProtocol, ProtocolNetwork>;
 pub type StateTransferProtocol = CollabStateTransfer<State, StateTransferNetwork, Logging>;
@@ -222,7 +229,7 @@ pub type MonConfig = MonolithicStateReplicaConfig<
 
 pub type SMRReplica = MonReplica<
     ReconfProtocol,
-    SingleThreadedMonExecutor,
+    Executor,
     State,
     Microbenchmark,
     OrderProtocol,
@@ -255,8 +262,7 @@ impl OrderProtocolTolerance for BFT {
 pub fn generate_log(id: u32) -> Vec<WorkerGuard> {
     let host_folder = format!("./logs/log_{}", id);
 
-    let debug_file =
-        tracing_appender::rolling::minutely(host_folder.clone(), format!("atlas_debug_{}.log", id));
+    let debug_file = tracing_appender::rolling::minutely(host_folder.clone(), format!("atlas_debug_{}.log", id));
     let warn_file = tracing_appender::rolling::hourly(host_folder, format!("atlas_{}.log", id));
 
     let (debug_file_nb, guard_1) = tracing_appender::non_blocking(debug_file);
@@ -267,7 +273,9 @@ pub fn generate_log(id: u32) -> Vec<WorkerGuard> {
     let warn_file_nb = warn_file_nb.with_max_level(Level::INFO);
     let console_nb = console_nb.with_max_level(Level::WARN);
 
-    let all_files = debug_file_nb.and(warn_file_nb).and(console_nb);
+    let all_files = debug_file_nb
+        .and(warn_file_nb)
+        .and(console_nb);
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())

@@ -1,15 +1,13 @@
 pub mod benchmark_configs;
 
-use atlas_common::error::Result;
+use atlas_common::error::*;
 use atlas_decision_log::config::DecLogConfig;
 use clap::Parser;
 use config::{Config, Source};
-use hot_iron_oxide::config::HotIronInitConfig;
-use hot_iron_oxide::crypto::QuorumInfo;
-use serde::{Deserialize, Serialize};
+use febft_pbft_consensus::bft::config::{PBFTConfig, ProposerConfig};
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::time::Duration;
-use threshold_crypto_keygen::NodeKeyPair;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -22,8 +20,19 @@ pub struct ReplicaArgs {
     pub db_path: PathBuf,
 }
 
-pub struct HotStuffConfig {
-    pub quorum: HotIronInitConfig<QuorumInfo>,
+#[derive(Deserialize, Clone, Debug)]
+pub struct FeBFTConfig {
+    timeout_duration: u64,
+    proposer_config: FeBFTProposerConfig,
+    watermark: u32,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct FeBFTProposerConfig {
+    target_batch_size: u64,
+    max_batch_size: u64,
+    batch_timeout: u64,
+    processing_threads: u32,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -46,38 +55,22 @@ pub struct StateTransferConfig {
     timeout_duration: u64,
 }
 
-pub fn parse_hotstuff_config(path: PathBuf) -> Result<HotStuffConfig> {
-    let NodeKeyPair {
-        private_key,
-        public_key,
-        public_key_set,
-        ..
-    } = threshold_crypto_keygen::parse_key_pair(path)?;
+pub fn parse_febft_conf<T>(source: T) -> Result<PBFTConfig>
+where
+    T: Source + Send + Sync + 'static,
+{
+    let mut settings = config::Config::builder().add_source(source).build()?;
 
-    let quorum_info = QuorumInfo::new(private_key, public_key, public_key_set);
+    let febft_config: FeBFTConfig = settings.try_deserialize()?;
 
-    Ok(HotStuffConfig {
-        quorum: HotIronInitConfig { quorum_info },
-    })
-}
-
-pub fn generate_hotstuff_config(f: usize) -> Vec<HotStuffConfig> {
-    let vec = QuorumInfo::initialize(f);
-
-    vec.into_iter()
-        .map(|quorum| HotStuffConfig {
-            quorum: HotIronInitConfig {
-                quorum_info: quorum,
-            },
-        })
-        .collect()
+    Ok(febft_config.into())
 }
 
 pub fn parse_dec_log_conf<T>(source: T) -> Result<DecLogConfig>
 where
     T: Source + Send + Sync + 'static,
 {
-    let settings = config::Config::builder().add_source(source).build()?;
+    let mut settings = config::Config::builder().add_source(source).build()?;
 
     let dec_log_config: DecisionLogConfig = settings.try_deserialize()?;
 
@@ -90,7 +83,7 @@ pub fn parse_log_transfer_conf<T>(
 where
     T: Source + Send + Sync + 'static,
 {
-    let settings = Config::builder().add_source(source).build()?;
+    let mut settings = Config::builder().add_source(source).build()?;
 
     let lt_config: LogTransferConfig = settings.try_deserialize()?;
 
@@ -151,6 +144,21 @@ impl From<ViewTransferConfig> for atlas_view_transfer::config::ViewTransferConfi
     fn from(value: ViewTransferConfig) -> Self {
         Self {
             timeout_duration: Duration::from_micros(value.timeout_duration),
+        }
+    }
+}
+
+impl From<FeBFTConfig> for PBFTConfig {
+    fn from(value: FeBFTConfig) -> Self {
+        PBFTConfig {
+            timeout_dur: Duration::from_micros(value.timeout_duration),
+            proposer_config: ProposerConfig {
+                target_batch_size: value.proposer_config.target_batch_size,
+                max_batch_size: value.proposer_config.max_batch_size,
+                batch_timeout: value.proposer_config.batch_timeout,
+                processing_threads: value.proposer_config.processing_threads,
+            },
+            watermark: value.watermark,
         }
     }
 }

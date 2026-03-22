@@ -1,5 +1,3 @@
-use anyhow::Context;
-use std::default::Default;
 use std::io::{Read, Write};
 use std::iter;
 use std::sync::Arc;
