@@ -23,7 +23,7 @@ use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
 use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use atlas_smr_core::serialize::{SMRSysMsg, Service, StateSys};
 use atlas_smr_core::SMRReq;
-use atlas_smr_execution::SingleThreadedMonExecutor;
+use atlas_smr_preemptive_execution::MonolithicPreemptiveExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
 use atlas_view_transfer::message::serialize::ViewTransfer;
@@ -186,7 +186,7 @@ pub type OrderProtocol = PBFTOrderProtocol<
     RequestPreProcessor<SMRReq<MicrobenchmarkData>>,
     ProtocolNetwork,
 >;
-pub type Executor = SingleThreadedMonExecutor<AppNetwork>;
+pub type Executor = MonolithicPreemptiveExecutor;
 pub type ExecutorHandle = SMRExecWrapper<<Executor as TExecutor<Microbenchmark, State>>::ExecutionHandle>;
 
 pub type DecisionLog =

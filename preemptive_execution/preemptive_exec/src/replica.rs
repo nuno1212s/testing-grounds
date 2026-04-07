@@ -81,7 +81,7 @@ pub(super) fn setup_metrics(influx: InfluxDBArgs) {
             with_metrics(atlas_communication::metric::metrics()),
             with_metrics(atlas_smr_replica::metric::metrics()),
             with_metrics(atlas_smr_core::metric::metrics()),
-            with_metrics(atlas_smr_execution::metric::metrics()),
+            with_metrics(atlas_smr_preemptive_execution::metric::metrics()),
             with_metrics(atlas_log_transfer::metrics::metrics()),
             with_metrics(febft_state_transfer::metrics::metrics()),
             with_metrics(atlas_view_transfer::metrics::metrics()),

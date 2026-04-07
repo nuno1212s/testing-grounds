@@ -24,7 +24,7 @@ use crate::common::{BFT, ClientNode, ReconfProtocol, SMRClient, generate_log};
 use crate::config::benchmark_configs::{
     BenchmarkConfig, read_benchmark_config, read_client_config,
 };
-use crate::serialize::{Key, MicrobenchmarkData, PERequest};
+use crate::serialize::{Key, MicrobenchmarkData, PERequest, PERequestType};
 use atlas_default_configs::crypto::FlattenedPathConstructor;
 
 pub(super) fn setup_metrics(influx_db_args: InfluxDBArgs) {
@@ -248,14 +248,16 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         semaphore.acquire();
 
         trace!("{:?} // Sending req {}...", concurrent_client.id(), req);
-        
 
         concurrent_client
             .update_imm_callback::<Ordered>(
-                PERequest::Read {
-                    cf_name: format!("cf_{}", id),
-                    key: Key::gen_random_key(),
-                },
+                PERequest::new(
+                    Duration::ZERO,
+                    PERequestType::Read {
+                        cf_name: format!("cf_{}", id),
+                        key: Key::gen_random_key(),
+                    },
+                ),
                 // I need to replace this
                 imm_callback.clone(),
             )
@@ -286,13 +288,16 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         semaphore.acquire();
 
         trace!("Sending req {}...", req);
-        
+
         concurrent_client
             .update_imm_callback::<Ordered>(
-                PERequest::Read {
-                    cf_name: format!("cf_{}", id),
-                    key: Key::gen_random_key(),
-                },
+                PERequest::new(
+                    Duration::ZERO,
+                    PERequestType::Read {
+                        cf_name: format!("cf_{}", id),
+                        key: Key::gen_random_key(),
+                    },
+                ),
                 // I need to replace this
                 imm_callback.clone(),
             )
