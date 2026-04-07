@@ -28,7 +28,7 @@ atlas-metrics = { path = "../../../Atlas/Atlas-Metrics" }
 atlas-persistent-log = { path = "../../../Atlas/Atlas-Persistent-Log" }
 atlas-log-transfer = { path = "../../../Atlas/Atlas-Log-Transfer", features = ["serialize_serde"] }
 atlas-decision-log = { path = "../../../Atlas/Atlas-Decision-Log", features = ["serialize_serde"] }
-atlas-smr-execution = { path = "../../../Atlas/Atlas-SMR-Execution" }
+atlas-smr-preemptive-execution = { path = "../../../Atlas/Atlas-SMR-Preemptive-Execution" }
 atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
 atlas-default-configs = { path = "../../../Atlas/Atlas-Tools/atlas-default-configs" }

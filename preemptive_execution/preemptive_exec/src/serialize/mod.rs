@@ -5,6 +5,8 @@ use atlas_smr_application::serialize::ApplicationData;
 use atlas_smr_application::state::monolithic_state::MonolithicState;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
+use std::time::Duration;
+use getset::CopyGetters;
 
 pub struct MicrobenchmarkData;
 
@@ -19,8 +21,26 @@ impl Key {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, CopyGetters)]
+pub struct PERequest {
+    #[get_copy = "pub"]
+    time_delay: Duration,
+    request_type: PERequestType
+}
+
+impl PERequest {
+    
+    pub fn new(time_delay: Duration, request_type: PERequestType) -> Self {
+        Self { time_delay, request_type }
+    }
+    
+    pub fn into_request_type(self) -> PERequestType {
+        self.request_type
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
-pub enum PERequest {
+pub enum PERequestType {
     Read {
         cf_name: String,
         key: Key,

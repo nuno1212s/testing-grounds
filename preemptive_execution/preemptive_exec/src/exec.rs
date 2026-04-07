@@ -1,9 +1,10 @@
+use std::time::Duration;
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_core::execution::requests::{IncrementableUpdateBatch, ReplyBatch, UpdateBatch};
 use atlas_smr_application::app::{Application, Reply, Request};
 
-use crate::serialize::{Key, MicrobenchmarkData, PEReply, PERequest, State};
+use crate::serialize::{Key, MicrobenchmarkData, PEReply, PERequest, PERequestType, State};
 
 pub struct Microbenchmark {
     id: NodeId,
@@ -27,23 +28,38 @@ impl Application<State> for Microbenchmark {
         state: &State,
         request: Request<Self, State>,
     ) -> Reply<Self, State> {
-        match request {
-            PERequest::Read { cf_name, key } => Self::handle_read_request(state, &cf_name, &key),
+        let sleep_duration = request.time_delay();
+        
+        let reply = match request.into_request_type() {
+            PERequestType::Read { cf_name, key } => Self::handle_read_request(state, &cf_name, &key),
             _ => unreachable!(""),
+        };
+        
+        if sleep_duration > Duration::ZERO {
+            std::thread::sleep(sleep_duration);
         }
+        
+        reply
     }
 
     fn update(&self, state: &mut State, request: Request<Self, State>) -> Reply<Self, State> {
-
-        match request {
-            PERequest::Read { cf_name, key } => Self::handle_read_request(state, &cf_name, &key),
-            PERequest::Write { cf_name, key, data } => {
+        let sleep_duration = request.time_delay();
+        
+        let reply = match request.into_request_type() {
+            PERequestType::Read { cf_name, key } => Self::handle_read_request(state, &cf_name, &key),
+            PERequestType::Write { cf_name, key, data } => {
                 Self::handle_write_request(state, &cf_name, &key, data)
             }
-            PERequest::Delete { cf_name, key } => {
+            PERequestType::Delete { cf_name, key } => {
                 Self::handle_delete_request(state, &cf_name, &key)
             }
+        };
+        
+        if sleep_duration > Duration::ZERO {
+            std::thread::sleep(sleep_duration);
         }
+        
+        reply
     }
 
     fn update_batch(
