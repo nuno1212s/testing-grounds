@@ -1,0 +1,84 @@
+---
+# remote-docker-deploy.yml
+#
+# Deploys to the cluster using Docker Compose (pre-built image from registry).
+# ca-root is baked into the Docker image, so no distribution step needed.
+#
+# Extra vars from Makefile:
+#   generated_dir, remote_workdir
+#
+# Flow:
+#   1. All hosts: set up working directory, sync config, copy compose file
+#   2. Replicas: docker compose up -d (detached)
+#   3. Clients:  docker compose up (attached, blocks until all clients exit)
+
+- name: Setup all hosts
+  hosts: all
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Create working directory and subdirs
+      file:
+        path: "{{ workdir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - ""
+        - logs
+
+    - name: Sync ca-root from generated directory
+      synchronize:
+        src: "{{ generated_dir }}/ca-root/"
+        dest: "{{ workdir }}/ca-root/"
+        delete: yes
+
+    - name: Sync replica config
+      synchronize:
+        src: "{{ generated_dir }}/config-replicas/"
+        dest: "{{ workdir }}/config/"
+        delete: yes
+      when: "'replicas' in group_names"
+
+    - name: Sync client config
+      synchronize:
+        src: "{{ generated_dir }}/config-clients/"
+        dest: "{{ workdir }}/config/"
+        delete: yes
+      when: "'clients' in group_names"
+
+    - name: Copy per-machine compose file
+      copy:
+        src: "{{ generated_dir }}/per-machine/{{ inventory_hostname }}-compose.yml"
+        dest: "{{ workdir }}/docker-compose.yml"
+
+- name: Start replicas (detached)
+  hosts: replicas
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Pull image
+      shell: docker compose pull
+      args:
+        chdir: "{{ workdir }}"
+      ignore_errors: yes
+
+    - name: Start replica containers
+      shell: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ workdir }}"
+
+- name: Start clients (blocking — waits until all clients finish)
+  hosts: clients
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Pull image
+      shell: docker compose pull
+      args:
+        chdir: "{{ workdir }}"
+      ignore_errors: yes
+
+    - name: Run client containers
+      shell: docker compose up --remove-orphans
+      args:
+        chdir: "{{ workdir }}"

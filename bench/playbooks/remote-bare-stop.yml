@@ -1,0 +1,11 @@
+---
+# remote-bare-stop.yml
+#
+# Kills all project binary processes on the cluster.
+# Requires: binary_name
+
+- name: Kill binary processes on all hosts
+  hosts: all
+  tasks:
+    - name: Kill processes
+      shell: "pkill -f {{ binary_name }} || true"

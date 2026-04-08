@@ -1,0 +1,59 @@
+# Shared Dockerfile for all testing-grounds projects.
+#
+# Build args:
+#   APP_NAME       - cargo binary name and resulting image identifier
+#   APP_SOURCE_DIR - path from the Atlas repo root to the Rust source tree
+#                    (workspace root or single-package dir, e.g.
+#                     testing-grounds/microbenchmarks-async/rust)
+#
+# The build context must be the Atlas repo root so that Atlas/ and febft/
+# are available alongside the project source.
+#
+# Example (from testing-grounds/):
+#   docker build \
+#     --build-arg APP_NAME=microbenchmarks-async \
+#     --build-arg APP_SOURCE_DIR=testing-grounds/microbenchmarks-async/rust \
+#     -f bench/Dockerfile \
+#     -t microbenchmarks \
+#     ..
+
+# ── Build stage ───────────────────────────────────────────────────────────────────
+FROM rustlang/rust:nightly-bullseye-slim AS build
+
+ARG APP_NAME=microbenchmarks-async
+ARG APP_SOURCE_DIR=testing-grounds/microbenchmarks-async/rust
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends capnproto clang && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY Atlas ./Atlas
+COPY febft ./febft
+COPY ${APP_SOURCE_DIR} ./${APP_SOURCE_DIR}
+
+# CARGO_TARGET_DIR redirects build output to a fixed path so the cache mount
+# hits the same location regardless of APP_SOURCE_DIR.
+RUN --mount=type=cache,target=/root/.rustup/toolchains \
+    --mount=type=cache,target=/root/.rustup/downloads \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/cargo-target \
+    set -e && \
+    cd ${APP_SOURCE_DIR} && \
+    CARGO_TARGET_DIR=/cargo-target \
+        cargo build --locked --release \
+                    --bin ${APP_NAME} \
+                    --config 'profile.release.lto="thin"' && \
+    cp /cargo-target/release/${APP_NAME} /bin/server && \
+    strip /bin/server
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────────
+# distroless/cc contains only glibc + libgcc — exactly what these binaries need.
+FROM gcr.io/distroless/cc-debian11 AS final
+
+COPY --from=build /bin/server /usr/app/server
+
+EXPOSE 10000
+WORKDIR /usr/app
+CMD ["./server"]

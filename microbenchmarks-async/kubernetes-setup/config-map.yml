@@ -1,0 +1,53 @@
+apiVersion: v1
+data:
+  dec_log.toml: ongoing_capacity = 150
+  febft.toml: |-
+    timeout_duration = 3_000_000
+    watermark = 150
+
+    [proposer_config]
+    target_batch_size = 1024
+    max_batch_size = 2048
+    batch_timeout = 3_000_000
+  influx_db.toml: |
+    ip = "http://host.docker.internal:8086"
+    db_name = "atlas"
+    user = "admin"
+  log_transfer.toml: |-
+    # Duration in micros for timeout of messages
+    timeout_duration = 3_000_000
+  network.toml: |-
+    worker_count = 8
+
+    [tcp_conns]
+    replica_concurrent_connections = 4
+    client_concurrent_connections = 2
+
+    [pool_config]
+    batch_limit = 1024
+    per_client_bound = 128
+    clients_per_pool = 1000
+    batch_timeout_micros = 100
+    batch_sleep_micros = 100
+    channel_size = 128
+
+    bind_addr = [{ ip = "0.0.0.0", port = 10000 }]
+  nodes.toml: |
+    bootstrap_nodes = [
+        { node_id = 0, ip = "replica-0", port = 10000, hostname = "srv0", node_type = "Replica" },
+        { node_id = 1, ip = "replica-1", port = 10001, hostname = "srv1", node_type = "Replica" },
+        { node_id = 2, ip = "replica-2", port = 10002, hostname = "srv2", node_type = "Replica" },
+        { node_id = 3, ip = "replica-3", port = 10003, hostname = "srv3", node_type = "Replica" },
+    ]
+
+    [own_node]
+    port = 10000
+  persistent_log.toml: ""
+  runtime_config.toml: |-
+    threadpool_threads=4
+    async_runtime_threads=4
+  state_transfer.toml: timeout_duration = 3_000_000
+  view_transfer.toml: timeout_duration = 3_000_000
+kind: ConfigMap
+metadata:
+  name: atlas-replicas-config-map
