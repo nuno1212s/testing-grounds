@@ -5,3 +5,10 @@
 /*.vim
 os_stats
 bench/generated/
+
+**/*.secret*
+# Generated bench output (per-project)
+**/bench/generated/
+**/ca-root
+**/logs
+**/storage
