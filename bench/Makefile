@@ -108,7 +108,7 @@ local: gen-configs
 	    --build-arg APP_SOURCE_DIR=$(APP_SOURCE_DIR) \
 	    -f $(DOCKERFILE_ABS) $(BUILD_CTX_ABS)
 	$(DOCKER) network create atlas_network 2>/dev/null || true
-	@bash -c 'trap "$(COMPOSE) -f $(GENERATED)/local-compose.yml down; $(DOCKER) network rm atlas_network 2>/dev/null" EXIT; $(COMPOSE) -f $(GENERATED)/local-compose.yml up'
+	@bash -c 'trap "$(COMPOSE) -f $(GENERATED)/local-compose.yml down; sleep 1; $(DOCKER) network rm atlas_network 2>/dev/null || true" EXIT; $(COMPOSE) -f $(GENERATED)/local-compose.yml up' || true
 
 stop-local:
 	$(COMPOSE) -f $(GENERATED)/local-compose.yml down
