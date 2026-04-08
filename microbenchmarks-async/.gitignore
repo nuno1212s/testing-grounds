@@ -4,3 +4,4 @@
 /env_replica
 /*.vim
 os_stats
+bench/generated/

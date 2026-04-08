@@ -1,0 +1,119 @@
+---
+# remote-bare-deploy.yml
+#
+# Deploys to the cluster as raw binaries (no Docker).
+# ca-root is distributed from the shared testing-grounds/bench/ca-root/ directory.
+#
+# Extra vars from Makefile:
+#   generated_dir, remote_workdir,
+#   binary_name, rust_log, request_size, reply_size, state_size
+#
+# Flow:
+#   1. All hosts: set up working directory, binary, ca-root, config, shared .env, run.sh
+#   2. Replicas: copy identity env, start in background (nohup)
+#   3. Clients:  copy all assigned .env files + start script, run blocking
+
+- name: Setup all hosts
+  hosts: all
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Create working directory and subdirs
+      file:
+        path: "{{ workdir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - ""
+        - logs
+
+    - name: Copy compiled binary
+      copy:
+        src: "{{ generated_dir }}/{{ binary_name }}"
+        dest: "{{ workdir }}/{{ binary_name }}"
+        mode: "0755"
+
+    - name: Sync ca-root from generated directory
+      synchronize:
+        src: "{{ generated_dir }}/ca-root/"
+        dest: "{{ workdir }}/ca-root/"
+        delete: yes
+
+    - name: Write shared .env
+      copy:
+        dest: "{{ workdir }}/.env"
+        mode: "0644"
+        content: |
+          export BINARY_NAME="{{ binary_name }}"
+          export RUST_LOG="{{ rust_log }}"
+          export RUST_BACKTRACE=full
+          export REQUEST_SIZE="{{ request_size }}"
+          export REPLY_SIZE="{{ reply_size }}"
+          export STATE_SIZE="{{ state_size }}"
+
+    - name: Copy run.sh
+      copy:
+        src: "{{ global_bench_dir }}/run.sh"
+        dest: "{{ workdir }}/run.sh"
+        mode: "0755"
+
+    - name: Sync replica config
+      synchronize:
+        src: "{{ generated_dir }}/config-replicas/"
+        dest: "{{ workdir }}/config/"
+        delete: yes
+      when: "'replicas' in group_names"
+
+    - name: Sync client config
+      synchronize:
+        src: "{{ generated_dir }}/config-clients/"
+        dest: "{{ workdir }}/config/"
+        delete: yes
+      when: "'clients' in group_names"
+
+- name: Setup and start replicas
+  hosts: replicas
+  vars:
+    workdir: "{{ remote_workdir }}"
+    nid: "{{ node_id }}"
+  tasks:
+    - name: Copy replica identity env
+      copy:
+        src: "{{ generated_dir }}/envs/.own_{{ nid }}.env"
+        dest: "{{ workdir }}/.own_{{ nid }}.env"
+        mode: "0644"
+
+    - name: Kill any existing process
+      shell: "pkill -f {{ binary_name }} || true"
+
+    - name: Start replica in background
+      shell: "nohup ./run.sh {{ nid }} > logs/replica-{{ nid }}.log 2>&1 &"
+      args:
+        chdir: "{{ workdir }}"
+
+- name: Setup and run clients (blocking)
+  hosts: clients
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Copy all client identity env files for this machine
+      copy:
+        src: "{{ item }}"
+        dest: "{{ workdir }}/"
+        mode: "0644"
+      with_fileglob:
+        - "{{ generated_dir }}/envs/.own_*.env"
+
+    - name: Copy per-machine client start script
+      copy:
+        src: "{{ generated_dir }}/envs/start-clients-{{ inventory_hostname }}.sh"
+        dest: "{{ workdir }}/start-clients.sh"
+        mode: "0755"
+
+    - name: Kill any existing processes
+      shell: "pkill -f {{ binary_name }} || true"
+
+    - name: Run all clients on this machine (blocks until all finish)
+      shell: "./start-clients.sh"
+      args:
+        chdir: "{{ workdir }}"

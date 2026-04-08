@@ -1,0 +1,15 @@
+---
+# remote-docker-stop.yml
+#
+# Stops and removes all Docker containers on the cluster.
+
+- name: Stop containers on all hosts
+  hosts: all
+  vars:
+    workdir: "{{ remote_workdir }}"
+  tasks:
+    - name: Stop and remove containers
+      shell: docker compose down --remove-orphans
+      args:
+        chdir: "{{ workdir }}"
+      ignore_errors: yes
