@@ -76,7 +76,8 @@ fi
 echo "Building keygen..."
 cargo build --release --manifest-path "$KEYGEN_DIR/Cargo.toml"
 
-KEYGEN_BIN="$KEYGEN_DIR/target/release/keygen"
+ATLAS_TARGET_DIR="$ATLAS_ROOT/Atlas/target/release"
+KEYGEN_BIN="$ATLAS_TARGET_DIR/keygen"
 
 # ── Generate certificates ──────────────────────────────────────────────────────
 # keygen always writes the folder layout; for flattened we use a temp dir.
