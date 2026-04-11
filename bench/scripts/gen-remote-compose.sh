@@ -6,13 +6,17 @@
 #
 #   BENCH_DIR          - absolute path to project bench dir (for hosts.yml)
 #   GENERATED          - absolute path to shared generated/ dir
-#   N_CLIENTS, N_CLIENT_MACHINES, DOCKER_IMAGE, DOCKER_VERSION, RUST_LOG
+#   N_CLIENTS          - logical clients per client machine (baked into client_config.toml)
+#   N_CLIENT_MACHINES  - number of client machines to use
+#   DOCKER_IMAGE, DOCKER_VERSION, RUST_LOG
+#
+# Each client machine gets exactly one container; that container runs N_CLIENTS
+# logical clients internally (configured via client_config.toml).
 
 set -euo pipefail
 
 : "${BENCH_DIR:?BENCH_DIR not set}"
 : "${GENERATED:?GENERATED not set}"
-: "${N_CLIENTS:?N_CLIENTS not set}"
 : "${N_CLIENT_MACHINES:?N_CLIENT_MACHINES not set}"
 : "${DOCKER_IMAGE:?DOCKER_IMAGE not set}"
 : "${DOCKER_VERSION:?DOCKER_VERSION not set}"
@@ -26,7 +30,6 @@ mkdir -p "$OUT_DIR"
 python3 - <<PYEOF
 import yaml, sys, os
 
-n_clients = int("$N_CLIENTS")
 n_client_machines = int("$N_CLIENT_MACHINES")
 image = "$DOCKER_IMAGE:$DOCKER_VERSION"
 rust_log = "$RUST_LOG"
@@ -64,28 +67,21 @@ for hostname, vals in inv["replicas"]["hosts"].items():
         f.write(content)
     print(f"  {path}")
 
-# ── Client compose files ──────────────────────────────────────────────────────────
+# ── Client compose files — one container per machine ─────────────────────────────
 client_machines = list(inv["clients"]["hosts"].items())
 if n_client_machines > len(client_machines):
     print(f"ERROR: N_CLIENT_MACHINES={n_client_machines} exceeds client hosts in hosts.yml ({len(client_machines)})", file=sys.stderr)
     sys.exit(1)
 active_machines = client_machines[:n_client_machines]
 
-machine_clients = {hostname: [] for hostname, _ in active_machines}
-for i in range(n_clients):
+for i, (hostname, vals) in enumerate(active_machines):
     nid = cli_base + i
-    hostname, vals = active_machines[i % n_client_machines]
     machine_ip = vals["machine_ip"]
-    machine_clients[hostname].append((i, nid, machine_ip))
-
-for hostname, clients in machine_clients.items():
-    services = ""
-    for idx, nid, ip in clients:
-        host_port = 10000 + nid
-        services += f"""  client-{idx}:
+    content = f"""services:
+  client-{i}:
     image: {image}
     ports:
-      - "{host_port}:10000"
+      - "10000:10000"
     volumes:
       - ./config:/usr/app/config
       - ./ca-root:/usr/app/ca-root
@@ -93,7 +89,7 @@ for hostname, clients in machine_clients.items():
     environment:
       ID: {nid}
       OWN_NODE__NODE_ID: {nid}
-      OWN_NODE__IP: "{ip}"
+      OWN_NODE__IP: "{machine_ip}"
       OWN_NODE__HOSTNAME: "cli{nid}"
       OWN_NODE__NODE_TYPE: "Client"
       CLIENT: 1
@@ -101,11 +97,10 @@ for hostname, clients in machine_clients.items():
       RUST_BACKTRACE: full
     restart: "no"
 """
-    content = f"services:\n{services}"
     path = os.path.join(out_dir, f"{hostname}-compose.yml")
     with open(path, "w") as f:
         f.write(content)
-    print(f"  {path} ({len(clients)} client(s))")
+    print(f"  {path} (1 container, N_CLIENTS logical clients from config)")
 
 print(f"Generated {len(inv['replicas']['hosts'])} replica + {n_client_machines} client compose files in {out_dir}/")
 PYEOF

@@ -58,7 +58,8 @@ help:
 	@echo "  clean              Remove all generated files (configs, ca-root, logs)"
 	@echo ""
 	@echo "Key variables (override on command line or in project bench.env):"
-	@echo "  N_REPLICAS=$(N_REPLICAS)  N_CLIENTS=$(N_CLIENTS)  N_CLIENT_MACHINES=$(N_CLIENT_MACHINES)"
+	@echo "  N_REPLICAS=$(N_REPLICAS)  N_CLIENTS=$(N_CLIENTS) (per machine)  N_CLIENT_MACHINES=$(N_CLIENT_MACHINES)"
+	@echo "  Total logical clients = N_CLIENTS x N_CLIENT_MACHINES = $$(( $(N_CLIENTS) * $(N_CLIENT_MACHINES) ))"
 	@echo "  CONCURRENT_RQS=$(CONCURRENT_RQS)  OPS_NUMBER=$(OPS_NUMBER)"
 	@echo ""
 	@echo "Edit $(CONFIG_BASE)/common/influx_db.toml to change InfluxDB target."
@@ -93,13 +94,13 @@ gen-configs: gen-ca-root
 	@$(SED_I) "s|REQUEST_SLEEP_MILLIS_PLACEHOLDER|$(REQUEST_SLEEP_MILLIS)|g" \
 	    $(GENERATED)/config-replicas/benchmark_config.toml \
 	    $(GENERATED)/config-clients/benchmark_config.toml
-	@$(SED_I) "s|CLIENTS_TO_RUN_PLACEHOLDER|$(CLIENTS_TO_RUN)|g" \
+	@$(SED_I) "s|CLIENTS_TO_RUN_PLACEHOLDER|$(N_CLIENTS)|g" \
 	    $(GENERATED)/config-clients/client_config.toml
 	@echo "Configs generated in $(GENERATED)/config-{replicas,clients}/"
 
 # ── Local Docker Compose ──────────────────────────────────────────────────────────
 local: gen-configs
-	@bash $(SCRIPTS)/gen-nodes-toml.sh local $(N_REPLICAS) $(N_CLIENTS) $(N_CLIENT_MACHINES)
+	@bash $(SCRIPTS)/gen-nodes-toml.sh local $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
 	@bash $(SCRIPTS)/gen-local-compose.sh
@@ -119,7 +120,7 @@ logs-local:
 
 # ── Remote Docker ─────────────────────────────────────────────────────────────────
 remote-docker: gen-configs
-	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENTS) $(N_CLIENT_MACHINES)
+	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
 	@bash $(SCRIPTS)/gen-remote-compose.sh
@@ -132,7 +133,7 @@ stop-remote-docker:
 
 # ── Remote Bare ───────────────────────────────────────────────────────────────────
 remote-bare: gen-configs build-binary
-	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENTS) $(N_CLIENT_MACHINES)
+	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
 	@bash $(SCRIPTS)/gen-remote-envs.sh
