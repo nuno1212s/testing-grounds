@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# gen-nodes-toml.sh <local|remote> <N_REPLICAS> <N_CLIENTS> <N_CLIENT_MACHINES>
+# gen-nodes-toml.sh <local|remote> <N_REPLICAS> <N_CLIENT_MACHINES>
 #
 # Generates generated/nodes.toml for the given deployment mode.
-# - local:  uses Docker service names as IPs
-# - remote: reads hosts.yml for IPs; distributes N_CLIENTS round-robin
+# - local:  uses Docker service names as IPs (one client container per machine slot)
+# - remote: reads hosts.yml for IPs; one entry per active client machine
+#
+# N_CLIENTS (logical clients per machine) is a process-level setting baked into
+# client_config.toml — it does not affect the network map here.
 #
 # Reads from environment (exported by shared bench Makefile):
 #   BENCH_DIR  - absolute path to project bench dir (for hosts.yml)
@@ -11,7 +14,7 @@
 #
 # Hostname convention must match ca-root cert names:
 #   Replicas: srv0, srv1, ..., srv{N-1}
-#   Clients:  cli1000, cli1001, ..., cli{1000+N-1}  (CLI_BASE=1000)
+#   Clients:  cli1000, cli1001, ..., cli{1000+N_CLIENT_MACHINES-1}  (CLI_BASE=1000)
 
 set -euo pipefail
 
@@ -20,8 +23,7 @@ set -euo pipefail
 
 MODE=$1
 N_REPLICAS=$2
-N_CLIENTS=$3
-N_CLIENT_MACHINES=$4
+N_CLIENT_MACHINES=$3
 
 HOSTS_YML="$BENCH_DIR/hosts.yml"
 OUT="$GENERATED/nodes.toml"
@@ -33,7 +35,6 @@ import sys
 
 mode = "$MODE"
 n_replicas = int("$N_REPLICAS")
-n_clients = int("$N_CLIENTS")
 n_client_machines = int("$N_CLIENT_MACHINES")
 cli_base = 1000
 
@@ -46,7 +47,7 @@ if mode == "local":
             f'    {{ node_id = {i}, ip = "replica-{i}", port = 10000, '
             f'hostname = "srv{i}", node_type = "Replica" }}'
         )
-    for i in range(n_clients):
+    for i in range(n_client_machines):
         nid = cli_base + i
         client_entries.append(
             f'    {{ node_id = {nid}, ip = "client-{i}", port = 10000, '
@@ -72,9 +73,8 @@ elif mode == "remote":
         sys.exit(1)
     active_machines = client_machines[:n_client_machines]
 
-    for i in range(n_clients):
+    for i, machine in enumerate(active_machines):
         nid = cli_base + i
-        machine = active_machines[i % n_client_machines]
         ip = machine["machine_ip"]
         client_entries.append(
             f'    {{ node_id = {nid}, ip = "{ip}", port = 10000, '
@@ -95,5 +95,5 @@ body = (
 
 with open("$OUT", "w") as f:
     f.write(body)
-print(f"Written $OUT ({n_replicas} replicas, {n_clients} clients in network map)")
+print(f"Written $OUT ({n_replicas} replicas, {n_client_machines} client machines in network map)")
 PYEOF

@@ -10,7 +10,7 @@
 #   IMAGE_NAME       - Docker image tag to build/use locally
 #   BUILD_CTX_ABS    - absolute path to Docker build context (Atlas repo root)
 #   DOCKERFILE_ABS   - absolute path to the shared Dockerfile
-#   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, RUST_LOG, LOCAL_INFLUXDB
+#   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, N_CLIENT_MACHINES, RUST_LOG, LOCAL_INFLUXDB
 
 set -euo pipefail
 
@@ -24,6 +24,7 @@ set -euo pipefail
 : "${APP_SOURCE_DIR:?APP_SOURCE_DIR not set}"
 : "${N_REPLICAS:?N_REPLICAS not set}"
 : "${N_CLIENTS:?N_CLIENTS not set}"
+: "${N_CLIENT_MACHINES:?N_CLIENT_MACHINES not set}"
 : "${RUST_LOG:=INFO}"
 : "${LOCAL_INFLUXDB:=0}"
 
@@ -106,7 +107,8 @@ EOF
   done
 
   # ── Clients ───────────────────────────────────────────────────────────────────
-  for i in $(seq 0 $((N_CLIENTS - 1))); do
+  # One container per client machine; each container runs N_CLIENTS logical clients.
+  for i in $(seq 0 $((N_CLIENT_MACHINES - 1))); do
     NODE_ID=$((CLI_BASE + i))
     HOST_PORT=$((11000 + i))
     cat <<EOF
@@ -160,4 +162,4 @@ VOLFOOTER
   fi
 } > "$OUT"
 
-echo "Written $OUT ($N_REPLICAS replicas, $N_CLIENTS clients)"
+echo "Written $OUT ($N_REPLICAS replicas, $N_CLIENT_MACHINES client containers, $N_CLIENTS logical clients each)"

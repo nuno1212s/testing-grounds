@@ -198,8 +198,7 @@ Per-project bench directories contain only what differs from the global defaults
 |---|---|---|
 | `N_REPLICAS` | `4` | Number of replica processes |
 | `N_CLIENT_MACHINES` | `1` | Number of machines running client processes |
-| `N_CLIENTS` | `1` | Total client processes (distributed round-robin across machines) |
-| `CLIENTS_TO_RUN` | `5` | Logical clients per client process |
+| `N_CLIENTS` | `5` | Logical clients per client machine (total = `N_CLIENTS × N_CLIENT_MACHINES`). Each machine runs one process that spawns this many clients internally. |
 | `CONCURRENT_RQS` | `200` | Max in-flight requests per logical client |
 | `OPS_NUMBER` | `1000000` | Total operations before the client exits |
 | `REQUEST_SLEEP_MILLIS` | `0` | Sleep between requests (ms, 0 = no sleep) |
@@ -280,11 +279,11 @@ clients:
     client-machine-1:
       ansible_host: hostname-or-ip
       ansible_user: nneto
-      machine_ip: 192.168.1.20  # no node_id — assigned automatically from N_CLIENTS
+      machine_ip: 192.168.1.20  # no node_id — assigned automatically (cli_base + index)
 ```
 
 - **Replicas**: one entry per machine, `node_id` must be unique and sequential from 0.
-- **Clients**: one entry per client machine. `N_CLIENTS` processes are distributed round-robin across `N_CLIENT_MACHINES` of the listed hosts (in order). `node_id` is not specified — it is computed as `1000 + i`.
+- **Clients**: one entry per client machine. `N_CLIENT_MACHINES` of the listed hosts are used (in order). Each machine runs one process with `N_CLIENTS` logical clients. `node_id` is not specified — it is computed as `1000 + i`.
 
 ---
 
@@ -313,7 +312,7 @@ clients:
 
 TLS certificates and Ed25519 signing keys are **generated automatically** on the first run of any target that depends on `gen-configs`. They are stored in `bench/generated/ca-root/` and reused for all subsequent runs.
 
-If you change `N_REPLICAS` or `N_CLIENTS`, regenerate:
+If you change `N_REPLICAS` or `N_CLIENT_MACHINES`, regenerate:
 
 ```bash
 make <project> regen-ca-root
