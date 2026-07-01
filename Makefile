@@ -14,7 +14,8 @@ PROJECTS := \
     preemptive_execution \
     microbenchmarks \
     microbenchmark-hotstuff \
-    microbenchmark-chainedhotstuff
+    microbenchmark-chainedhotstuff \
+    crud_perf
 
 MODES := local stop-local logs-local \
          remote-docker stop-remote-docker \
@@ -28,6 +29,7 @@ bench_dir_preemptive_execution           := preemptive_execution/bench
 bench_dir_microbenchmarks                := microbenchmarks/bench
 bench_dir_microbenchmark-hotstuff        := hot_stuff/microbenchmark-hotstuff/bench
 bench_dir_microbenchmark-chainedhotstuff := hot_stuff/microbenchmark-chainedhotstuff/bench
+bench_dir_crud_perf                      := crud_perf/bench
 
 CURRENT_PROJECT := $(firstword $(filter $(PROJECTS), $(MAKECMDGOALS)))
 GLOBAL_BENCH_DIR := $(CURDIR)/bench
