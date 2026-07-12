@@ -6,6 +6,7 @@ use atlas_smr_application::app::{Application, Reply, Request};
 
 use crate::serialize::{Key, MicrobenchmarkData, PEReply, PERequest, PERequestType, State};
 
+#[derive(Clone)]
 pub struct Microbenchmark {
     id: NodeId,
 }

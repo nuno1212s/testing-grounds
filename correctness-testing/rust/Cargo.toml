@@ -1,0 +1,68 @@
+[package]
+name = "correctness-testing"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# In-process, protocol-agnostic fault-injection harness for Atlas ordering protocols.
+# Runs a whole BFT cluster (N replicas + clients) as threads in ONE process over a
+# custom in-memory "chaos" transport, so faults can be injected at exact protocol
+# phases. Tests MUST be run with `cargo nextest run` (each #[test] = own process),
+# because atlas-common holds process-global OnceLock singletons that cannot be reset.
+
+[lib]
+name = "correctness_testing"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "*"
+serde = { version = "*", features = ["derive"] }
+bincode = "2"
+tracing = "*"
+tracing-subscriber = { version = "*", features = ["std", "registry", "fmt", "env-filter"] }
+enum-map = "2"
+
+# Foundation
+atlas-common = { path = "../../../Atlas/Atlas-Common" }
+atlas-communication = { path = "../../../Atlas/Atlas-Communication" }
+atlas-metrics = { path = "../../../Atlas/Atlas-Metrics" }
+
+# Protocol core
+atlas-core = { path = "../../../Atlas/Atlas-Core" }
+atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
+
+# Logging / state transfer
+atlas-logging-core = { path = "../../../Atlas/Atlas-Logging-Core" }
+atlas-persistent-log = { path = "../../../Atlas/Atlas-Persistent-Log" }
+atlas-log-transfer = { path = "../../../Atlas/Atlas-Log-Transfer", features = ["serialize_serde"] }
+atlas-decision-log = { path = "../../../Atlas/Atlas-Decision-Log", features = ["serialize_serde"] }
+atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = ["serialize_serde"] }
+
+# SMR stack
+atlas-smr-application = { path = "../../../Atlas/Atlas-SMR-Application" }
+atlas-smr-core = { path = "../../../Atlas/Atlas-SMR-Core" }
+atlas-smr-replica = { path = "../../../Atlas/Atlas-SMR-Replica" }
+atlas-smr-execution = { path = "../../../Atlas/Atlas-SMR-Execution" }
+atlas-client = { path = "../../../Atlas/Atlas-Client" }
+
+# febft ordering + state transfer, and hot-iron-oxide (HotIron + IronChain) — all in one build.
+# FEATURE PIN (F3): serialize_serde only; never serialize_capnp.
+febft-pbft-consensus = { path = "../../../febft/febft-pbft-consensus", features = ["serialize_serde"] }
+febft-state-transfer = { path = "../../../febft/febft-state-transfer", features = ["serialize_serde"] }
+hot-iron-oxide = { path = "../../../hot-iron-oxide", features = ["serialize_serde"] }
+
+[dev-dependencies]
+
+[profile.dev]
+# Consensus is timing-sensitive; a fully unoptimized build can be too slow and
+# provoke spurious view-change timeouts even with no injected faults.
+opt-level = 1
+# REQUIRED: febft (and other Atlas crates) are only ever run in release, where
+# overflow-checks are off. They contain latent unchecked subtractions that wrap
+# harmlessly there but PANIC under dev's default overflow checks — e.g. the febft
+# proposer's `global_batch_time_limit - elapsed` (proposer/mod.rs:374) underflows the
+# moment the proposer idles past one batch window, killing all proposing. Match the
+# crates' intended runtime semantics so scenarios exercise real behavior, not a
+# debug-only panic. Applies to dependencies too (default dev profile scope).
+overflow-checks = false

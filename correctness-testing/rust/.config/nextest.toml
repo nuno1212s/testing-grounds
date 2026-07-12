@@ -1,0 +1,22 @@
+# nextest configuration for the correctness-testing harness.
+#
+# Scenarios provoke timeout-driven view changes, so tests can legitimately take a few
+# seconds. But a genuinely wedged cluster (deadlocked bootstrap, a protocol that never
+# decides) must FAIL rather than hang the suite — so we terminate any test that runs
+# past a hard ceiling.
+
+[profile.default]
+# Each scenario runs a whole 5-node BFT cluster in ONE process (~35+ OS threads for the
+# replicas' protocol/proposer/log/timeout threads, plus the shared pool). Running many
+# such processes at once oversubscribes the CPU and stalls latency-sensitive consensus
+# timeouts — so cap parallelism. The suite is small and each test is sub-second, so this
+# stays fast. Run serially: each scenario spins a full 5-node in-process cluster, and a
+# finished test can leave protocol threads briefly spinning during teardown (disconnected-
+# channel loops) that starve a concurrent heavy bootstrap — IronChain's in particular. The
+# suite is only a handful of sub-second tests, so serial execution is both reliable and
+# quick. Raise this if teardown is made fully joinable.
+test-threads = 1
+# Warn once a test has run this long...
+slow-timeout = { period = "20s", terminate-after = 6 }
+# ...i.e. kill it after 20s * 6 = 120s. Bring-up + one request completes in well under
+# a second; this ceiling only trips on a real hang.
