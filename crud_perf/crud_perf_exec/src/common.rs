@@ -19,7 +19,6 @@ use atlas_smr_core::networking::client::{CLINodeWrapper, SMRClientNetworkNode};
 use atlas_smr_core::networking::{ReplicaNodeWrapper, SMRReplicaNetworkNode};
 use atlas_smr_core::request_pre_processing::RequestPreProcessor;
 use atlas_smr_core::serialize::{SMRSysMsg, Service, StateSys};
-use atlas_smr_preemptive_execution::MonolithicPreemptiveExecutor;
 use atlas_smr_replica::config::{MonolithicStateReplicaConfig, ReplicaConfig};
 use atlas_smr_replica::server::monolithic_server::MonReplica;
 use atlas_view_transfer::SimpleViewTransferProtocol;
@@ -162,7 +161,10 @@ pub type OrderProtocol = PBFTOrderProtocol<
     RequestPreProcessor<SMRReq<MicrobenchmarkData>>,
     ProtocolNetwork,
 >;
-pub type Executor = MonolithicPreemptiveExecutor;
+// Which executor is compiled in, and everything specific to it, lives in
+// `crate::executor_variant` -- one module per variant.
+pub use crate::executor_variant::Executor;
+
 pub type ExecutorHandle =
     SMRExecWrapper<<Executor as TExecutor<Microbenchmark, State>>::ExecutionHandle>;
 

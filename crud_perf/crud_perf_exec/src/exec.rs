@@ -9,7 +9,10 @@ use atlas_metrics::metrics::{
 use atlas_smr_application::app::{Application, Reply, Request};
 
 use crate::metric::{CRUD_BATCH_EXEC_TIME_ID, CRUD_OP_EXEC_TIME_ID, CRUD_OPS_PER_BATCH_ID};
-use crate::serialize::{CRUDReply, CRUDRequest, CRUDRequestType, MicrobenchmarkData, State};
+use crate::serialize::{
+    CRUD_COLUMN, CRUDReply, CRUDRequest, CRUDRequestType, MicrobenchmarkData, State,
+};
+use atlas_smr_preemptive_execution::{CRUDApplication, CRUDState};
 
 #[derive(Clone)]
 pub struct Microbenchmark {
@@ -92,6 +95,52 @@ impl Application<State> for Microbenchmark {
         metric_store_count(CRUD_OPS_PER_BATCH_ID, batch_len);
 
         reply_batch
+    }
+}
+
+impl CRUDApplication<State> for Microbenchmark {
+    /// Speculative counterpart to [`Application::update`].
+    ///
+    /// This must produce byte-identical replies and state effects to `update`, or speculation
+    /// diverges from the confirmed execution and the executor backtracks (or worse, silently
+    /// disagrees). Two things are deliberate here:
+    ///
+    /// - `Create` routes through `CRUDState::update`, not `CRUDState::create`. `update`'s
+    ///   `handle_write` uses overwrite-insert semantics and returns the previous value, whereas
+    ///   `CRUDState::create` is insert-if-absent returning a `bool`. Using `create` would both
+    ///   change the reply and diverge on an already-present key.
+    /// - The `time_delay` sleep is applied here too. It models the application's own work; if
+    ///   speculation skipped it, speculative execution would look artificially fast and bias
+    ///   the very comparison this benchmark exists to make.
+    fn speculatively_execute(
+        &self,
+        state: &mut impl CRUDState,
+        request: Request<Self, State>,
+    ) -> Reply<Self, State> {
+        let sleep_duration = request.time_delay();
+        let start = metric_local_duration_start();
+
+        let reply = match request.into_request_type() {
+            CRUDRequestType::Read { key } => CRUDReply::ReadResult {
+                data: state.read(CRUD_COLUMN, &key.to_bytes()),
+            },
+            CRUDRequestType::Create { key, data } | CRUDRequestType::Update { key, data } => {
+                CRUDReply::WriteResult {
+                    previous_value: state.update(CRUD_COLUMN, &key.to_bytes(), &data),
+                }
+            }
+            CRUDRequestType::Delete { key } => CRUDReply::DeleteResult {
+                previous_value: state.delete(CRUD_COLUMN, &key.to_bytes()),
+            },
+        };
+
+        metric_local_duration_end(CRUD_OP_EXEC_TIME_ID, start);
+
+        if sleep_duration > Duration::ZERO {
+            std::thread::sleep(sleep_duration);
+        }
+
+        reply
     }
 }
 

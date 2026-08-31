@@ -10,6 +10,7 @@ mod collision;
 mod common;
 mod config;
 mod exec;
+mod executor_variant;
 mod metric;
 mod replica;
 mod serialize;

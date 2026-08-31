@@ -3,6 +3,17 @@ name = "crud_perf_exec"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Exactly one executor variant must be selected; they are mutually exclusive because each
+# defines the `Executor` type alias. Selecting a non-default one requires
+# --no-default-features, e.g.:
+#   cargo build --release --no-default-features --features crud_scalable
+default = ["crud_single"]
+dual_state = []
+crud_single = []
+crud_scalable = []
+baseline = []
+
 [dependencies]
 anyhow = "1.0"
 serde = "*"
@@ -32,6 +43,7 @@ atlas-persistent-log = { path = "../../../Atlas/Atlas-Persistent-Log" }
 atlas-log-transfer = { path = "../../../Atlas/Atlas-Log-Transfer", features = ["serialize_serde"] }
 atlas-decision-log = { path = "../../../Atlas/Atlas-Decision-Log", features = ["serialize_serde"] }
 atlas-smr-preemptive-execution = { path = "../../../Atlas/Atlas-SMR-Preemptive-Execution" }
+atlas-smr-execution = { path = "../../../Atlas/Atlas-SMR-Execution" }
 atlas-view-transfer = { path = "../../../Atlas/Atlas-View-Transfer", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../../Atlas/Atlas-Reconfiguration" }
 atlas-default-configs = { path = "../../../Atlas/Atlas-Tools/atlas-default-configs" }

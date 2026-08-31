@@ -9,11 +9,15 @@ use tracing::{error, info};
 use atlas_comm_mio::config::MIOConfig;
 use atlas_common::async_runtime;
 use atlas_common::ordering::SeqNo;
+use atlas_core::metric::{RQ_BATCH_TRACKING_ID, RQ_CLIENT_TRACKING_ID};
 use atlas_decision_log::config::DecLogConfig;
 use atlas_default_configs::crypto::FlattenedPathConstructor;
 use atlas_default_configs::{get_network_configurations, get_reconfig_config};
 use atlas_log_transfer::config::LogTransferConfig;
-use atlas_metrics::{InfluxDBArgs, MetricLevel, with_metric_level, with_metrics};
+use atlas_metrics::{
+    InfluxDBArgs, MetricLevel, MetricRegistry, override_metric_levels, with_metric_level,
+    with_metrics,
+};
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use atlas_smr_replica::server::monolithic_server::MonReplica;
 use atlas_view_transfer::config::ViewTransferConfig;
@@ -68,15 +72,28 @@ pub fn init_mon_replica_conf(
     })
 }
 
+/// Raises the per-request correlation trackers above `MetricLevel::Disabled`.
+///
+/// `atlas-core` registers `RQ_CLIENT_TRACKING` (32) and `RQ_BATCH_TRACKING` (33) as `Disabled`,
+/// so they emit nothing by default -- and they are what carry the per-request end-to-end
+/// latency breakdown this benchmark exists to measure.
+fn enable_request_tracking(metrics: Vec<MetricRegistry>) -> Vec<MetricRegistry> {
+    override_metric_levels(
+        metrics,
+        &[RQ_CLIENT_TRACKING_ID, RQ_BATCH_TRACKING_ID],
+        MetricLevel::Debug,
+    )
+}
+
 pub(super) fn setup_metrics(influx: InfluxDBArgs) {
     atlas_metrics::initialize_metrics(
         vec![
             with_metrics(febft_pbft_consensus::bft::metric::metrics()),
-            with_metrics(atlas_core::metric::metrics()),
+            with_metrics(enable_request_tracking(atlas_core::metric::metrics())),
             with_metrics(atlas_communication::metric::metrics()),
             with_metrics(atlas_smr_replica::metric::metrics()),
             with_metrics(atlas_smr_core::metric::metrics()),
-            with_metrics(atlas_smr_preemptive_execution::metric::metrics()),
+            with_metrics(crate::executor_variant::metrics()),
             with_metrics(atlas_log_transfer::metrics::metrics()),
             with_metrics(febft_state_transfer::metrics::metrics()),
             with_metrics(atlas_view_transfer::metrics::metrics()),
@@ -102,7 +119,22 @@ pub(super) fn run_replica() {
     )
     .unwrap();
 
-    setup_metrics(influx.into());
+    let mut influx: InfluxDBArgs = influx.into();
+
+    // Stamp the run with the executor that was actually compiled in, unless the deployment
+    // set INFLUX_EXTRA explicitly. Every variant writes to the same InfluxDB, so an unlabelled
+    // or mislabelled run is indistinguishable from the others at analysis time.
+    if influx.extra.is_none() {
+        influx.extra = Some(crate::executor_variant::NAME.to_string());
+    }
+
+    info!(
+        executor_variant = crate::executor_variant::NAME,
+        influx_extra = ?influx.extra,
+        "Starting replica"
+    );
+
+    setup_metrics(influx);
 
     let _log_guard = generate_log(node_id.0);
 
