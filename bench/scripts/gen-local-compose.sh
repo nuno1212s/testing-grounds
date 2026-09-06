@@ -11,6 +11,17 @@
 #   BUILD_CTX_ABS    - absolute path to Docker build context (Atlas repo root)
 #   DOCKERFILE_ABS   - absolute path to the shared Dockerfile
 #   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, N_CLIENT_MACHINES, RUST_LOG, LOCAL_INFLUXDB
+#
+# WAN emulation (optional, see bench/wan-profiles/ and bench/README.md):
+#   WAN_ENABLED=1 additionally emits, per shaped node, cap_add: [NET_ADMIN], a
+#   static ipv4_address, the /wan spec mount and WAN_NODE/WAN_IFACE, and selects
+#   the `final-wan` build target. With WAN_ENABLED=0 (the default) the output is
+#   byte-identical to what this script produced before WAN support existed.
+#
+#   WAN_SUBNET        - subnet for static addressing (default 10.90.0.0/24)
+#   WAN_IFACE         - interface shaped inside the container (default eth0)
+#   WAN_SHAPE_CLIENTS - 0 to shape replica<->replica links only
+#   IMAGE_NAME_EFFECTIVE - image tag to use (Makefile sets <IMAGE_NAME>-wan in WAN mode)
 
 set -euo pipefail
 
@@ -27,11 +38,28 @@ set -euo pipefail
 : "${N_CLIENT_MACHINES:?N_CLIENT_MACHINES not set}"
 : "${RUST_LOG:=INFO}"
 : "${LOCAL_INFLUXDB:=0}"
+: "${WAN_ENABLED:=0}"
+: "${WAN_SUBNET:=10.90.0.0/24}"
+: "${WAN_IFACE:=eth0}"
+: "${WAN_SHAPE_CLIENTS:=1}"
+
+IMAGE="${IMAGE_NAME_EFFECTIVE:-$IMAGE_NAME}"
 
 OUT="$GENERATED/local-compose.yml"
 mkdir -p "$GENERATED/logs"
 
 _sed_i() { if [ "$(uname)" = "Darwin" ]; then sed -i '' "$@"; else sed -i "$@"; fi; }
+
+# Static address for a node, by offset within WAN_SUBNET. Offsets match gen-wan.py:
+# influxdb .5, replica-i .10+i, client-i .100+i.
+_wan_ip() {
+  python3 -c "import ipaddress,sys; print(ipaddress.ip_network(sys.argv[1])[int(sys.argv[2])])" \
+    "$WAN_SUBNET" "$1"
+}
+
+if [ "$WAN_ENABLED" = "1" ]; then
+  mkdir -p "$GENERATED/wan"
+fi
 
 if [ "$LOCAL_INFLUXDB" = "1" ]; then
   for f in "$GENERATED/config-replicas/influx_db.toml" \
@@ -63,6 +91,9 @@ HEADER
         aliases:
           - influxdb
 INFLUX
+    if [ "$WAN_ENABLED" = "1" ]; then
+      echo "        ipv4_address: $(_wan_ip 5)"
+    fi
   fi
 
   CLI_BASE=1000
@@ -72,10 +103,13 @@ INFLUX
     HOST_PORT=$((10000 + i))
     cat <<EOF
   replica-${i}:
-    image: ${IMAGE_NAME}
+    image: ${IMAGE}
     build:
       context: ${BUILD_CTX_ABS}
       dockerfile: ${DOCKERFILE_ABS}
+EOF
+    [ "$WAN_ENABLED" = "1" ] && echo "      target: final-wan"
+    cat <<EOF
       args:
         APP_NAME: ${BINARY_NAME}
         APP_SOURCE_DIR: ${APP_SOURCE_DIR}
@@ -90,6 +124,9 @@ INFLUX
       - ${GENERATED}/config-replicas:/usr/app/config
       - ${GENERATED}/ca-root:/usr/app/ca-root
       - ${GENERATED}/logs:/usr/app/logs
+EOF
+    [ "$WAN_ENABLED" = "1" ] && echo "      - ${GENERATED}/wan:/wan:ro"
+    cat <<EOF
     environment:
       ID: ${i}
       OWN_NODE__NODE_ID: ${i}
@@ -98,12 +135,23 @@ INFLUX
       OWN_NODE__NODE_TYPE: "Replica"
       RUST_LOG: "${RUST_LOG}"
       RUST_BACKTRACE: full
+EOF
+    if [ "$WAN_ENABLED" = "1" ]; then
+      cat <<EOF
+      WAN_NODE: "replica-${i}"
+      WAN_IFACE: "${WAN_IFACE}"
+    cap_add:
+      - NET_ADMIN
+EOF
+    fi
+    cat <<EOF
     restart: on-failure
     networks:
       atlas_network:
         aliases:
           - replica-${i}
 EOF
+    [ "$WAN_ENABLED" = "1" ] && echo "        ipv4_address: $(_wan_ip $((10 + i)))"
   done
 
   # ── Clients ───────────────────────────────────────────────────────────────────
@@ -111,12 +159,19 @@ EOF
   for i in $(seq 0 $((N_CLIENT_MACHINES - 1))); do
     NODE_ID=$((CLI_BASE + i))
     HOST_PORT=$((11000 + i))
+    # Clients are shaped only when WAN_SHAPE_CLIENTS=1; they still need a static
+    # address either way, so the replicas' destination-IP filters keep matching.
+    CLIENT_SHAPED=0
+    if [ "$WAN_ENABLED" = "1" ] && [ "$WAN_SHAPE_CLIENTS" = "1" ]; then CLIENT_SHAPED=1; fi
     cat <<EOF
   client-${i}:
-    image: ${IMAGE_NAME}
+    image: ${IMAGE}
     build:
       context: ${BUILD_CTX_ABS}
       dockerfile: ${DOCKERFILE_ABS}
+EOF
+    [ "$WAN_ENABLED" = "1" ] && echo "      target: final-wan"
+    cat <<EOF
       args:
         APP_NAME: ${BINARY_NAME}
         APP_SOURCE_DIR: ${APP_SOURCE_DIR}
@@ -131,6 +186,9 @@ EOF
       - ${GENERATED}/config-clients:/usr/app/config
       - ${GENERATED}/ca-root:/usr/app/ca-root
       - ${GENERATED}/logs:/usr/app/logs
+EOF
+    [ "$CLIENT_SHAPED" = "1" ] && echo "      - ${GENERATED}/wan:/wan:ro"
+    cat <<EOF
     environment:
       ID: ${NODE_ID}
       OWN_NODE__NODE_ID: ${NODE_ID}
@@ -140,12 +198,23 @@ EOF
       CLIENT: 1
       RUST_LOG: "${RUST_LOG}"
       RUST_BACKTRACE: full
+EOF
+    if [ "$CLIENT_SHAPED" = "1" ]; then
+      cat <<EOF
+      WAN_NODE: "client-${i}"
+      WAN_IFACE: "${WAN_IFACE}"
+    cap_add:
+      - NET_ADMIN
+EOF
+    fi
+    cat <<EOF
     restart: on-failure
     networks:
       atlas_network:
         aliases:
           - client-${i}
 EOF
+    [ "$WAN_ENABLED" = "1" ] && echo "        ipv4_address: $(_wan_ip $((100 + i)))"
   done
 
   cat <<'NETFOOTER'
@@ -162,4 +231,8 @@ VOLFOOTER
   fi
 } > "$OUT"
 
-echo "Written $OUT ($N_REPLICAS replicas, $N_CLIENT_MACHINES client containers, $N_CLIENTS logical clients each)"
+if [ "$WAN_ENABLED" = "1" ]; then
+  echo "Written $OUT ($N_REPLICAS replicas, $N_CLIENT_MACHINES client containers, $N_CLIENTS logical clients each) [WAN: $WAN_SUBNET, image $IMAGE]"
+else
+  echo "Written $OUT ($N_REPLICAS replicas, $N_CLIENT_MACHINES client containers, $N_CLIENTS logical clients each)"
+fi

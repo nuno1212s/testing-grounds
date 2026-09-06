@@ -21,7 +21,13 @@ PROJECTS := \
 MODES := local stop-local logs-local \
          remote-docker stop-remote-docker \
          remote-bare stop-remote-bare \
-         build-binary gen-configs clean help
+         build-binary gen-configs \
+         wan-check wan-plan wan-show wan-apply \
+         clean clean-docker clean-cargo distclean help
+
+# Cleanup targets that act on the shared/global bench dir and can run without a
+# project named (naming one additionally purges that project's image / target/).
+PROJECT_FREE := clean clean-docker distclean help
 
 # Mapping: project name → bench dir (relative to this Makefile's directory)
 bench_dir_microbenchmarks-async          := microbenchmarks-async/bench
@@ -43,7 +49,19 @@ SHARED_MAKEFILE  := $(GLOBAL_BENCH_DIR)/Makefile
 $(PROJECTS): ;
 
 $(MODES):
-	@if [ -z "$(CURRENT_PROJECT)" ]; then \
+	@if [ -n "$(CURRENT_PROJECT)" ]; then \
+	    PROJECT_BENCH="$(CURDIR)/$(bench_dir_$(CURRENT_PROJECT))"; \
+	    if [ ! -d "$$PROJECT_BENCH" ]; then \
+	        echo "ERROR: bench dir not found: $$PROJECT_BENCH"; \
+	        echo "Create $(bench_dir_$(CURRENT_PROJECT))/bench.env with project identity variables."; \
+	        exit 1; \
+	    fi; \
+	    $(MAKE) -f $(SHARED_MAKEFILE) $@ \
+	        GLOBAL_BENCH_DIR=$(GLOBAL_BENCH_DIR) \
+	        PROJECT_BENCH_DIR=$$PROJECT_BENCH; \
+	elif [ -n "$(filter $@,$(PROJECT_FREE))" ]; then \
+	    $(MAKE) -f $(SHARED_MAKEFILE) $@ GLOBAL_BENCH_DIR=$(GLOBAL_BENCH_DIR); \
+	else \
 	    echo "Usage: make <project> <target> [VAR=value ...]"; \
 	    echo ""; \
 	    echo "Projects:"; \
@@ -52,12 +70,3 @@ $(MODES):
 	    echo "Targets: $(MODES)"; \
 	    exit 1; \
 	fi
-	@PROJECT_BENCH="$(CURDIR)/$(bench_dir_$(CURRENT_PROJECT))"; \
-	if [ ! -d "$$PROJECT_BENCH" ]; then \
-	    echo "ERROR: bench dir not found: $$PROJECT_BENCH"; \
-	    echo "Create $(bench_dir_$(CURRENT_PROJECT))/bench.env with project identity variables."; \
-	    exit 1; \
-	fi; \
-	$(MAKE) -f $(SHARED_MAKEFILE) $@ \
-	    GLOBAL_BENCH_DIR=$(GLOBAL_BENCH_DIR) \
-	    PROJECT_BENCH_DIR=$$PROJECT_BENCH
