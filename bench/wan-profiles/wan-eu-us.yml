@@ -1,0 +1,26 @@
+# wan-eu-us — the simplest interesting WAN: one transatlantic link.
+#
+# With the default N_REPLICAS=4 this puts 2 replicas on each side, so no single
+# region holds a quorum (2f+1 = 3 of 4) and every decision must cross the
+# Atlantic. Clients sit in eu-west, next to the leader.
+
+defaults:
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 1gbit
+
+placement:
+  "replica-0": eu-west
+  "replica-1": eu-west
+  "replica-2": us-east
+  "replica-3": us-east
+  "client-*": eu-west
+
+intra_region:
+  rtt_ms: 0.5
+
+links:
+  - { a: eu-west, b: us-east, rtt_ms: 78, jitter_ms: 3, loss_pct: 0.01 }
+
+overrides: []
+schedule: []

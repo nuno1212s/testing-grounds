@@ -1,0 +1,35 @@
+# lossy-wan — a deliberately bad network: high jitter, real loss, a narrow pipe.
+#
+# For liveness and timeout testing rather than throughput numbers. Expect view
+# changes. If the run stalls, raise WAN_TIMEOUT_SCALE (the protocol timeouts in
+# config-base assume a LAN) before concluding the protocol is at fault:
+#
+#   make <project> local WAN_ENABLED=1 WAN_PROFILE=lossy-wan WAN_TIMEOUT_SCALE=4
+#
+# loss_pct is a ROUND-TRIP figure; gen-wan.py splits it exactly across the two
+# directions (p = 1 - sqrt(1 - L)), so 2% here really is 2% per round trip.
+
+defaults:
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 100mbit
+
+placement:
+  "replica-0": eu-west
+  "replica-1": eu-west
+  "replica-2": us-east
+  "replica-3": ap-south
+  "client-*": eu-west
+
+intra_region:
+  rtt_ms: 2
+  jitter_ms: 1
+  loss_pct: 0.1
+
+links:
+  - { a: eu-west, b: us-east,  rtt_ms: 120, jitter_ms: 40, loss_pct: 1.0 }
+  - { a: eu-west, b: ap-south, rtt_ms: 220, jitter_ms: 60, loss_pct: 2.0, rate: 50mbit }
+  - { a: us-east, b: ap-south, rtt_ms: 300, jitter_ms: 80, loss_pct: 3.0, rate: 50mbit }
+
+overrides: []
+schedule: []

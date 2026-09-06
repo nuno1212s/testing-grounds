@@ -1,0 +1,34 @@
+# wan-global-3region — three continents, AWS-like inter-region RTTs.
+#
+# The default profile. With N_REPLICAS=4, eu-west holds 2 of 4 replicas, so a
+# quorum (3) always needs at least one intercontinental hop. Contains one
+# deliberately asymmetric link (see overrides) to exercise the asymmetric path.
+
+defaults:
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 1gbit
+
+placement:
+  "replica-0": eu-west
+  "replica-1": eu-west
+  "replica-2": us-east
+  "replica-3": ap-south
+  "client-*": eu-west
+
+intra_region:
+  rtt_ms: 1
+  jitter_ms: 0.2
+
+links:
+  - { a: eu-west, b: us-east,  rtt_ms: 78,  jitter_ms: 4,  loss_pct: 0.01 }
+  - { a: eu-west, b: ap-south, rtt_ms: 125, jitter_ms: 8,  loss_pct: 0.05 }
+  - { a: us-east, b: ap-south, rtt_ms: 198, jitter_ms: 10, loss_pct: 0.05 }
+
+overrides:
+  # Asymmetric: replica-2 -> replica-3 is routed the long way round, while the
+  # reverse direction keeps the region default. owd_ms is taken verbatim (no
+  # halving), which is how one direction is pinned independently of the other.
+  - { from: "replica-2", to: "replica-3", owd_ms: 200, owd_jitter_ms: 10 }
+
+schedule: []

@@ -1,0 +1,20 @@
+# none — the control profile. Every link is zero-delay, zero-loss, unthrottled.
+#
+# Use it to prove the WAN harness itself costs nothing: a run with
+# WAN_ENABLED=1 WAN_PROFILE=none must match a WAN_ENABLED=0 run within noise.
+# If it does not, the overhead is in the tc/HTB path, not in your protocol.
+
+defaults:
+  rtt_ms: 0
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 10gbit
+
+placement:
+  "replica-*": everywhere
+  "client-*": everywhere
+
+intra_region: { rtt_ms: 0 }
+links: []
+overrides: []
+schedule: []
