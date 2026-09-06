@@ -106,6 +106,10 @@ make microbenchmarks-async remote-bare
 # Stop a running local deployment
 make microbenchmarks-async stop-local
 
+# Emulate a WAN locally (latency/jitter/loss between containers)
+make microbenchmarks-async wan-check    # once: verify the kernel has netem
+make microbenchmarks-async local WAN_ENABLED=1 WAN_PROFILE=wan-global-3region
+
 # Regenerate configs after changing N_REPLICAS
 make microbenchmarks-async gen-configs
 ```
@@ -131,10 +135,12 @@ make microbenchmarks-async gen-configs
 | `OPS_NUMBER` | `1000000` | Total operations before client exits |
 | `REQUEST_SIZE` | `0` | Request payload size in bytes |
 | `RUST_LOG` | `INFO` | Log filter for all processes |
+| `WAN_ENABLED` | `0` | `1` emulates a WAN between containers in `local` mode |
+| `WAN_PROFILE` | `wan-global-3region` | Topology profile from `bench/wan-profiles/` |
 
 ### Deployment Modes
 
-- **`local`** — Docker Compose on the local machine. Configs and PKI certificates are volume-mounted.
+- **`local`** — Docker Compose on the local machine. Configs and PKI certificates are volume-mounted. Optionally emulates a WAN (per-link latency, jitter, loss, bandwidth caps) via `WAN_ENABLED=1` — see [bench/README.md](bench/README.md#wan-emulation).
 - **`remote-docker`** — Push Docker images to a remote cluster via Ansible. Requires a pre-built image and a populated `hosts.yml`.
 - **`remote-bare`** — Cross-compile a native Rust binary and deploy it directly via Ansible. No Docker required on remote hosts.
 

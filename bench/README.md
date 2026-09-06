@@ -14,10 +14,10 @@ This directory is the single shared benchmarking layer for all projects in `test
    - [Global bench.env](#global-benchenv)
    - [Per-project bench.env](#per-project-benchenv)
    - [hosts.yml](#hostsyml)
-6. [Adding a New Project](#adding-a-new-project)
-7. [PKI / ca-root Generation](#pki--ca-root-generation)
-8. [Generated Output](#generated-output)
-9. [Variable Reference](#variable-reference)
+6. [WAN Emulation](#wan-emulation)
+7. [Adding a New Project](#adding-a-new-project)
+8. [PKI / ca-root Generation](#pki--ca-root-generation)
+9. [Generated Output](#generated-output)
 
 ---
 
@@ -43,6 +43,11 @@ make microbenchmarks-async stop-local
 
 # Regenerate configs (e.g. after changing N_REPLICAS in bench.env)
 make microbenchmarks-async gen-configs
+
+# Emulate a WAN locally: check the kernel once, preview the topology, then run
+make microbenchmarks-async wan-check
+make microbenchmarks-async wan-plan WAN_PROFILE=wan-global-3region
+make microbenchmarks-async local WAN_ENABLED=1 WAN_PROFILE=wan-global-3region
 
 # Force-regenerate TLS/signing certificates
 make microbenchmarks-async regen-ca-root
@@ -83,6 +88,10 @@ make <project> <target> [VAR=value ...]
 | `build-binary` | Compile the Rust binary only (used by `remote-bare`) |
 | `gen-configs` | Generate config files and ca-root into `generated/` |
 | `gen-ca-root` | Generate PKI certificates only (skips if already present) |
+| `wan-check` | Verify this host's kernel supports netem (run once, before first WAN use) |
+| `wan-plan` | Compile the WAN profile and print the latency matrix (no containers) |
+| `wan-show` | Show live `tc` stats inside the running containers |
+| `wan-apply` | Re-apply the WAN profile to an already-running cluster |
 | `regen-ca-root` | Delete and regenerate PKI certificates |
 | `clean` | Remove all generated output (`bench/generated/`) |
 | `help` | Print target summary and current variable values |
@@ -102,6 +111,9 @@ make microbenchmarks-async local N_REPLICAS=7 N_CLIENTS=10 RUST_LOG=DEBUG
 Builds a Docker image from the shared `bench/Dockerfile` using the project's source tree, creates a Docker network (`atlas_network`), and starts one container per replica and one per client. Configs and ca-root are volume-mounted from `bench/generated/` — no files are baked into the image.
 
 The network is torn down automatically when the Compose stack exits.
+
+Local mode can additionally emulate a WAN — per-link latency, jitter, loss and
+bandwidth caps between containers. See [WAN Emulation](#wan-emulation).
 
 ```bash
 make microbenchmarks-async local
@@ -155,10 +167,19 @@ testing-grounds/
     │       ├── benchmark_config.toml
     │       ├── client_config.toml
     │       └── ...
+    ├── wan-profiles/               WAN topology profiles (see WAN Emulation)
+    │   ├── none.yml                zero-delay control profile
+    │   ├── lan.yml
+    │   ├── wan-eu-us.yml
+    │   ├── wan-global-3region.yml
+    │   ├── wan-global-5region.yml
+    │   └── lossy-wan.yml
     ├── scripts/
     │   ├── gen-ca-root.sh          generate PKI certificates into generated/ca-root/
     │   ├── gen-nodes-toml.sh       generate generated/nodes.toml
     │   ├── gen-local-compose.sh    generate generated/local-compose.yml
+    │   ├── gen-wan.py              compile a WAN profile into per-node tc scripts
+    │   ├── wan-entrypoint.sh       baked into the final-wan image; applies tc, execs server
     │   ├── gen-remote-compose.sh   generate generated/per-machine/*-compose.yml
     │   └── gen-remote-envs.sh      generate generated/envs/ (bare deployment identities)
     ├── playbooks/
@@ -208,6 +229,12 @@ Per-project bench directories contain only what differs from the global defaults
 | `CA_ROOT_FORMAT` | `flattened` | PKI layout: `flattened` or `folder` (see [PKI section](#pki--ca-root-generation)) |
 | `LOCAL_INFLUXDB` | `0` | Set to `1` to spin up a local InfluxDB 1.8 container |
 | `RUST_LOG` | `INFO` | Rust log filter passed to all containers/processes |
+| `WAN_ENABLED` | `0` | `1` enables tc/netem WAN emulation (see [WAN Emulation](#wan-emulation)) |
+| `WAN_PROFILE` | `wan-global-3region` | Profile basename in `bench/wan-profiles/` |
+| `WAN_SUBNET` | `10.90.0.0/24` | Subnet for static container IPs (WAN mode only) |
+| `WAN_IFACE` | `eth0` | Interface shaped inside each container |
+| `WAN_SHAPE_CLIENTS` | `1` | `0` shapes replica↔replica links only |
+| `WAN_TIMEOUT_SCALE` | `1` | Multiplies `timeout_duration` in the generated configs |
 | `ANSIBLE_USER` | `nneto` | SSH user for Ansible remote deployments |
 | `REMOTE_WORKDIR` | `/home/nneto/atlas-bench` | Working directory on remote hosts |
 
@@ -284,6 +311,171 @@ clients:
 
 - **Replicas**: one entry per machine, `node_id` must be unique and sequential from 0.
 - **Clients**: one entry per client machine. `N_CLIENT_MACHINES` of the listed hosts are used (in order). Each machine runs one process with `N_CLIENTS` logical clients. `node_id` is not specified — it is computed as `1000 + i`.
+
+---
+
+## WAN Emulation
+
+`make <project> local` normally runs every node on one Docker bridge, where each link
+is a ~0.1 ms loopback. WAN emulation injects realistic per-link **latency, jitter,
+packet loss and bandwidth caps** between containers using `tc`/`netem`, so
+geographically distributed deployments can be studied locally.
+
+It is **off by default and inert when off**: with `WAN_ENABLED=0` the generated
+`local-compose.yml` is byte-identical to what it was before this feature existed, and
+containers run the same distroless image as always.
+
+### Before first use: `wan-check`
+
+netem is a kernel module (`sch_netem`). Some container VMs ship without it, and
+nothing else in the stack can substitute — netem is the only qdisc that adds delay.
+Check once:
+
+```bash
+make crud_perf wan-check
+```
+
+If it fails on **podman on macOS**, the podman machine runs Fedora CoreOS, whose base
+image omits `sch_netem`. Add it once:
+
+```bash
+podman machine ssh 'sudo rpm-ostree install kernel-modules-extra'
+podman machine stop && podman machine start
+make crud_perf wan-check
+```
+
+The layered package survives VM reboots, but not `podman machine rm`. Undo it with
+`podman machine ssh 'sudo rpm-ostree rollback'`.
+
+### Running
+
+```bash
+# See the topology a profile produces — no containers, fast; this is the authoring loop
+make crud_perf wan-plan WAN_PROFILE=wan-global-3region
+
+# Run the benchmark under it
+make crud_perf local WAN_ENABLED=1 WAN_PROFILE=wan-global-3region
+
+# While it runs, from another shell:
+make crud_perf wan-show                       # live tc counters per node
+podman exec replica-0 ping -c 5 replica-2     # confirm the RTT is what you asked for
+
+# Change conditions without restarting the cluster
+make crud_perf wan-apply WAN_ENABLED=1 WAN_PROFILE=lossy-wan
+```
+
+### Shipped profiles
+
+| Profile | What it models |
+|---|---|
+| `none` | Zero delay, zero loss, no caps. The **control**: a run with `WAN_PROFILE=none` must match a `WAN_ENABLED=0` run within noise. |
+| `lan` | A single well-provisioned datacenter (0.4 ms RTT). |
+| `wan-eu-us` | One transatlantic link, 2+2 replicas, so no region holds a quorum. |
+| `wan-global-3region` | Three continents with AWS-like RTTs, plus one deliberately asymmetric link. The default. |
+| `wan-global-5region` | Five regions, one replica each. Run with `N_REPLICAS=5`. |
+| `lossy-wan` | High jitter, real loss, a narrow pipe. For liveness/timeout testing, not throughput. |
+
+### Writing a profile
+
+Profiles live in `bench/wan-profiles/<name>.yml`. Nodes are assigned to regions, links
+are declared between regions, and per-node-pair `overrides` handle anything the region
+model cannot express — including asymmetric links.
+
+```yaml
+defaults:
+  rtt_ms: 0
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 10gbit          # HTB ceiling; 10gbit means "no meaningful cap"
+  distribution: normal
+  netem_limit: auto     # backlog in packets; auto = from bandwidth-delay product
+
+placement:              # node -> region; globs allowed, first match wins
+  "replica-0": eu-west
+  "replica-1": eu-west
+  "replica-2": us-east
+  "replica-3": ap-south
+  "client-*":  eu-west
+
+intra_region: { rtt_ms: 1, jitter_ms: 0.2 }
+
+links:
+  - { a: eu-west, b: us-east,  rtt_ms: 78,  jitter_ms: 4, loss_pct: 0.01 }
+  - { a: eu-west, b: ap-south, rtt_ms: 125, jitter_ms: 8, loss_pct: 0.05 }
+  - { a: us-east, b: ap-south, rtt_ms: 198, jitter_ms: 10, loss_pct: 0.05 }
+
+overrides:
+  # Directional: pins one direction only. owd_ms is taken verbatim, unhalved.
+  - { from: "replica-2", to: "replica-3", owd_ms: 200 }
+  # Symmetric node-pair override:
+  - { between: ["replica-0", "client-0"], rtt_ms: 20 }
+
+schedule: []            # reserved for timed events; parsed and validated, not yet applied
+```
+
+Every node in the run must match a `placement` entry — `wan-plan` fails loudly listing
+any it cannot place, which is what catches "I bumped `N_REPLICAS` but not the profile".
+
+**Round-trip vs one-way.** Shaping is applied on egress at *both* ends, so profile
+values describing a round trip are split across the two directions using the exact
+formulas, not approximations:
+
+| Profile key | Per-direction value |
+|---|---|
+| `rtt_ms` | `rtt_ms / 2` (delays add) |
+| `jitter_ms` | `jitter_ms / sqrt(2)` (independent variances add) |
+| `loss_pct` | `1 - sqrt(1 - loss_pct/100)` (round-trip success is `(1-p)^2`) |
+
+Use `owd_ms`, `owd_jitter_ms` and `owd_loss_pct` to set a direction verbatim with no
+splitting. `wan-plan` prints the resulting per-direction matrix, so the numbers that
+will actually be installed are always visible before a run.
+
+**Jitter causes reordering.** `netem delay X Y distribution normal` lets packets
+overtake one another. That is realistic, but for strictly reproducible, in-order runs
+set `jitter_ms: 0`. `wan-plan` warns when a profile uses jitter.
+
+### Protocol timeouts
+
+The timeouts in `config-base/` assume a LAN. Under a high-delay or lossy profile they
+can fire spuriously and trigger view changes that are an artifact of the emulation
+rather than a property of the protocol. `WAN_TIMEOUT_SCALE` multiplies
+`timeout_duration` in the **generated** configs (`febft.toml`, `log_transfer.toml`,
+`state_transfer.toml`, `view_transfer.toml`):
+
+```bash
+make crud_perf local WAN_ENABLED=1 WAN_PROFILE=lossy-wan WAN_TIMEOUT_SCALE=4
+```
+
+The scaled value is always derived from the pristine `config-base` template, so this is
+idempotent and `config-base` itself is never modified.
+
+### How it works
+
+| Piece | Role |
+|---|---|
+| `bench/Dockerfile` stage `final-wan` | `debian:bullseye-slim` + `iproute2`. Used **only** when `WAN_ENABLED=1`, tagged `<IMAGE_NAME>-wan` so it never collides with the normal image. The default `final` stage stays distroless and stays last in the file, which is what keeps the off-path unchanged. |
+| `scripts/wan-entrypoint.sh` | Baked into that image. Applies `/wan/$WAN_NODE.sh`, then `exec`s the server — so shaping is in place *before* the first packet, and a failure to shape aborts the container rather than silently producing an unshaped run. |
+| `scripts/gen-wan.py` | Compiles the profile into `generated/wan/`: one `tc` script per node, `matrix.txt`, and `profile.resolved.yml` (the fully expanded profile, worth keeping with the results). |
+| Static IPs | WAN mode assigns addresses from `WAN_SUBNET` (`replica-i` → `.10+i`, `client-i` → `.100+i`) so destination-IP filters survive the `restart: on-failure` these services already use. Node names still resolve normally, so `nodes.toml` is unchanged. |
+| `tc` structure | One HTB class per peer, each carrying its own `netem`, selected by a `u32` filter on destination IP. Unmatched traffic falls into an unshaped default class. |
+
+The `/wan` directory is bind-mounted, not baked in, so `wan-apply` can change
+conditions on a running cluster without a rebuild.
+
+### Limitations
+
+- All `N_CLIENTS` logical clients in one container share one profile. To place clients
+  in different regions raise `N_CLIENT_MACHINES` (one container per region), and
+  remember `make <project> regen-ca-root` after changing cluster sizing.
+- Traffic arriving through published host ports (`10000+i`) is **not** shaped; only
+  container-to-container traffic is.
+- The `final-wan` image runs as root with `CAP_NET_ADMIN`. Fine for a local harness;
+  don't push it to a registry for cluster use.
+- Shaping is egress-only, so each node controls only its own outbound half of a link.
+- WAN emulation covers **local mode only**. `remote-docker` and `remote-bare` are
+  untouched — those already run on a real network.
+- Rootless podman may refuse `CAP_NET_ADMIN` inside the container netns; `wan-check`
+  is what surfaces that.
 
 ---
 
@@ -376,5 +568,6 @@ This is intentional: you work on one project at a time. If you need to compare t
 | `generated/local-compose.yml` | `gen-local-compose.sh` | Docker Compose file for local mode |
 | `generated/per-machine/` | `gen-remote-compose.sh` | Per-machine compose files for remote-docker |
 | `generated/envs/` | `gen-remote-envs.sh` | Per-node identity env files + client start scripts for remote-bare |
+| `generated/wan/` | `gen-wan.py` | Per-node `tc` scripts, `matrix.txt`, `profile.resolved.yml` |
 | `generated/logs/` | runtime | Log output from replicas and clients |
 | `generated/<BINARY_NAME>` | `build-binary` | Compiled Rust binary for remote-bare |
