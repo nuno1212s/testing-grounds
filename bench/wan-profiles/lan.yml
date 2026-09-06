@@ -1,0 +1,22 @@
+# lan — a single well-provisioned datacenter LAN.
+#
+# Roughly what the DCC-FCUP cluster looks like between two machines on the same
+# switch. Useful as the baseline every WAN profile is compared against.
+
+defaults:
+  rtt_ms: 0.4
+  jitter_ms: 0
+  loss_pct: 0
+  rate: 10gbit
+
+placement:
+  "replica-*": dc1
+  "client-*": dc1
+
+intra_region:
+  rtt_ms: 0.4
+  jitter_ms: 0
+
+links: []
+overrides: []
+schedule: []
