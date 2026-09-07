@@ -4,3 +4,5 @@
 **/ca-root
 **/logs
 **/storage
+# Generator bytecode (bench/grafana/build-dashboards.py)
+__pycache__/

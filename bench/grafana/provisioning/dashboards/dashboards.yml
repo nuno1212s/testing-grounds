@@ -1,0 +1,20 @@
+# Loads every dashboard JSON under /etc/grafana/dashboards (bind-mounted from
+# bench/grafana/dashboards/) on startup and re-scans it every 10s.
+#
+# allowUiUpdates lets you tweak a panel in the browser and keep the change until
+# the next reload; to make an edit permanent, export the dashboard JSON from the
+# UI (Dashboard settings -> JSON Model / Export) back into bench/grafana/dashboards/.
+apiVersion: 1
+
+providers:
+  - name: atlas-bench
+    orgId: 1
+    folder: Atlas
+    folderUid: atlas-bench
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

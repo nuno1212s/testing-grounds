@@ -15,9 +15,10 @@ This directory is the single shared benchmarking layer for all projects in `test
    - [Per-project bench.env](#per-project-benchenv)
    - [hosts.yml](#hostsyml)
 6. [WAN Emulation](#wan-emulation)
-7. [Adding a New Project](#adding-a-new-project)
-8. [PKI / ca-root Generation](#pki--ca-root-generation)
-9. [Generated Output](#generated-output)
+7. [Metrics and Grafana](#metrics-and-grafana)
+8. [Adding a New Project](#adding-a-new-project)
+9. [PKI / ca-root Generation](#pki--ca-root-generation)
+10. [Generated Output](#generated-output)
 
 ---
 
@@ -51,6 +52,12 @@ make microbenchmarks-async local WAN_ENABLED=1 WAN_PROFILE=wan-global-3region
 
 # Force-regenerate TLS/signing certificates
 make microbenchmarks-async regen-ca-root
+
+# The metrics stack (InfluxDB + Grafana) starts automatically before any run, so
+# there is normally nothing to do. These are for driving it by hand — no project
+# name needed, and it can be started before or after a run.
+make metrics
+make stop-metrics
 ```
 
 ---
@@ -88,6 +95,10 @@ make <project> <target> [VAR=value ...]
 | `build-binary` | Compile the Rust binary only (used by `remote-bare`) |
 | `gen-configs` | Generate config files and ca-root into `generated/` |
 | `gen-ca-root` | Generate PKI certificates only (skips if already present) |
+| `metrics` | Start InfluxDB + Grafana on `atlas_network` and wait for the database (no project needed) |
+| `stop-metrics` | Stop the metrics stack, keeping its data volumes |
+| `logs-metrics` | Follow InfluxDB + Grafana logs |
+| `clean-metrics` | Stop the metrics stack and delete its data volumes (**including every measurement**) |
 | `wan-check` | Verify this host's kernel supports netem (run once, before first WAN use) |
 | `wan-plan` | Compile the WAN profile and print the latency matrix (no containers) |
 | `wan-show` | Show live `tc` stats inside the running containers |
@@ -95,6 +106,11 @@ make <project> <target> [VAR=value ...]
 | `regen-ca-root` | Delete and regenerate PKI certificates |
 | `clean` | Remove all generated output (`bench/generated/`) |
 | `help` | Print target summary and current variable values |
+
+`clean`, `help` and the four `metrics` targets act on the shared bench dir only and so
+take no project name — `make metrics` on its own is the normal form. `grafana`,
+`stop-grafana`, `logs-grafana` and `clean-grafana` remain as aliases from when the
+stack was Grafana alone.
 
 Any `bench.env` variable can be overridden on the command line:
 
@@ -174,10 +190,22 @@ testing-grounds/
     │   ├── wan-global-3region.yml
     │   ├── wan-global-5region.yml
     │   └── lossy-wan.yml
+    ├── grafana/                    Grafana stack (its own Compose project)
+    │   ├── README.md               how it finds InfluxDB, how to read the panels
+    │   ├── docker-compose.yml      joins atlas_network; publishes :3000
+    │   ├── provisioning/
+    │   │   └── dashboards/         dashboard provider (datasource is generated)
+    │   ├── build-dashboards.py     generates dashboards/ from the Rust metric registries
+    │   └── dashboards/
+    │       ├── atlas-cluster-overview.json
+    │       └── suite-<project>.json     one per test suite
     ├── scripts/
     │   ├── gen-ca-root.sh          generate PKI certificates into generated/ca-root/
     │   ├── gen-nodes-toml.sh       generate generated/nodes.toml
     │   ├── gen-local-compose.sh    generate generated/local-compose.yml
+    │   ├── gen-grafana.sh          resolve the InfluxDB target, write the server env,
+    │   │                           Grafana's env and the provisioned datasource
+    │   ├── metrics-up.sh           start InfluxDB + Grafana, wait for the database
     │   ├── gen-wan.py              compile a WAN profile into per-node tc scripts
     │   ├── wan-entrypoint.sh       baked into the final-wan image; applies tc, execs server
     │   ├── gen-remote-compose.sh   generate generated/per-machine/*-compose.yml
@@ -193,6 +221,7 @@ testing-grounds/
         ├── config-clients/
         ├── nodes.toml
         ├── local-compose.yml
+        ├── grafana/                influxdb.env + grafana.env + provisioned datasource
         ├── per-machine/            per-machine compose files (remote-docker)
         ├── envs/                   per-node identity envs + start scripts (remote-bare)
         ├── logs/
@@ -228,6 +257,13 @@ Per-project bench directories contain only what differs from the global defaults
 | `STATE_SIZE` | `0` | State snapshot size in bytes |
 | `CA_ROOT_FORMAT` | `flattened` | PKI layout: `flattened` or `folder` (see [PKI section](#pki--ca-root-generation)) |
 | `LOCAL_INFLUXDB` | `0` | Set to `1` to spin up a local InfluxDB 1.8 container |
+| `INFLUX_EXTRA` | unset | Run name; becomes the `extra` tag on every metric point, and Grafana's "Run" filter. Left unset (not empty) so the tag keeps its `None` default |
+| `GRAFANA_IMAGE` | `grafana/grafana:11.4.0` | Grafana image for `make grafana` |
+| `GRAFANA_PORT` | `3000` | Host port Grafana is published on |
+| `GRAFANA_BIND` | `127.0.0.1` | Host interface for that port. Loopback because anonymous access is on |
+| `GRAFANA_ANONYMOUS` | `true` | Anonymous (Admin-role) access, so there is nothing to log into locally |
+| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / `admin` | Grafana admin login |
+| `GRAFANA_INFLUX_URL` / `_DB` / `_USER` / `_PASSWORD` | empty | Override the resolved InfluxDB target; empty means derive it from `influx_db.toml` + `LOCAL_INFLUXDB` |
 | `RUST_LOG` | `INFO` | Rust log filter passed to all containers/processes |
 | `WAN_ENABLED` | `0` | `1` enables tc/netem WAN emulation (see [WAN Emulation](#wan-emulation)) |
 | `WAN_PROFILE` | `wan-global-3region` | Profile basename in `bench/wan-profiles/` |
@@ -479,6 +515,149 @@ conditions on a running cluster without a rebuild.
 
 ---
 
+## Metrics and Grafana
+
+Every Atlas node runs a metrics thread that collects and resets its metrics once a
+second and writes them to InfluxDB. Where they go is set by
+`config-base/common/influx_db.toml` — one file, read by replicas and clients alike.
+
+InfluxDB and Grafana are one Compose project, `bench/grafana/docker-compose.yml`, and
+**every target that starts a run brings it up first and blocks until the database
+answers**. In the normal case there is nothing to do:
+
+```bash
+make crud_perf local INFLUX_EXTRA=baseline-4r   # tag the run so you can pick it out later
+# → metrics stack up, InfluxDB ready, then the cluster starts
+#   Grafana on http://127.0.0.1:3000, folder 'Atlas'
+```
+
+`LOCAL_INFLUXDB=1` (the default) means the stack runs the database itself and the
+*generated* configs are rewritten to reach it at `http://influxdb:8086`; the
+checked-in `influx_db.toml` keeps naming the external instance either way. With
+`LOCAL_INFLUXDB=0` the `influxdb` service is filtered out by its Compose profile and
+everything — replicas, clients, Grafana — talks to the instance that file names.
+
+### Why the wait matters
+
+The gate is not politeness. Atlas' OS monitor thread writes every 250 ms through
+
+```rust
+rt::block_on(client.query(readings)).expect("Failed to write metrics to influxdb")
+```
+
+(`Atlas/Atlas-Metrics/src/metrics/os_mon.rs`), and the workspace's release profile sets
+`panic = "abort"` — the profile both the bench Dockerfile and `make build-binary` use.
+So a node that starts before InfluxDB is listening does not run without OS metrics; it
+aborts within the first second. That is why `scripts/metrics-up.sh` polls until the
+database answers `SHOW DATABASES` and refuses to start the run if it never does, and
+why `METRICS_AUTOSTART=0` prints a warning rather than quietly skipping ahead.
+
+### Driving the stack by hand
+
+```bash
+make metrics            # start it (or re-run: idempotent)
+make logs-metrics
+make stop-metrics       # keeps both data volumes
+make clean-metrics      # drops them — every stored measurement goes with it
+```
+
+The metrics stack is **its own Compose project**, not part of the generated benchmark
+stack, because it has to outlive the run it is showing — a database torn down with the
+run is empty exactly when there is something to look at. The two stacks meet on the
+`atlas_network` bridge, which both declare `external: true` and which the Makefile's
+`ensure-network` target owns:
+
+```
+  make metrics ──────┐                               ┌─ make <project> local
+  (or automatically, ▼                               ▼
+   before a run)  ┌─────────────────────┐   ┌──────────────────────────────┐
+                  │ atlas-influxdb :8086│◀──│ replica-0..n-1, client-0..m  │
+                  │ atlas-grafana  :3000│   │      (write metrics)         │
+                  └──────────┬──────────┘   └───────────────┬──────────────┘
+                             └────────── atlas_network ─────┘
+                     (created by ensure-network, removed
+                      only when nothing is attached)
+```
+
+So the stack can start before or after a run, and a bench teardown leaves it running:
+removing the network fails while the stack holds it, and the failure is ignored by
+design.
+
+`make metrics` (and the automatic start) first runs `scripts/gen-grafana.sh`, which
+resolves the InfluxDB the replicas use — the in-network container when
+`LOCAL_INFLUXDB=1`, otherwise the instance from `influx_db.toml` — and writes
+`generated/grafana/`: the server's own env (database name and admin user), Grafana's
+env, and the provisioned datasource. All three come from that one TOML, so the
+writers, the database and Grafana cannot drift apart.
+
+### Reaching it from a remote cluster
+
+`remote-docker` and `remote-bare` start the stack too, but the nodes there read the
+*unmodified* `influx_db.toml` — only `gen-local-compose.sh` rewrites the address — and
+they cannot resolve the `influxdb` alias, which exists only on `atlas_network`. For a
+remote cluster to write into this host's database, point `influx_db.toml` at this host
+and publish the port beyond loopback:
+
+```bash
+make microbenchmarks-async remote-bare INFLUXDB_BIND=0.0.0.0 INFLUXDB_AUTH_ENABLED=true
+```
+
+The run targets print this reminder themselves.
+
+Eight dashboards are provisioned into the **Atlas** folder: one per test suite, plus a
+cross-suite *Cluster Overview* to start from.
+
+| Dashboard | `make` target | Ordering protocol |
+|---|---|---|
+| Cluster Overview | — | any |
+| microbenchmarks-async | `make microbenchmarks-async local` | febft PBFT |
+| app-scaling-tests | `make app-scaling-tests local` | febft PBFT |
+| preemptive_execution | `make preemptive_execution local` | febft PBFT |
+| microbenchmarks (legacy) | `make microbenchmarks local` | febft PBFT |
+| crud_perf | `make crud_perf local` | febft PBFT |
+| microbenchmark-hotstuff | `make microbenchmark-hotstuff local` | HotStuff (four-phase) |
+| microbenchmark-chainedhotstuff | `make microbenchmark-chainedhotstuff local` | Chained HotStuff |
+
+Every suite dashboard has the same shape — headline stats, then that suite's **ordering
+protocol** rows, then its **executor** rows, then a shared **Atlas baseline** (client,
+request pre-processing, replica loop, communication, logging and transfer, host
+resources). The baseline is deliberately identical everywhere, so two suites can be
+compared panel-for-panel.
+
+Panels are generated, not hand-written: `grafana/build-dashboards.py` parses the metric
+registries out of the Rust sources and draws only what a given suite actually emits —
+which depends both on the crates its binary registers and on its
+`with_metric_level(..)`. Each dashboard's *About this suite* note names the metrics its
+level filters out, so a blank panel is explained rather than mysterious. Regenerate
+with:
+
+```bash
+python3 bench/grafana/build-dashboards.py
+```
+
+Both variables — **Node** (`host`) and **Run** (`extra`) — filter every panel. Filtering
+by Run matters more than it looks: all suites share one database, and `PREPARE_LATENCY`
+and `COMMIT_LATENCY` mean different things in febft and in HotStuff.
+
+`correctness-testing` and IronDumbo have no dashboard: the first is an in-process
+`cargo nextest` library that never initialises metrics, the second has no metrics
+instrumentation at all. Neither writes to InfluxDB, so neither needs the metrics stack
+running — `correctness-testing` is not a `make` run target in any case. See
+[`grafana/README.md`](grafana/README.md) for the per-suite metric analysis, how to read
+each metric kind, and two measurement quirks worth knowing before trusting a panel.
+
+### With WAN emulation
+
+`WAN_ENABLED=1` requires `atlas_network` to carry `WAN_SUBNET`, so if the network
+already exists with a different subnet it must be recreated — which cannot happen
+while the metrics stack is attached. `make stop-metrics` first; the Makefile says as
+much if you forget. InfluxDB and Grafana both take dynamic addresses at the low end of
+the subnet, clear of the static offsets (replicas `.10+i`, clients `.100+i`), and are
+left unshaped: they match no `tc` filter and land in the default class, so collecting
+metrics does not consume emulated WAN bandwidth.
+
+---
+
 ## Adding a New Project
 
 1. Create `<project>/bench/bench.env` with the four required identity variables.
@@ -569,5 +748,6 @@ This is intentional: you work on one project at a time. If you need to compare t
 | `generated/per-machine/` | `gen-remote-compose.sh` | Per-machine compose files for remote-docker |
 | `generated/envs/` | `gen-remote-envs.sh` | Per-node identity env files + client start scripts for remote-bare |
 | `generated/wan/` | `gen-wan.py` | Per-node `tc` scripts, `matrix.txt`, `profile.resolved.yml` |
+| `generated/grafana/` | `gen-grafana.sh` | `influxdb.env` (server: db name + admin user), `grafana.env` (resolved InfluxDB target) + provisioned datasource |
 | `generated/logs/` | runtime | Log output from replicas and clients |
 | `generated/<BINARY_NAME>` | `build-binary` | Compiled Rust binary for remote-bare |

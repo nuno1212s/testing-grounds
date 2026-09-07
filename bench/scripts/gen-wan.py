@@ -93,7 +93,7 @@ def parse_rate(rate):
 # ── node inventory and addressing ─────────────────────────────────────────────────
 
 def build_nodes(n_replicas, n_client_machines, subnet, shape_clients, local_influxdb):
-    """Node name -> IP. Offsets match the plan: influx .5, replicas .10+i, clients .100+i."""
+    """Node name -> IP. Offsets match the plan: replicas .10+i, clients .100+i."""
     net = ipaddress.ip_network(subnet, strict=True)
 
     def addr(offset, what):
@@ -113,9 +113,14 @@ def build_nodes(n_replicas, n_client_machines, subnet, shape_clients, local_infl
         die(f"N_REPLICAS={n_replicas} overflows the replica address block "
             f"(.10...99); widen WAN_SUBNET and adjust the offsets in gen-wan.py")
 
+    # Hosts on atlas_network that are not shaped and get no static address. The
+    # metrics stack (InfluxDB, Grafana) is its own Compose project, brought up before
+    # the run, so it takes dynamic addresses at the low end of the subnet — clear of
+    # the .10+ and .100+ blocks reserved above. Listed here only so the matrix says
+    # where the metrics traffic goes and why it is not in the table.
     extra = {}
     if local_influxdb == "1":
-        extra["influxdb"] = addr(5, "influxdb")
+        extra["influxdb"] = "(dynamic)"
 
     # Which nodes actually receive a shaping spec.
     shaped = [n for n in nodes if shape_clients or n.startswith("replica-")]
@@ -362,7 +367,7 @@ def main():
     iface = env("WAN_IFACE", "eth0")
     shape_clients = env("WAN_SHAPE_CLIENTS", "1") == "1"
     timeout_scale = float(env("WAN_TIMEOUT_SCALE", "1"))
-    local_influxdb = env("LOCAL_INFLUXDB", "0")
+    local_influxdb = env("LOCAL_INFLUXDB", "1")
 
     profile_path = os.path.join(global_bench, "wan-profiles", f"{profile_name}.yml")
     if not os.path.isfile(profile_path):
@@ -509,7 +514,7 @@ def render_matrix(profile_name, nodes, extra, regions, resolved, shape_clients):
     for n in names:
         L.append(f"  {n.ljust(nw)}  {nodes[n].ljust(16)}  region={regions[n]}")
     for n, ip in extra.items():
-        L.append(f"  {n.ljust(nw)}  {ip.ljust(16)}  (unshaped)")
+        L.append(f"  {n.ljust(nw)}  {ip.ljust(16)}  (metrics stack, unshaped)")
 
     rates = {p[3]["rate"] for ps in resolved.values() for p in ps}
     L += ["", f"Bandwidth ceilings in use: {', '.join(sorted(rates)) or '(none)'}"]

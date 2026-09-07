@@ -112,6 +112,11 @@ make microbenchmarks-async local WAN_ENABLED=1 WAN_PROFILE=wan-global-3region
 
 # Regenerate configs after changing N_REPLICAS
 make microbenchmarks-async gen-configs
+
+# The metrics stack (InfluxDB + Grafana) starts automatically before every run, so
+# there is normally nothing to do here. No project name; drive it by hand with:
+make metrics
+make stop-metrics
 ```
 
 ### Available Projects
@@ -137,12 +142,22 @@ make microbenchmarks-async gen-configs
 | `RUST_LOG` | `INFO` | Log filter for all processes |
 | `WAN_ENABLED` | `0` | `1` emulates a WAN between containers in `local` mode |
 | `WAN_PROFILE` | `wan-global-3region` | Topology profile from `bench/wan-profiles/` |
+| `LOCAL_INFLUXDB` | `1` | `1` uses the metrics stack's own InfluxDB; `0` uses the external one from `influx_db.toml` |
+| `METRICS_AUTOSTART` | `1` | `0` skips starting the metrics stack before a run |
+| `INFLUX_EXTRA` | unset | Run name; tags every metric point so Grafana can separate runs |
+| `GRAFANA_PORT` | `3000` | Host port for Grafana (bound to `127.0.0.1`) |
+| `INFLUXDB_RETENTION` | unset | Retention for the metrics database, e.g. `30d`; unset keeps everything |
 
 ### Deployment Modes
 
 - **`local`** — Docker Compose on the local machine. Configs and PKI certificates are volume-mounted. Optionally emulates a WAN (per-link latency, jitter, loss, bandwidth caps) via `WAN_ENABLED=1` — see [bench/README.md](bench/README.md#wan-emulation).
 - **`remote-docker`** — Push Docker images to a remote cluster via Ansible. Requires a pre-built image and a populated `hosts.yml`.
 - **`remote-bare`** — Cross-compile a native Rust binary and deploy it directly via Ansible. No Docker required on remote hosts.
+
+Metrics from any of the three go to InfluxDB. It and Grafana are a separate Compose
+stack, started automatically before each run and left running afterwards so the
+numbers survive the cluster that produced them — see
+[bench/README.md](bench/README.md#metrics-and-grafana).
 
 ### Adding a New Project
 
@@ -168,4 +183,4 @@ make <project> regen-ca-root
 - **Rust** (stable toolchain) — for building Atlas binaries
 - **Docker** — for local and remote-docker modes
 - **Ansible** — for remote-docker and remote-bare deployments
-- **InfluxDB 1.8** (optional) — for metrics collection; set `LOCAL_INFLUXDB=1` to spin up a local instance automatically
+- **InfluxDB 1.8 + Grafana** — the metrics stack, started on the bench network before every run and wired to whichever InfluxDB the run writes to. Both images are pulled on first use; nothing to install. Note that a node whose InfluxDB is unreachable aborts, so this is a dependency rather than an optional extra — see [`bench/grafana/README.md`](bench/grafana/README.md)

@@ -1,0 +1,995 @@
+{
+  "uid": "atlas-overview",
+  "title": "Atlas \u2014 Cluster Overview",
+  "description": "Cross-suite entry point. Start here, then open the dashboard for the suite you are actually running.",
+  "tags": [
+    "atlas",
+    "bench",
+    "overview"
+  ],
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1s",
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Node",
+        "type": "query",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "atlas-influx"
+        },
+        "query": "SHOW TAG VALUES WITH KEY = \"host\"",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "sort": 1,
+        "hide": 0,
+        "description": "Atlas tags every point with host=NodeId(n): replicas are 0..n-1, clients start at 1000. Keep multi/includeAll on \u2014 the values contain parentheses, and Grafana only regex-escapes multi-value variables."
+      },
+      {
+        "name": "run",
+        "label": "Run",
+        "type": "query",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "atlas-influx"
+        },
+        "query": "SHOW TAG VALUES WITH KEY = \"extra\"",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "sort": 1,
+        "hide": 0,
+        "description": "The `extra` tag: 'None' unless the run set INFLUX_EXTRA. Suites share one database and several measurement names, so filter by Run before comparing anything across protocols."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Ordered throughput",
+      "description": "Mean across replicas. Empty for suites with no executor metrics (microbenchmarks legacy) \u2014 use the per-suite dashboard there.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"OPERATIONS_EXECUTED_PER_SECOND\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Client request rate",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT sum(\"rate\") FROM (SELECT mean(\"value\") AS \"rate\" FROM \"CLIENT_RQ_PER_SECOND\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\") GROUP BY time($__interval) fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Client latency",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_RQ_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Consensus wait",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONSENSUS_WAIT_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4
+    },
+    {
+      "type": "text",
+      "title": "Which dashboard do I want?",
+      "datasource": {
+        "type": "datasource",
+        "uid": "grafana"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "This is the cross-suite view: it draws only what **every** suite can produce, so a blank panel here usually means the running suite does not register that metric rather than that anything is wrong. For the full picture pick the suite's own dashboard in this folder:\n\n| Dashboard | `make` target | Ordering protocol |\n|---|---|---|\n| Atlas \u2014 microbenchmarks-async | `make microbenchmarks-async local` | febft PBFT |\n| Atlas \u2014 app-scaling-tests | `make app-scaling-tests local` | febft PBFT |\n| Atlas \u2014 preemptive_execution | `make preemptive_execution local` | febft PBFT |\n| Atlas \u2014 microbenchmarks (legacy) | `make microbenchmarks local` | febft PBFT |\n| Atlas \u2014 crud_perf | `make crud_perf local` | febft PBFT |\n| Atlas \u2014 microbenchmark-hotstuff | `make microbenchmark-hotstuff local` | HotStuff (four-phase) |\n| Atlas \u2014 microbenchmark-chainedhotstuff | `make microbenchmark-chainedhotstuff local` | Chained HotStuff |\n\nAll suites write to one database and several measurement names are shared between protocols (`PREPARE_LATENCY` and `COMMIT_LATENCY` mean different things in febft and HotStuff), so tag runs with `INFLUX_EXTRA` and use the **Run** filter before comparing anything across suites.",
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        }
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 5
+    },
+    {
+      "type": "row",
+      "title": "Throughput and latency",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "description": "",
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput per replica",
+      "description": "Ordered but not executed means execution is falling behind consensus.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"OPERATIONS_EXECUTED_PER_SECOND\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "executed $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"OPERATIONS_ORDERED\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "ordered $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 7
+    },
+    {
+      "type": "timeseries",
+      "title": "Client rate and timeouts",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_RQ_PER_SECOND\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "sent $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_RQ_RECV_PER_SECOND\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "received $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_RQ_TIMEOUT\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "timeouts $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Client latency",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_RQ_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "ordered $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_UNORDERED_RQ_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "unordered $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Replica-side latency breakdown",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONSENSUS_WAIT_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "consensus wait $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"EXECUTION_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "execution latency $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"EXECUTION_TIME_TAKEN\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "execution time $tag_host"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"REPLY_SENT_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "reply send $tag_host"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"END_TO_END_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "end-to-end (HotStuff) $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "Batch size",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"BATCH_SIZE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "consensus batch $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"RQ_PRE_PROCESSING_BATCH_SIZE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "pre-processing batch $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CLIENT_POOL_BATCH_SIZE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "client pool batch $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 11
+    },
+    {
+      "type": "row",
+      "title": "Host resources",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "description": "",
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU per node",
+      "description": "Averaged over cores; OS_CPU_USER is a 0..1 fraction per core.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"OS_CPU_USER\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "$tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 46
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Process RSS per node",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"OS_RAM_USAGE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "$tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 46
+      },
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "Network per node",
+      "description": "os_mon.rs crosses the directions \u2014 trust the series names, not up/down.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") * 4 FROM \"OS_NETWORK_UP\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "OS_NETWORK_UP $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") * 4 FROM \"OS_NETWORK_DOWN\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "OS_NETWORK_DOWN $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 46
+      },
+      "id": 15
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}
