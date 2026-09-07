@@ -27,6 +27,10 @@ pub type Executor = ScalableCRUDMonolithicPreemptiveExecutor;
 /// metric IDs 800+, so registering the wrong crate would mislabel this run's data rather
 /// than fail. Relevant here: `SCALABLE_PREEMPTIVE_EXECUTION_TIME`, `SCALABLE_COLLISION_RATE`,
 /// `SCALABLE_COLLISION_COUNT`, plus the shared `CACHE_*` state-machine metrics.
+///
+/// `OPERATIONS_EXECUTED_PER_SECOND` is the exception to the "different names" rule: the
+/// preemptive crate exports it under the same name as the baseline, counted at
+/// confirmation, so throughput can be compared against `baseline` panel-for-panel.
 pub fn metrics() -> Vec<MetricRegistry> {
     atlas_smr_preemptive_execution::metric::metrics()
 }
