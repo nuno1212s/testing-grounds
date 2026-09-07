@@ -1,0 +1,136 @@
+# The Atlas bench metrics stack — InfluxDB (where every node writes) and Grafana
+# (where you read it), deliberately separate from the benchmark stack
+# (generated/local-compose.yml).
+#
+# Why separate: the bench stack is generated per run and torn down when the run
+# ends. The metrics have to outlive that — you look at the numbers *after* the run —
+# so InfluxDB and Grafana get their own Compose project, their own lifecycle and
+# their own volumes. Putting the database in the bench stack (as this repo did until
+# the influxdb service moved here from gen-local-compose.sh) meant the server died
+# with the run and Grafana went blank the moment there was something to look at.
+#
+# The link between the two stacks is the `atlas_network` bridge: both this file and
+# the generated bench compose declare it `external: true`, so whichever stack comes
+# up first finds a network that the Makefile has already created. That is what lets
+# replicas, clients and Grafana all reach InfluxDB by its `influxdb` alias.
+#
+# Run it through the Makefile so the datasource and the server's own env are
+# generated first — both are derived from config-base/common/influx_db.toml:
+#
+#   make metrics          # from testing-grounds/ (alias: make grafana)
+#   make stop-metrics
+#
+# Every variable below is exported by the bench Makefile from bench/bench.env; the
+# defaults here keep the file usable standalone (`podman-compose up -d` in this dir),
+# provided ../generated/grafana/ has already been generated.
+
+services:
+  # ── InfluxDB ───────────────────────────────────────────────────────────────────
+  # Under the `local-influx` Compose profile, so LOCAL_INFLUXDB=0 (an external or
+  # cluster InfluxDB) starts Grafana alone rather than a second server fighting for
+  # :8086. The Makefile passes --profile local-influx when LOCAL_INFLUXDB=1.
+  #
+  # 1.8, not 2.x: Atlas writes through the `influxdb` crate 0.7 (1.x line protocol)
+  # and the provisioned datasource is InfluxQL. A 2.x server would need both changed.
+  influxdb:
+    image: ${INFLUXDB_IMAGE:-influxdb:1.8}
+    container_name: atlas-influxdb
+    hostname: influxdb
+    profiles:
+      - local-influx
+    ports:
+      # Only needed to reach the database from outside atlas_network — remote-bare /
+      # remote-docker nodes, or a curl from the host. Containers on the network use
+      # the `influxdb` alias and ignore this. Loopback by default: HTTP auth is off.
+      - "${INFLUXDB_BIND:-127.0.0.1}:${INFLUXDB_PORT:-8086}:8086"
+    # Database name and admin credentials, generated from the same influx_db.toml the
+    # replicas read — see scripts/gen-grafana.sh. Not spelled out here, because a
+    # second copy is a second thing to forget to change.
+    env_file:
+      - ../generated/grafana/influxdb.env
+    environment:
+      INFLUXDB_REPORTING_DISABLED: "true"
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    # The gate the whole design rests on: a node whose InfluxDB refuses the
+    # connection dies (os_mon.rs `.expect`, release profile is panic = "abort"), so
+    # the Makefile waits for this to go healthy before it starts any replica.
+    # CMD-SHELL, and $$ for the container's own env: credentials are ignored when
+    # auth is off and required when it is on, so passing them always is correct.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - influx -username "$$INFLUXDB_ADMIN_USER" -password "$$INFLUXDB_ADMIN_PASSWORD"
+          -execute 'SHOW DATABASES' >/dev/null 2>&1
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      atlas_network:
+        aliases:
+          - influxdb
+
+  # ── Grafana ────────────────────────────────────────────────────────────────────
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.4.0}
+    container_name: atlas-grafana
+    hostname: grafana
+    # Deliberately no depends_on: influxdb. Compose rejects a dependency on a service
+    # its active profiles filter out ("depends on undefined service"), which would
+    # break LOCAL_INFLUXDB=0 outright, and start ordering buys nothing here — Grafana
+    # retries a datasource that is not up yet, and it is the Makefile (metrics-up.sh)
+    # that gates the benchmark on InfluxDB being ready.
+    ports:
+      # Bound to loopback by default: anonymous access is on, so do not expose this
+      # to a network you do not control. Set GRAFANA_BIND=0.0.0.0 to open it up.
+      - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+    # InfluxDB connection details, generated from the same influx_db.toml the
+    # replicas use. Referenced as $INFLUX_* from the provisioned datasource, never
+    # inlined into it — the passwords in these configs contain '$', which Grafana's
+    # provisioning interpolation would otherwise eat.
+    env_file:
+      - ../generated/grafana/grafana.env
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_AUTH_ANONYMOUS_ENABLED: "${GRAFANA_ANONYMOUS:-true}"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_USERS_DEFAULT_THEME: "dark"
+      GF_LOG_LEVEL: "warn"
+      # Metrics land in InfluxDB once per second; the 5s floor Grafana ships with
+      # would quantise them away on short runs.
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "1s"
+      # Nothing here needs the internet, and a bench host often has no route to it.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      # Generated (holds the resolved InfluxDB target) — see scripts/gen-grafana.sh.
+      - ../generated/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      # Checked in.
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/etc/grafana/dashboards:ro
+      # Grafana's own state (users, starred dashboards, UI edits). Survives
+      # stop-grafana; removed by clean-grafana.
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      atlas_network:
+        aliases:
+          - grafana
+
+volumes:
+  # Grafana's own state (users, starred dashboards, UI edits).
+  grafana-data:
+  # The measurements themselves. Named by the Compose project, so this is
+  # atlas-grafana_influxdb-data — a different volume from the one the old bench-stack
+  # influxdb service used (atlas-bench_influxdb-data), which is left untouched.
+  influxdb-data:
+
+networks:
+  # Created by the bench Makefile (`ensure-network`), shared with the benchmark
+  # stack. External on both sides so neither stack owns or destroys it.
+  atlas_network:
+    external: true

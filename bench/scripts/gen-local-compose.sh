@@ -10,7 +10,16 @@
 #   IMAGE_NAME       - Docker image tag to build/use locally
 #   BUILD_CTX_ABS    - absolute path to Docker build context (Atlas repo root)
 #   DOCKERFILE_ABS   - absolute path to the shared Dockerfile
-#   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, N_CLIENT_MACHINES, RUST_LOG, LOCAL_INFLUXDB
+#   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, N_CLIENT_MACHINES, RUST_LOG
+#   LOCAL_INFLUXDB   - 1 to point the generated configs at the metrics stack's own
+#                      InfluxDB. The server itself is NOT emitted here: it lives in
+#                      bench/grafana/docker-compose.yml, because a database that is
+#                      torn down with the run is empty exactly when you want to read
+#                      it. All this script does is rewrite the address.
+#   INFLUX_EXTRA     - optional run name; becomes the `extra` tag on every metric
+#                      point (config crate reads INFLUX_* into the influx config).
+#                      Emitted only when non-empty: an empty value would replace
+#                      the "None" default with an empty tag.
 #
 # WAN emulation (optional, see bench/wan-profiles/ and bench/README.md):
 #   WAN_ENABLED=1 additionally emits, per shaped node, cap_add: [NET_ADMIN], a
@@ -37,8 +46,9 @@ set -euo pipefail
 : "${N_CLIENTS:?N_CLIENTS not set}"
 : "${N_CLIENT_MACHINES:?N_CLIENT_MACHINES not set}"
 : "${RUST_LOG:=INFO}"
-: "${LOCAL_INFLUXDB:=0}"
+: "${LOCAL_INFLUXDB:=1}"
 : "${WAN_ENABLED:=0}"
+: "${INFLUX_EXTRA:=}"
 : "${WAN_SUBNET:=10.90.0.0/24}"
 : "${WAN_IFACE:=eth0}"
 : "${WAN_SHAPE_CLIENTS:=1}"
@@ -51,7 +61,9 @@ mkdir -p "$GENERATED/logs"
 _sed_i() { if [ "$(uname)" = "Darwin" ]; then sed -i '' "$@"; else sed -i "$@"; fi; }
 
 # Static address for a node, by offset within WAN_SUBNET. Offsets match gen-wan.py:
-# influxdb .5, replica-i .10+i, client-i .100+i.
+# replica-i .10+i, client-i .100+i. The metrics stack is not addressed statically —
+# like Grafana, InfluxDB takes a dynamic address at the low end of the subnet, well
+# clear of these offsets, and is left unshaped.
 _wan_ip() {
   python3 -c "import ipaddress,sys; print(ipaddress.ip_network(sys.argv[1])[int(sys.argv[2])])" \
     "$WAN_SUBNET" "$1"
@@ -61,6 +73,10 @@ if [ "$WAN_ENABLED" = "1" ]; then
   mkdir -p "$GENERATED/wan"
 fi
 
+# Point the generated configs at the metrics stack's InfluxDB, reachable on
+# atlas_network under the `influxdb` alias. Only the address is rewritten — db_name,
+# user and password stay as config-base names them, and gen-grafana.sh feeds the same
+# three to the server and to Grafana.
 if [ "$LOCAL_INFLUXDB" = "1" ]; then
   for f in "$GENERATED/config-replicas/influx_db.toml" \
            "$GENERATED/config-clients/influx_db.toml"; do
@@ -72,29 +88,6 @@ fi
   cat <<'HEADER'
 services:
 HEADER
-
-  if [ "$LOCAL_INFLUXDB" = "1" ]; then
-    cat <<'INFLUX'
-  influxdb:
-    image: influxdb:1.8
-    container_name: influxdb
-    hostname: influxdb
-    ports:
-      - "8086:8086"
-    environment:
-      INFLUXDB_DB: atlas
-      INFLUXDB_HTTP_AUTH_ENABLED: "false"
-    volumes:
-      - influxdb-data:/var/lib/influxdb
-    networks:
-      atlas_network:
-        aliases:
-          - influxdb
-INFLUX
-    if [ "$WAN_ENABLED" = "1" ]; then
-      echo "        ipv4_address: $(_wan_ip 5)"
-    fi
-  fi
 
   CLI_BASE=1000
 
@@ -136,6 +129,7 @@ EOF
       RUST_LOG: "${RUST_LOG}"
       RUST_BACKTRACE: full
 EOF
+    [ -n "$INFLUX_EXTRA" ] && echo "      INFLUX_EXTRA: \"${INFLUX_EXTRA}\""
     if [ "$WAN_ENABLED" = "1" ]; then
       cat <<EOF
       WAN_NODE: "replica-${i}"
@@ -199,6 +193,7 @@ EOF
       RUST_LOG: "${RUST_LOG}"
       RUST_BACKTRACE: full
 EOF
+    [ -n "$INFLUX_EXTRA" ] && echo "      INFLUX_EXTRA: \"${INFLUX_EXTRA}\""
     if [ "$CLIENT_SHAPED" = "1" ]; then
       cat <<EOF
       WAN_NODE: "client-${i}"
@@ -223,12 +218,6 @@ networks:
     external: true
 NETFOOTER
 
-  if [ "$LOCAL_INFLUXDB" = "1" ]; then
-    cat <<'VOLFOOTER'
-volumes:
-  influxdb-data:
-VOLFOOTER
-  fi
 } > "$OUT"
 
 if [ "$WAN_ENABLED" = "1" ]; then

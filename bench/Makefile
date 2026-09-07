@@ -3,11 +3,20 @@
 #        GLOBAL_BENCH_DIR=/abs/path/testing-grounds/bench \
 #        PROJECT_BENCH_DIR=/abs/path/<project>/bench
 
+# Targets that act on the shared bench dir only and so do not need a project named:
+# cleanup, help, and the metrics stack (whose InfluxDB target comes from the global
+# config-base, not from any one project).
+PROJECT_FREE_TARGETS := clean help \
+                        metrics stop-metrics logs-metrics clean-metrics \
+                        grafana stop-grafana logs-grafana clean-grafana
+
 ifndef GLOBAL_BENCH_DIR
 $(error GLOBAL_BENCH_DIR is not set. Invoke via testing-grounds/Makefile: make <project> <target>)
 endif
 ifndef PROJECT_BENCH_DIR
+ifeq ($(filter $(PROJECT_FREE_TARGETS),$(MAKECMDGOALS)),)
 $(error PROJECT_BENCH_DIR is not set. Invoke via testing-grounds/Makefile: make <project> <target>)
+endif
 endif
 
 include $(GLOBAL_BENCH_DIR)/bench.env
@@ -42,6 +51,23 @@ IMAGE_NAME_EFFECTIVE := $(if $(WAN),$(IMAGE_NAME)-wan,$(IMAGE_NAME))
 DOCKER_TARGET        := $(if $(WAN),final-wan,final)
 NETEM_PROBE_IMAGE    := atlas-netem-probe
 
+# ── Metrics stack ─────────────────────────────────────────────────────────────────
+# InfluxDB + Grafana, a Compose project of its own (bench/grafana/) joined to the same
+# atlas_network as the benchmark stack. Kept separate because it has to outlive the
+# run: the database is read after the run ends, so it cannot be torn down with it.
+#
+# The influxdb service sits behind the `local-influx` Compose profile, which is how
+# LOCAL_INFLUXDB=0 (external instance) starts Grafana alone. On `down` the profile is
+# passed unconditionally, so a stack started with the profile is still fully removed
+# after LOCAL_INFLUXDB has been flipped back to 0.
+GRAFANA_DIR     := $(GLOBAL_BENCH_DIR)/grafana
+GRAFANA_COMPOSE := $(GRAFANA_DIR)/docker-compose.yml
+GRAFANA_PROJECT := atlas-grafana
+METRICS_DOWN    := $(COMPOSE) --profile local-influx -p $(GRAFANA_PROJECT) -f $(GRAFANA_COMPOSE)
+METRICS_AUTOSTART ?= 1
+# Only selects which warnings metrics-up.sh prints; set per run target below.
+METRICS_MODE      ?= explicit
+
 # Shell snippet expanding to the nodes that carry a shaping spec.
 WAN_NODE_LIST = $$(seq 0 $$(($(N_REPLICAS)-1)) | sed 's/^/replica-/'; \
                   if [ "$(WAN_SHAPE_CLIENTS)" = "1" ]; then \
@@ -51,7 +77,9 @@ WAN_NODE_LIST = $$(seq 0 $$(($(N_REPLICAS)-1)) | sed 's/^/replica-/'; \
         remote-docker stop-remote-docker \
         remote-bare stop-remote-bare build-binary \
         gen-configs gen-ca-root regen-ca-root clean help \
-        ensure-lockfile \
+        ensure-lockfile ensure-network \
+        metrics stop-metrics logs-metrics clean-metrics \
+        grafana stop-grafana logs-grafana clean-grafana ensure-metrics \
         wan-plan wan-check wan-show wan-apply
 
 # ── Help ─────────────────────────────────────────────────────────────────────────
@@ -73,6 +101,12 @@ help:
 	@echo "  regen-ca-root      Force regeneration of ca-root certificates"
 	@echo "  clean              Remove all generated files (configs, ca-root, logs)"
 	@echo ""
+	@echo "  metrics            Start InfluxDB + Grafana on atlas_network and wait for the DB"
+	@echo "  stop-metrics       Stop the metrics stack (keeps its data volumes)"
+	@echo "  logs-metrics       Follow InfluxDB + Grafana logs"
+	@echo "  clean-metrics      Stop the metrics stack and delete its data volumes"
+	@echo "                     (grafana / stop-grafana / logs-grafana / clean-grafana are aliases)"
+	@echo ""
 	@echo "  wan-check          Verify this host's kernel can do netem (run this first)"
 	@echo "  wan-plan           Compile the WAN profile and print the latency matrix"
 	@echo "  wan-show           Show tc stats inside the running containers"
@@ -88,6 +122,9 @@ help:
 	@echo "Available WAN profiles: $$(ls $(GLOBAL_BENCH_DIR)/wan-profiles/*.yml 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/\.yml$$//' | tr '\n' ' ')"
 	@echo ""
 	@echo "Edit $(CONFIG_BASE)/common/influx_db.toml to change InfluxDB target."
+	@echo "  LOCAL_INFLUXDB=$(LOCAL_INFLUXDB)  METRICS_AUTOSTART=$(METRICS_AUTOSTART)"
+	@echo "  GRAFANA_PORT=$(GRAFANA_PORT)  GRAFANA_BIND=$(GRAFANA_BIND)"
+	@echo "  INFLUXDB_PORT=$(INFLUXDB_PORT)  INFLUXDB_BIND=$(INFLUXDB_BIND)  INFLUXDB_RETENTION=$(INFLUXDB_RETENTION)"
 	@echo "Generated output: $(GENERATED)"
 
 # ── CA-root generation ────────────────────────────────────────────────────────────
@@ -133,8 +170,47 @@ ensure-lockfile:
 	    (cd $(RUST_SRC_ABS) && cargo generate-lockfile); \
 	fi
 
+# ── Shared network ────────────────────────────────────────────────────────────────
+# atlas_network is the one thing the benchmark stack and the Grafana stack have in
+# common: both declare it `external: true`, so it must exist before either comes up
+# and neither may own its lifetime. This target is the single place that creates it.
+#
+# Teardown is deliberately best-effort everywhere (`network rm ... || true`): when the
+# metrics stack is attached, removing the network fails, the network survives the run,
+# and InfluxDB and Grafana keep working — which is the point.
+#
+# In WAN mode the network additionally has to carry WAN_SUBNET, because the tc filters
+# match on destination IP and so the addresses must be static.
+ensure-network:
+ifneq ($(WAN),)
+	@want="$(WAN_SUBNET)"; \
+	 have=$$($(DOCKER) network inspect atlas_network \
+	         -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true); \
+	 if [ "$$have" != "$$want" ]; then \
+	     if [ -n "$$have" ]; then \
+	         echo "Recreating atlas_network: subnet '$$have' -> '$$want'"; \
+	     fi; \
+	     $(DOCKER) network rm atlas_network 2>/dev/null || true; \
+	     $(DOCKER) network create --subnet="$$want" atlas_network || { \
+	         echo ""; \
+	         echo "ERROR: could not (re)create atlas_network with subnet $$want."; \
+	         echo "       Most likely something is still attached to the old network —"; \
+	         echo "       the metrics stack is the usual culprit, since it outlives a run:"; \
+	         echo ""; \
+	         echo "           make stop-metrics && make <project> local WAN_ENABLED=1"; \
+	         echo ""; \
+	         echo "       Check with: $(DOCKER) network inspect atlas_network"; \
+	         exit 1; \
+	     }; \
+	 fi
+else
+	@$(DOCKER) network create atlas_network 2>/dev/null || true
+endif
+
 # ── Local Docker Compose ──────────────────────────────────────────────────────────
-local: gen-configs ensure-lockfile
+# ensure-metrics comes before anything that starts a node: see its comment below.
+local: METRICS_MODE := local
+local: gen-configs ensure-lockfile ensure-network ensure-metrics
 	@bash $(SCRIPTS)/gen-nodes-toml.sh local $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
@@ -148,20 +224,8 @@ endif
 	    --build-arg APP_SOURCE_DIR=$(APP_SOURCE_DIR) \
 	    -f $(DOCKERFILE_ABS) $(BUILD_CTX_ABS)
 ifneq ($(WAN),)
-	@want="$(WAN_SUBNET)"; \
-	 have=$$($(DOCKER) network inspect atlas_network \
-	         -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true); \
-	 if [ "$$have" != "$$want" ]; then \
-	     if [ -n "$$have" ]; then \
-	         echo "Recreating atlas_network: subnet '$$have' -> '$$want'"; \
-	     fi; \
-	     $(DOCKER) network rm atlas_network 2>/dev/null || true; \
-	     $(DOCKER) network create --subnet="$$want" atlas_network; \
-	 fi
 	@echo "WAN emulation ON — profile '$(WAN_PROFILE)', subnet $(WAN_SUBNET)."
 	@echo "Inspect the topology with: make <project> wan-plan"
-else
-	$(DOCKER) network create atlas_network 2>/dev/null || true
 endif
 	@bash -c 'trap "$(COMPOSE) -f $(GENERATED)/local-compose.yml down; sleep 1; $(DOCKER) network rm atlas_network 2>/dev/null || true" EXIT; $(COMPOSE) -f $(GENERATED)/local-compose.yml up' || true
 
@@ -173,7 +237,8 @@ logs-local:
 	$(COMPOSE) -f $(GENERATED)/local-compose.yml logs -f
 
 # ── Remote Docker ─────────────────────────────────────────────────────────────────
-remote-docker: gen-configs ensure-lockfile
+remote-docker: METRICS_MODE := remote
+remote-docker: gen-configs ensure-lockfile ensure-metrics
 	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
@@ -186,7 +251,8 @@ stop-remote-docker:
 	    -e "remote_workdir=$(REMOTE_WORKDIR)"
 
 # ── Remote Bare ───────────────────────────────────────────────────────────────────
-remote-bare: gen-configs build-binary
+remote-bare: METRICS_MODE := remote
+remote-bare: gen-configs build-binary ensure-metrics
 	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
@@ -284,6 +350,66 @@ wan-apply:
 	done
 	@echo ""
 	@cat $(GENERATED)/wan/matrix.txt
+
+# ── Metrics stack ─────────────────────────────────────────────────────────────────
+# InfluxDB (where every node writes) and Grafana (where you read it), as their own
+# Compose project on the shared atlas_network:
+#
+#   * with LOCAL_INFLUXDB=1 the stack runs the database, replicas and clients reach
+#     it as http://influxdb:8086 over atlas_network, and Grafana reads the same
+#     container — no host port needs to be published for any of that;
+#   * with LOCAL_INFLUXDB=0 the influxdb service is filtered out by its Compose
+#     profile and everything talks to the external instance from
+#     config-base/common/influx_db.toml.
+#
+# gen-grafana.sh resolves which of the two applies and writes the server's env, the
+# datasource and the credentials from one file, so the writers, the database and
+# Grafana cannot end up on different databases.
+#
+# No project name is required: `make metrics` from testing-grounds/ is enough.
+metrics: ensure-network
+	@bash $(SCRIPTS)/metrics-up.sh explicit
+	@echo "  Dashboards: folder 'Atlas'. Anonymous access is $(GRAFANA_ANONYMOUS); admin login is $(GRAFANA_ADMIN_USER)."
+
+# Hook for the run targets. Same script, so the automatic path and `make metrics`
+# cannot diverge; METRICS_AUTOSTART=0 opts out. `up -d` on a running stack is a
+# no-op and the wait returns immediately, so this costs ~nothing once it is up.
+#
+# It is a hard prerequisite rather than a best-effort nicety on purpose: a node whose
+# InfluxDB is unreachable aborts (os_mon's .expect + panic = "abort" in the release
+# profile), so a run started before the database is up does not produce degraded
+# results — it produces none.
+ensure-metrics: ensure-network
+ifeq ($(METRICS_AUTOSTART),1)
+	@bash $(SCRIPTS)/metrics-up.sh $(METRICS_MODE)
+else
+	@echo "METRICS_AUTOSTART=0 — not starting the metrics stack."
+	@echo "  Nodes still write to whatever generated/config-*/influx_db.toml names, and"
+	@echo "  abort on the first failed write. Make sure that instance is up."
+endif
+
+stop-metrics:
+	$(METRICS_DOWN) down
+	@$(DOCKER) network rm atlas_network 2>/dev/null || true
+
+logs-metrics:
+	$(METRICS_DOWN) logs -f
+
+# Also drops both data volumes: Grafana's own state (UI edits, users, starred
+# dashboards) and, more to the point, every measurement InfluxDB has stored. The
+# provisioned dashboards come straight back from bench/grafana/dashboards/; the
+# measurements do not come back at all.
+clean-metrics:
+	$(METRICS_DOWN) down -v
+	@rm -rf $(GENERATED)/grafana
+	@$(DOCKER) network rm atlas_network 2>/dev/null || true
+	@echo "Metrics stack stopped; data volumes and $(GENERATED)/grafana removed."
+
+# Aliases kept from when the stack was Grafana alone.
+grafana: metrics
+stop-grafana: stop-metrics
+logs-grafana: logs-metrics
+clean-grafana: clean-metrics
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────────
 clean:

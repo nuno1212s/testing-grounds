@@ -22,12 +22,19 @@ MODES := local stop-local logs-local \
          remote-docker stop-remote-docker \
          remote-bare stop-remote-bare \
          build-binary gen-configs \
+         metrics stop-metrics logs-metrics clean-metrics \
+         grafana stop-grafana logs-grafana clean-grafana \
          wan-check wan-plan wan-show wan-apply \
          clean clean-docker clean-cargo distclean help
 
-# Cleanup targets that act on the shared/global bench dir and can run without a
-# project named (naming one additionally purges that project's image / target/).
-PROJECT_FREE := clean clean-docker distclean help
+# Targets that act on the shared/global bench dir and can run without a project named.
+# For the cleanup targets, naming one additionally purges that project's image /
+# target/. The metrics stack (InfluxDB + Grafana) is project-independent outright: it
+# reads the InfluxDB target from the global config-base, so `make metrics` on its own
+# is the normal form.
+PROJECT_FREE := clean clean-docker distclean help \
+                metrics stop-metrics logs-metrics clean-metrics \
+                grafana stop-grafana logs-grafana clean-grafana
 
 # Mapping: project name → bench dir (relative to this Makefile's directory)
 bench_dir_microbenchmarks-async          := microbenchmarks-async/bench
@@ -68,5 +75,7 @@ $(MODES):
 	    for p in $(PROJECTS); do echo "  $$p"; done; \
 	    echo ""; \
 	    echo "Targets: $(MODES)"; \
+	    echo ""; \
+	    echo "These need no project: $(PROJECT_FREE)"; \
 	    exit 1; \
 	fi
