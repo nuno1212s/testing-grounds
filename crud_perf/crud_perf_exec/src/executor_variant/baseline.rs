@@ -24,6 +24,12 @@ pub type Executor = SingleThreadedMonExecutor<AppNetwork>;
 /// other crate's names here would therefore export this run's execution timings under labels
 /// belonging to an executor that never ran -- corrupting the comparison silently instead of
 /// failing. Each variant module registers its own, so the two cannot be mismatched.
+///
+/// The one pair both crates export under the *same* name is
+/// `OPERATIONS_EXECUTED_PER_SECOND` / `UNORDERED_OPERATIONS_EXECUTED_PER_SECOND` -- the
+/// headline throughput series. That sharing is deliberate and is what makes the four
+/// variants comparable to each other and to the other suites; see the note on IDs 824/825
+/// in `Atlas-SMR-Preemptive-Execution/CLAUDE.md`.
 pub fn metrics() -> Vec<MetricRegistry> {
     atlas_smr_execution::metric::metrics()
 }

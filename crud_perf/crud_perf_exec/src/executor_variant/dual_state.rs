@@ -29,6 +29,10 @@ pub type Executor = MonolithicPreemptiveExecutor;
 /// metric IDs 800+, so registering the wrong crate would mislabel this run's data rather
 /// than fail. Relevant here: `DS_PREEMPTIVE_EXECUTION_TIME`, `DS_BACKTRACK_COUNT`,
 /// `DS_SPECULATION_TO_CONFIRM_LATENCY`, `CONFIRM_EXECUTION_TIME`.
+///
+/// `OPERATIONS_EXECUTED_PER_SECOND` is the exception to the "different names" rule: the
+/// preemptive crate exports it under the same name as the baseline, counted at
+/// confirmation, so throughput can be compared against `baseline` panel-for-panel.
 pub fn metrics() -> Vec<MetricRegistry> {
     atlas_smr_preemptive_execution::metric::metrics()
 }
