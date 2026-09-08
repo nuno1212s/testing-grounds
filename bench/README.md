@@ -14,6 +14,7 @@ This directory is the single shared benchmarking layer for all projects in `test
    - [Global bench.env](#global-benchenv)
    - [Per-project bench.env](#per-project-benchenv)
    - [hosts.yml](#hostsyml)
+   - [Compile-time variants (EXECUTOR_VARIANT)](#compile-time-variants-executor_variant)
 6. [WAN Emulation](#wan-emulation)
 7. [Metrics and Grafana](#metrics-and-grafana)
 8. [Adding a New Project](#adding-a-new-project)
@@ -126,6 +127,8 @@ make microbenchmarks-async local N_REPLICAS=7 N_CLIENTS=10 RUST_LOG=DEBUG
 
 Builds a Docker image from the shared `bench/Dockerfile` using the project's source tree, creates a Docker network (`atlas_network`), and starts one container per replica and one per client. Configs and ca-root are volume-mounted from `bench/generated/` — no files are baked into the image.
 
+If the project selects a compile-time variant (`EXECUTOR_VARIANT`, see [Compile-time variants](#compile-time-variants-executor_variant)), that selection is compiled into this image and encoded in its tag.
+
 The network is torn down automatically when the Compose stack exits.
 
 Local mode can additionally emulate a WAN — per-link latency, jitter, loss and
@@ -143,6 +146,8 @@ Generates per-machine `docker-compose.yml` files and uses Ansible to push config
 - A populated `hosts.yml` in the project's `bench/` directory
 - A pre-built image at `DOCKER_IMAGE:DOCKER_VERSION` accessible from the cluster
 
+This mode **builds nothing** — each machine pulls the registry image. A compile-time variant therefore cannot be chosen at deploy time; it has to be baked in when that image is built and pushed. See [Compile-time variants](#compile-time-variants-executor_variant).
+
 ```bash
 make microbenchmarks-async remote-docker
 make microbenchmarks-async stop-remote-docker
@@ -150,7 +155,7 @@ make microbenchmarks-async stop-remote-docker
 
 ### `remote-bare` — Native binary on a remote cluster
 
-Compiles the Rust binary with `RUSTFLAGS="-C target-cpu=native"`, then uses Ansible to push the binary, configs, ca-root, and identity env files to each machine and start processes. No Docker required on remote hosts.
+Compiles the Rust binary with `RUSTFLAGS="-C target-cpu=native"`, then uses Ansible to push the binary, configs, ca-root, and identity env files to each machine and start processes. No Docker required on remote hosts. Honours `EXECUTOR_VARIANT`.
 
 ```bash
 make microbenchmarks-async remote-bare
@@ -299,6 +304,8 @@ Each project's `bench.env` must define four identity variables and may override 
 | Variable | How it is derived |
 |---|---|
 | `APP_SOURCE_DIR` | Derived from `RUST_SRC_RELPATH` relative to the Atlas repo root (used as a Docker build arg) |
+| `CARGO_FEATURES` | Copied from `EXECUTOR_VARIANT`; empty for projects that set none. Reaches `build-binary` as cargo flags and the Docker build as a build arg |
+| `IMAGE_NAME_EFFECTIVE` | `IMAGE_NAME`, plus `-<variant>` when `CARGO_FEATURES` is set, plus `-wan` in WAN mode |
 | `DOCKERFILE_ABS` | Always `bench/Dockerfile` |
 | `BUILD_CTX_ABS` | Always the Atlas repo root (two levels above `bench/`) |
 
@@ -347,6 +354,57 @@ clients:
 
 - **Replicas**: one entry per machine, `node_id` must be unique and sequential from 0.
 - **Clients**: one entry per client machine. `N_CLIENT_MACHINES` of the listed hosts are used (in order). Each machine runs one process with `N_CLIENTS` logical clients. `node_id` is not specified — it is computed as `1000 + i`.
+
+### Compile-time variants (`EXECUTOR_VARIANT`)
+
+Some binaries pick a variant of themselves at compile time, because the choice is a Rust
+type alias and cannot be a runtime switch. `crud_perf` is the one that does today: its
+`EXECUTOR_VARIANT` names one of four mutually exclusive Cargo features (`baseline`,
+`dual_state`, `crud_single`, `crud_scalable`), and the chosen name is what the binary
+stamps as the InfluxDB `extra` tag, so runs are self-identifying at analysis time.
+
+The bench system carries this generically, under the name `CARGO_FEATURES`. Set
+`EXECUTOR_VARIANT` in the project's `bench.env` or override it per run:
+
+```bash
+make crud_perf local        EXECUTOR_VARIANT=baseline
+make crud_perf build-binary EXECUTOR_VARIANT=baseline
+```
+
+| Mode | Honours `EXECUTOR_VARIANT`? | How |
+|---|---|---|
+| `local` | yes | `--build-arg CARGO_FEATURES=<variant>` on the image build, mirrored into `build.args` of `generated/local-compose.yml` |
+| `build-binary` / `remote-bare` | yes | `--no-default-features --features <variant>` on the cargo invocation |
+| `remote-docker` | **no** | Builds nothing; every machine pulls `DOCKER_IMAGE:DOCKER_VERSION`. The target prints a warning naming the variant it is ignoring |
+
+Empty (the normal case — no other project sets it) means both paths run exactly the
+cargo/`docker build` command they ran before this arg existed.
+
+**The image tag varies with the variant.** `IMAGE_NAME_EFFECTIVE` becomes
+`<IMAGE_NAME>-<variant>` (`crud-perf-baseline`, `crud-perf-crud-single`; underscores and
+commas folded to dashes to stay a legal tag), and `-wan` is still appended on top in WAN
+mode. Without this a cached image from the previous variant would be reused and the run
+would silently benchmark the wrong executor.
+
+For `remote-docker`, build and push a per-variant tag and select it with `DOCKER_VERSION`:
+
+```bash
+docker build --build-arg APP_NAME=crud_perf_exec \
+             --build-arg APP_SOURCE_DIR=testing-grounds/crud_perf/crud_perf_exec \
+             --build-arg CARGO_FEATURES=baseline \
+             -f testing-grounds/bench/Dockerfile \
+             -t nukino/atlas-crud-perf:baseline .          # from the Atlas repo root
+docker push nukino/atlas-crud-perf:baseline
+make crud_perf remote-docker DOCKER_VERSION=baseline
+```
+
+Confirm what actually ran rather than what you asked for: each replica logs
+`executor_variant=<name>` at startup, and the same name lands in InfluxDB —
+
+```bash
+docker exec atlas-influxdb influx -database atlas \
+    -execute 'SHOW TAG VALUES WITH KEY = "extra"'
+```
 
 ---
 

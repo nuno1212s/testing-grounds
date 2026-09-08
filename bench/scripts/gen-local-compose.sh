@@ -11,6 +11,12 @@
 #   BUILD_CTX_ABS    - absolute path to Docker build context (Atlas repo root)
 #   DOCKERFILE_ABS   - absolute path to the shared Dockerfile
 #   BINARY_NAME, APP_SOURCE_DIR, N_REPLICAS, N_CLIENTS, N_CLIENT_MACHINES, RUST_LOG
+#   CARGO_FEATURES   - optional Cargo feature list compiled into the binary (the
+#                      Makefile sources it from EXECUTOR_VARIANT). Emitted as a
+#                      build arg only when non-empty, so projects that select no
+#                      variant produce the same build block as before. The image
+#                      tag has to vary with it too — that is IMAGE_NAME_EFFECTIVE's
+#                      job, see below.
 #   LOCAL_INFLUXDB   - 1 to point the generated configs at the metrics stack's own
 #                      InfluxDB. The server itself is NOT emitted here: it lives in
 #                      bench/grafana/docker-compose.yml, because a database that is
@@ -30,7 +36,9 @@
 #   WAN_SUBNET        - subnet for static addressing (default 10.90.0.0/24)
 #   WAN_IFACE         - interface shaped inside the container (default eth0)
 #   WAN_SHAPE_CLIENTS - 0 to shape replica<->replica links only
-#   IMAGE_NAME_EFFECTIVE - image tag to use (Makefile sets <IMAGE_NAME>-wan in WAN mode)
+#   IMAGE_NAME_EFFECTIVE - image tag to use. The Makefile appends the Cargo feature
+#                          list and, in WAN mode, -wan, so images built from
+#                          different sources cannot collide in the local cache.
 
 set -euo pipefail
 
@@ -42,6 +50,7 @@ set -euo pipefail
 : "${DOCKERFILE_ABS:?DOCKERFILE_ABS not set}"
 : "${BINARY_NAME:?BINARY_NAME not set}"
 : "${APP_SOURCE_DIR:?APP_SOURCE_DIR not set}"
+: "${CARGO_FEATURES:=}"
 : "${N_REPLICAS:?N_REPLICAS not set}"
 : "${N_CLIENTS:?N_CLIENTS not set}"
 : "${N_CLIENT_MACHINES:?N_CLIENT_MACHINES not set}"
@@ -106,6 +115,9 @@ EOF
       args:
         APP_NAME: ${BINARY_NAME}
         APP_SOURCE_DIR: ${APP_SOURCE_DIR}
+EOF
+    [ -n "$CARGO_FEATURES" ] && echo "        CARGO_FEATURES: ${CARGO_FEATURES}"
+    cat <<EOF
     container_name: replica-${i}
     hostname: replica-${i}
     ports:
@@ -169,6 +181,9 @@ EOF
       args:
         APP_NAME: ${BINARY_NAME}
         APP_SOURCE_DIR: ${APP_SOURCE_DIR}
+EOF
+    [ -n "$CARGO_FEATURES" ] && echo "        CARGO_FEATURES: ${CARGO_FEATURES}"
+    cat <<EOF
     container_name: client-${i}
     hostname: client-${i}
     ports:
