@@ -22,11 +22,23 @@ docs there explain what each executor actually does and what to watch when bench
 | `crud_single` | `crud_single.rs` | `CRUDMonolithicPreemptiveExecutor` | Single-threaded cache/delta; applies a precomputed delta on confirm. Default. |
 | `crud_scalable` | `crud_scalable.rs` | `ScalableCRUDMonolithicPreemptiveExecutor` | As above, but parallel within a batch with collision detection. |
 
-Set it in `bench/bench.env`, or override per run:
+Set it in `bench/bench.env`, or override per run. Every mode that *builds* honours it:
 
 ```bash
-make crud_perf build-binary EXECUTOR_VARIANT=baseline
+make crud_perf local        EXECUTOR_VARIANT=baseline   # Docker; variant is a build arg
+make crud_perf build-binary EXECUTOR_VARIANT=baseline   # native binary (also remote-bare)
+make crud_perf remote-bare  EXECUTOR_VARIANT=baseline
 ```
+
+`local` bakes the variant into the image and into its tag (`crud-perf-baseline`,
+`crud-perf-crud-single`, ...), so switching variants cannot silently reuse the previous
+build's image.
+
+`remote-docker` is the exception: it builds nothing and every machine pulls
+`DOCKER_IMAGE:DOCKER_VERSION`, so the variant has to be baked in when that image is built
+and pushed, and distinguished by its tag. The target prints the exact build/push/deploy
+commands when it detects a variant it cannot honour. See
+`../bench/README.md#compile-time-variants-executor_variant`.
 
 Building directly (note: Cargo features are additive and `crud_single` is the default, so a
 non-default variant needs `--no-default-features`):
@@ -36,6 +48,15 @@ cargo build --release --no-default-features --features crud_scalable
 ```
 
 Selecting zero or more than one variant is a compile error, not a silent misconfiguration.
+
+Confirm what was actually built rather than what you asked for — each replica logs
+`executor_variant=<name>` at startup, and the same name is stamped as the InfluxDB `extra`
+tag whenever `INFLUX_EXTRA` is unset:
+
+```bash
+docker exec atlas-influxdb influx -database atlas \
+    -execute 'SHOW TAG VALUES WITH KEY = "extra"'
+```
 
 ## What gets measured
 

@@ -42,14 +42,34 @@ RUST_SRC_ABS    := $(abspath $(PROJECT_BENCH_DIR)/$(RUST_SRC_RELPATH))
 # APP_SOURCE_DIR: RUST_SRC_ABS expressed relative to the Atlas repo root (build context).
 APP_SOURCE_DIR  := $(patsubst $(BUILD_CTX_ABS)/%,%,$(RUST_SRC_ABS))
 
+# ── Compile-time feature selection ────────────────────────────────────────────────
+# Some projects select a variant of their binary at compile time rather than at run
+# time. crud_perf is the one that does today: EXECUTOR_VARIANT (in its bench.env)
+# names one of four mutually exclusive Cargo features, and the chosen name is also
+# what the binary stamps as the InfluxDB `extra` tag.
+#
+# CARGO_FEATURES is the generic carrier: it reaches build-binary as cargo flags and
+# the Docker build as the CARGO_FEATURES build arg. It is empty for every other
+# project, and empty means "build exactly as before" on both paths.
+CARGO_FEATURES := $(EXECUTOR_VARIANT)
+
 # ── WAN emulation ─────────────────────────────────────────────────────────────────
 # All of this is inert unless WAN_ENABLED=1. When off, IMAGE_NAME_EFFECTIVE and
 # DOCKER_TARGET resolve to exactly what the build used before WAN support existed
 # (`final` is the last stage in the Dockerfile, so --target final is a no-op).
 WAN                  := $(if $(filter 1,$(WAN_ENABLED)),1,)
-IMAGE_NAME_EFFECTIVE := $(if $(WAN),$(IMAGE_NAME)-wan,$(IMAGE_NAME))
 DOCKER_TARGET        := $(if $(WAN),final-wan,final)
 NETEM_PROBE_IMAGE    := atlas-netem-probe
+
+# ── Local image tag ───────────────────────────────────────────────────────────────
+# The tag has to encode everything that changes what is *inside* the image, or a
+# cached image from a previous run is silently reused: `make crud_perf local
+# EXECUTOR_VARIANT=baseline` would then benchmark whatever variant was built last.
+# Underscores and commas are folded to dashes so a feature list stays a legal tag
+# (crud-perf-crud-single, not crud-perf-crud_single,foo).
+COMMA              := ,
+IMAGE_VARIANT_SFX  := $(subst _,-,$(subst $(COMMA),-,$(CARGO_FEATURES)))
+IMAGE_NAME_EFFECTIVE := $(IMAGE_NAME)$(if $(IMAGE_VARIANT_SFX),-$(IMAGE_VARIANT_SFX),)$(if $(WAN),-wan,)
 
 # ── Metrics stack ─────────────────────────────────────────────────────────────────
 # InfluxDB + Grafana, a Compose project of its own (bench/grafana/) joined to the same
@@ -222,7 +242,11 @@ endif
 	    --target $(DOCKER_TARGET) \
 	    --build-arg APP_NAME=$(BINARY_NAME) \
 	    --build-arg APP_SOURCE_DIR=$(APP_SOURCE_DIR) \
+	    $(if $(CARGO_FEATURES),--build-arg CARGO_FEATURES=$(CARGO_FEATURES),) \
 	    -f $(DOCKERFILE_ABS) $(BUILD_CTX_ABS)
+ifneq ($(CARGO_FEATURES),)
+	@echo "Built $(IMAGE_NAME_EFFECTIVE) with cargo features: $(CARGO_FEATURES)"
+endif
 ifneq ($(WAN),)
 	@echo "WAN emulation ON — profile '$(WAN_PROFILE)', subnet $(WAN_SUBNET)."
 	@echo "Inspect the topology with: make <project> wan-plan"
@@ -237,8 +261,27 @@ logs-local:
 	$(COMPOSE) -f $(GENERATED)/local-compose.yml logs -f
 
 # ── Remote Docker ─────────────────────────────────────────────────────────────────
+# NOTE: unlike `local`, this mode does not build anything — every machine pulls
+# $(DOCKER_IMAGE):$(DOCKER_VERSION) from the registry. A compile-time variant therefore
+# cannot be selected here; it has to be baked in when that image is built and pushed,
+# and distinguished by its tag. Hence the warning rather than a build arg.
 remote-docker: METRICS_MODE := remote
 remote-docker: gen-configs ensure-lockfile ensure-metrics
+# Suppressed once DOCKER_VERSION names the variant — that is the fix being suggested.
+ifeq ($(if $(CARGO_FEATURES),$(findstring $(CARGO_FEATURES),$(DOCKER_VERSION)),skip),)
+	@echo "WARNING: EXECUTOR_VARIANT=$(CARGO_FEATURES) is IGNORED by remote-docker."
+	@echo "         This mode pulls the pre-built image $(DOCKER_IMAGE):$(DOCKER_VERSION);"
+	@echo "         the variant compiled into it is whatever was pushed under that tag."
+	@echo "         Build and push a per-variant tag, then set DOCKER_VERSION to it:"
+	@echo "           docker build --build-arg APP_NAME=$(BINARY_NAME) \\"
+	@echo "                        --build-arg APP_SOURCE_DIR=$(APP_SOURCE_DIR) \\"
+	@echo "                        --build-arg CARGO_FEATURES=$(CARGO_FEATURES) \\"
+	@echo "                        -f $(DOCKERFILE_ABS) \\"
+	@echo "                        -t $(DOCKER_IMAGE):$(CARGO_FEATURES) $(BUILD_CTX_ABS)"
+	@echo "           docker push $(DOCKER_IMAGE):$(CARGO_FEATURES)"
+	@echo "           make <project> remote-docker DOCKER_VERSION=$(CARGO_FEATURES)"
+	@echo ""
+endif
 	@bash $(SCRIPTS)/gen-nodes-toml.sh remote $(N_REPLICAS) $(N_CLIENT_MACHINES)
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-replicas/nodes.toml
 	@cp $(GENERATED)/nodes.toml $(GENERATED)/config-clients/nodes.toml
@@ -267,9 +310,9 @@ stop-remote-bare:
 	    -e "binary_name=$(BINARY_NAME)"
 
 build-binary:
-	@echo "Compiling $(BINARY_NAME)$(if $(EXECUTOR_VARIANT), [executor variant: $(EXECUTOR_VARIANT)],)..."
+	@echo "Compiling $(BINARY_NAME)$(if $(CARGO_FEATURES), [executor variant: $(CARGO_FEATURES)],)..."
 	cd $(RUST_SRC_ABS) && RUSTFLAGS="-C target-cpu=native" cargo build --release \
-	    $(if $(EXECUTOR_VARIANT),--no-default-features --features $(EXECUTOR_VARIANT),)
+	    $(if $(CARGO_FEATURES),--no-default-features --features $(CARGO_FEATURES),)
 	@mkdir -p $(GENERATED)
 	@cp $(RUST_SRC_ABS)/target/release/$(BINARY_NAME) $(GENERATED)/$(BINARY_NAME)
 	@echo "Binary copied to $(GENERATED)/$(BINARY_NAME)"
