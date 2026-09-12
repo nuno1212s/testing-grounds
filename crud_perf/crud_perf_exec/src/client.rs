@@ -28,8 +28,11 @@ use crate::common::{BFT, ClientNode, ReconfProtocol, SMRClient, generate_log};
 use crate::config::benchmark_configs::{
     BenchmarkConfig, read_benchmark_config, read_client_config,
 };
-use crate::metric::{CRUD_CLIENT_LATENCY_ID, CRUD_CLIENT_OPS_DONE_ID};
-use crate::serialize::{CRUDRequest, MicrobenchmarkData};
+use crate::metric::{
+    CRUD_CLIENT_LATENCY_ID, CRUD_CLIENT_OPS_DONE_ID, CRUD_LATENCY_DELETE_ID, CRUD_LATENCY_READ_ID,
+    CRUD_LATENCY_WRITE_ID,
+};
+use crate::serialize::{CRUDRequest, CRUDRequestType, MicrobenchmarkData};
 use crate::workload::{KeyDistributionKind, WorkloadGenerator, WorkloadType};
 use atlas_default_configs::crypto::FlattenedPathConstructor;
 
@@ -279,15 +282,30 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
         let op = generator.next_op(force_ordered);
 
+        // Which per-kind tracker this request also reports to. The aggregate
+        // CRUD_CLIENT_LATENCY is dominated by whichever kind the mix favours (reads, at the
+        // default 70/15/10/5), and speculation does materially different work per kind --
+        // a read is answered from the accumulated cache, a write accumulates a delta -- so
+        // the aggregate alone cannot show where the win came from.
+        let kind_metric_id = match &op.request_type {
+            CRUDRequestType::Read { .. } => CRUD_LATENCY_READ_ID,
+            CRUDRequestType::Create { .. } | CRUDRequestType::Update { .. } => {
+                CRUD_LATENCY_WRITE_ID
+            }
+            CRUDRequestType::Delete { .. } => CRUD_LATENCY_DELETE_ID,
+        };
+
         let correlation_id = format!("{}-{}", id, seq.fetch_add(1, Ordering::Relaxed));
 
         metric_correlation_time_start(CRUD_CLIENT_LATENCY_ID, &correlation_id);
+        metric_correlation_time_start(kind_metric_id, &correlation_id);
 
         let sem_clone = meas_sem.clone();
         let corr_clone = correlation_id.clone();
 
         let callback = Arc::new(move |_reply| {
             metric_correlation_time_end(CRUD_CLIENT_LATENCY_ID, &corr_clone);
+            metric_correlation_time_end(kind_metric_id, &corr_clone);
             metric_increment(CRUD_CLIENT_OPS_DONE_ID, Some(1));
             sem_clone.release();
         });

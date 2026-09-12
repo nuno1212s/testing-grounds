@@ -9,8 +9,11 @@ Usage:
     ./compare_variants.py --url http://localhost:8086 --db atlas
     ./compare_variants.py --since 30m --variants baseline,crud_scalable
 
-Note on statistics: atlas-metrics stores rolling mean/stddev (Welford), not histograms, so
-there are no percentiles available. Latency claims from this table are mean +/- stddev only.
+Note on statistics: atlas-metrics stores rolling mean/stddev (Welford) for Duration, Count
+and Counter metrics, so those rows are mean +/- stddev only. The exception is the
+CorrelationDurationTracker kind (CRUD_CLIENT_LATENCY and the per-kind CRUD_LATENCY_*), which
+writes one point per request -- real percentiles exist for those, and the tail-latency
+section below reads them.
 """
 
 import argparse
@@ -36,6 +39,41 @@ EXEC_METRICS = [
     ("SCALABLE_PREEMPTIVE_EXECUTION_TIME", "Execution (scalable spec)", "ns"),
     ("CONFIRM_EXECUTION_TIME", "Confirm re-exec (dual-state)", "ns"),
     ("CACHE_CONFIRM_APPLICATION_TIME", "Confirm delta apply (cache)", "ns"),
+    ("SCALABLE_CONFIRM_APPLICATION_TIME", "Confirm delta apply (scalable)", "ns"),
+    # Application-side, split by path. dual_state runs both, so its two rows add up to what
+    # one operation actually costs it; baseline fills only the confirmed row and the cache
+    # variants only the speculative one.
+    ("CRUD_OP_EXEC_TIME", "App op (confirmed path)", "ns"),
+    ("CRUD_SPEC_OP_EXEC_TIME", "App op (speculative path)", "ns"),
+]
+
+# The two directions of the speculation race, and the reason this script exists.
+#
+# SPECULATION_TO_CONFIRM is the reply waiting on consensus -- speculation won, and that wait
+# is latency the client never paid. CONFIRM_TO_REPLY is consensus waiting on the reply, which
+# is the part that is still on the critical path. A preemptive variant beats the baseline
+# exactly insofar as it moves time from the second row into the first.
+#
+# Read SPECULATION_HIT_RATE first. It is the validity check: the speculative path engages via
+# Rust specialization, which fails silently, so a run with a 0% hit rate compiled and ran and
+# produced every number below while actually measuring the baseline against itself.
+CONFIRM_METRICS = [
+    ("SPECULATION_HIT_RATE", "Speculation hit rate", "permille"),
+    ("CACHE_SPECULATION_TO_CONFIRM_LATENCY", "Reply waiting (cache)", "ns"),
+    ("DS_SPECULATION_TO_CONFIRM_LATENCY", "Reply waiting (dual-state)", "ns"),
+    ("SCALABLE_SPECULATION_TO_CONFIRM_LATENCY", "Reply waiting (scalable)", "ns"),
+    ("CONFIRM_TO_REPLY_TIME", "Post-commit path (all)", "ns"),
+    ("CONFIRM_BLOCKED_ON_EXEC_TIME", "  ...on a speculation miss", "ns"),
+    ("CONFIRM_ENQUEUE_TO_APPLY_LATENCY", "  ...queueing alone", "ns"),
+    ("SPECULATION_FALLBACK_COUNT", "Speculation misses", "count"),
+]
+
+# CorrelationDurationTracker metrics: one InfluxDB point per request, so percentile() works.
+PERCENTILE_METRICS = [
+    ("CRUD_CLIENT_LATENCY", "E2E latency (all ops)", "ns"),
+    ("CRUD_LATENCY_READ", "E2E latency (reads)", "ns"),
+    ("CRUD_LATENCY_WRITE", "E2E latency (writes)", "ns"),
+    ("CRUD_LATENCY_DELETE", "E2E latency (deletes)", "ns"),
 ]
 
 # The cost side of speculation: if these are high, a latency win is not free.
@@ -93,6 +131,35 @@ def fetch(url, db, measurement, since, user, password):
     return out
 
 
+def fetch_percentiles(url, db, measurement, since, user, password):
+    """Return {variant: (p50, p99)} for a CorrelationDurationTracker measurement.
+
+    Only valid for that kind: it writes one point per request, so InfluxDB still holds the
+    individual samples. Every other kind has already been collapsed to a per-second mean by
+    the metrics thread before it is written, and percentile() over those means is meaningless.
+    """
+    q = (
+        f'SELECT percentile("value", 50), percentile("value", 99) FROM "{measurement}" '
+        f"WHERE time > now() - {since} GROUP BY \"extra\""
+    )
+    data = query(url, db, q, user, password)
+    if not data:
+        return {}
+
+    out = {}
+    for result in data.get("results", []):
+        for series in result.get("series", []):
+            variant = series.get("tags", {}).get("extra") or "(untagged)"
+            # Read positionally: InfluxQL names the two output columns "percentile" and
+            # "percentile_1", and the disambiguating suffix is not worth depending on.
+            # Column 0 is always time.
+            values = series["values"][0][1:]
+            p50 = values[0] if values else None
+            p99 = values[1] if len(values) > 1 else None
+            out[variant] = (p50, p99)
+    return out
+
+
 def fmt(value, unit):
     if value is None:
         return "-"
@@ -129,6 +196,7 @@ def main():
     variants = [v.strip() for v in args.variants.split(",") if v.strip()]
     sections = [
         ("Latency", LATENCY_METRICS),
+        ("Speculation: who waited for whom", CONFIRM_METRICS),
         ("Execution", EXEC_METRICS),
         ("Speculation cost / resources", OVERHEAD_METRICS),
     ]
@@ -172,9 +240,35 @@ def main():
                 line += cell.ljust(col_w)
             print(line)
 
+    tails = OrderedDict()
+    for measurement, _, _ in PERCENTILE_METRICS:
+        data = fetch_percentiles(
+            args.url, args.db, measurement, args.since, args.user, args.password
+        )
+        if data:
+            tails[measurement] = data
+
+    if tails:
+        print("\n=== Tail latency (p50 / p99, per-request samples) ===")
+        print("metric".ljust(label_w) + "".join(v.ljust(col_w) for v in variants))
+        print("-" * (label_w + col_w * len(variants)))
+        for measurement, label, unit in PERCENTILE_METRICS:
+            data = tails.get(measurement, {})
+            if not data:
+                continue
+            line = label.ljust(label_w)
+            for variant in variants:
+                p50, p99 = data.get(variant, (None, None))
+                cell = f"{fmt(p50, unit)} / {fmt(p99, unit)}" if p50 is not None else "-"
+                line += cell.ljust(col_w)
+            print(line)
+
     print(
-        "\nmean ±stddev only -- atlas-metrics uses Welford's online algorithm and stores no "
-        "histogram, so percentiles are not available."
+        "\nEvery table above the tail-latency one is mean ±stddev only -- atlas-metrics uses "
+        "Welford's online algorithm and stores no histogram, so a Duration reaches InfluxDB "
+        "already averaged into a one-second bucket. Only the CorrelationDurationTracker "
+        "metrics keep per-request samples, which is why the tail table exists for those and "
+        "nothing else."
     )
     return 0
 

@@ -8,7 +8,10 @@ use atlas_metrics::metrics::{
 };
 use atlas_smr_application::app::{Application, Reply, Request};
 
-use crate::metric::{CRUD_BATCH_EXEC_TIME_ID, CRUD_OP_EXEC_TIME_ID, CRUD_OPS_PER_BATCH_ID};
+use crate::metric::{
+    CRUD_BATCH_EXEC_TIME_ID, CRUD_OP_EXEC_TIME_ID, CRUD_OPS_PER_BATCH_ID,
+    CRUD_SPEC_OP_EXEC_TIME_ID, CRUD_UNORDERED_OP_EXEC_TIME_ID,
+};
 use crate::serialize::{
     CRUD_COLUMN, CRUDReply, CRUDRequest, CRUDRequestType, MicrobenchmarkData, State,
 };
@@ -45,7 +48,7 @@ impl Application<State> for Microbenchmark {
             _ => unreachable!("Non-read request routed as unordered"),
         };
 
-        metric_local_duration_end(CRUD_OP_EXEC_TIME_ID, start);
+        metric_local_duration_end(CRUD_UNORDERED_OP_EXEC_TIME_ID, start);
 
         if sleep_duration > Duration::ZERO {
             std::thread::sleep(sleep_duration);
@@ -134,7 +137,10 @@ impl CRUDApplication<State> for Microbenchmark {
             },
         };
 
-        metric_local_duration_end(CRUD_OP_EXEC_TIME_ID, start);
+        // Deliberately not CRUD_OP_EXEC_TIME: dual_state runs every operation on both
+        // paths, so sharing the name would report one average over two different pieces
+        // of work and hide the re-execution cost this benchmark is trying to price.
+        metric_local_duration_end(CRUD_SPEC_OP_EXEC_TIME_ID, start);
 
         if sleep_duration > Duration::ZERO {
             std::thread::sleep(sleep_duration);

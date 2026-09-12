@@ -78,6 +78,46 @@ End-to-end latency needs no new instrumentation — both systems share the reply
 already cover both. The per-request correlation trackers are registered `Disabled` upstream
 and are re-enabled here in `replica.rs::enable_request_tracking`.
 
+### Who waited for whom
+
+`CONSENSUS_WAIT_TIME` says how much dead time speculation *could* have filled. Two families
+say what it actually did with it, measuring the same race from opposite ends:
+
+| Direction | Metrics | Means |
+|---|---|---|
+| Reply waiting on consensus | `CACHE_` / `DS_` / `SCALABLE_SPECULATION_TO_CONFIRM_LATENCY` | The reply was finished and idle, waiting only for the commit. This is the win, in nanoseconds the client never paid. |
+| Consensus waiting on the reply | `CONFIRM_TO_REPLY_TIME` | Commit queued at the executor → replies ready to dispatch. Still on the critical path. |
+
+`CONFIRM_TO_REPLY_TIME` is the headline comparison, because it spans exactly the same two
+points as `EXECUTION_LATENCY + EXECUTION_TIME_TAKEN` does for the baseline executor: for
+`baseline` it is queueing plus a full batch execution, for a preemptive variant whose
+speculation hit it is queueing plus a delta apply. Its two companions decompose it —
+`CONFIRM_ENQUEUE_TO_APPLY_LATENCY` is the queueing alone, and
+`CONFIRM_BLOCKED_ON_EXEC_TIME` is the same span restricted to batches speculation had not
+reached, so the gap between that and `CONFIRM_TO_REPLY_TIME` prices one speculation hit.
+
+Unlike everything else in this table, those four (IDs 828–831) carry one name across all
+three preemptive executors, which is what lets a four-way comparison read them as one row.
+
+### Where the time went at the client
+
+`CRUD_CLIENT_LATENCY` covers the whole workload, and at the default 70/15/10/5 mix that
+makes it mostly a read latency with the writes averaged into invisibility. `CRUD_LATENCY_READ`,
+`CRUD_LATENCY_WRITE` and `CRUD_LATENCY_DELETE` split it by kind — exactly one per request, so
+the cost is one extra point per request, not three. This matters because speculation does
+different work per kind: a read is answered from the accumulated cache, a write accumulates a
+delta, and `crud_scalable`'s collision detection is driven by writes alone.
+
+On the application side, `CRUD_OP_EXEC_TIME` (confirmed path), `CRUD_SPEC_OP_EXEC_TIME`
+(speculative path) and `CRUD_UNORDERED_OP_EXEC_TIME` (reads that never reach consensus) are
+three separate names for what used to be one. They had to be separated: `dual_state` executes
+every operation twice — once speculatively, once again on confirmation — and `baseline`
+executes it once, yet under a shared name both reported the same-looking average and the
+re-execution cost was invisible. `dual_state` is the only variant that fills both of the
+first two; their sum is what one operation really costs it.
+
+### The cost side
+
 Beyond latency, the comparison is only meaningful alongside the *cost* of speculation:
 backtrack counts, collision rate, pending-queue depth, confirm-path cost, and CPU/RAM. A
 latency win at a 30% backtrack rate is a different result from one at 0.1%.
@@ -91,8 +131,14 @@ automatically unless `INFLUX_EXTRA` is exported. Run each variant, then:
 ./analysis/compare_variants.py --url http://localhost:8086 --db atlas --since 1h
 ```
 
-`atlas-metrics` stores rolling mean/stddev (Welford), not histograms — there are no
-percentiles. Latency claims from this harness are mean ± stddev only.
+`atlas-metrics` stores rolling mean/stddev (Welford) for `Duration`, `Count` and `Counter`,
+so those rows are mean ± stddev only — by the time such a metric reaches InfluxDB it has
+already been averaged into a one-second bucket, and a percentile over those averages means
+nothing.
+
+The exception is the `CorrelationDurationTracker` kind, which writes one point per request:
+`CRUD_CLIENT_LATENCY` and the three `CRUD_LATENCY_*` metrics keep their individual samples,
+so real p50/p99 exist for those and the script prints them in its own table.
 
 ## Verifying speculation is live
 
@@ -109,6 +155,11 @@ Two guards:
 - At runtime, confirm the speculative metrics are non-zero: `CACHE_PREEMPTIVE_EXECUTION_TIME`
   (crud_single), `DS_PREEMPTIVE_EXECUTION_TIME` (dual_state), or
   `SCALABLE_PREEMPTIVE_EXECUTION_TIME` (crud_scalable).
+- Simpler, and variant-independent: **`SPECULATION_HIT_RATE`**, the share of commits served
+  from pre-computed replies (permille, so 1000 = 100%). It is the first row of
+  `compare_variants.py`'s speculation table and a headline stat on the dashboard. Zero on a
+  preemptive build means the run is measuring the baseline against itself; blank on
+  `baseline` is correct, since it has no speculative path.
 
 ## Known gap: dual-state and state transfer
 
