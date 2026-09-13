@@ -267,6 +267,14 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         semaphore.acquire();
     }
 
+    // The drain above is a barrier: acquiring every permit proves no warm-up request is
+    // still in flight. Those permits are ours now, and nothing will release them -- the
+    // warm-up callbacks that would have are all done. Hand them back, or the measurement
+    // loop below blocks forever on its very first acquire().
+    for _ in 0..concurrent_rqs {
+        semaphore.release();
+    }
+
     // ── Measurement phase ──
     info!(
         "Executing experiment ({} ops)...",
