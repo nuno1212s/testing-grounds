@@ -1,6 +1,7 @@
 **/*.secret*
 # Generated bench output (per-project)
 **/bench/generated/
+**/bench/ca-root
 **/ca-root
 **/logs
 **/storage
