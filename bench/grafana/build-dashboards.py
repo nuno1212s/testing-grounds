@@ -675,14 +675,49 @@ def preemptive_executor_rows(L, E):
         ("SCALABLE_PREEMPTIVE_EXECUTION_TIME", "scalable"),
         ("CONFIRM_EXECUTION_TIME", "confirm"),
         ("CACHE_CONFIRM_APPLICATION_TIME", "cache confirm apply"),
+        ("SCALABLE_CONFIRM_APPLICATION_TIME", "scalable confirm apply"),
         ("CACHE_UNORDERED_EXECUTION_TIME", "cache unordered"),
     ]), "ns", "Only the variant the binary was built with reports; the rest stay empty."))
-    L.add(graph("Speculation-to-confirm latency", series(E, [
+    L.add(graph("Reply waiting on consensus (speculation-to-confirm)", series(E, [
         ("CACHE_SPECULATION_TO_CONFIRM_LATENCY", "cache"),
         ("DS_SPECULATION_TO_CONFIRM_LATENCY", "double-state"),
+        ("SCALABLE_SPECULATION_TO_CONFIRM_LATENCY", "scalable"),
         ("CONFIRMED_WORKER_LATENCY", "confirmed worker"),
         ("CACHE_ENQUEUE_TO_EXECUTE_LATENCY", "enqueue→execute"),
-    ]), "ns"))
+    ]), "ns",
+        "How long a reply sat finished, waiting only for consensus to commit the batch it "
+        "belongs to. This is the win, measured directly: it is work that finished before it "
+        "was needed, so every nanosecond here is latency the client did not pay.\n\n"
+        "Read against the confirmation-path row below, which measures the opposite "
+        "direction — consensus waiting on execution."))
+
+    L.row("Preemptive execution — the confirmation path",
+          "The mirror image of the row above, and the same four measurements for all three "
+          "variants rather than one name each. Every span starts when the ordering protocol "
+          "hands the executor a commit.")
+    L.add(graph("Post-commit critical path", series(E, [
+        ("CONFIRM_TO_REPLY_TIME", "commit → replies ready"),
+        ("CONFIRM_BLOCKED_ON_EXEC_TIME", "…when speculation missed"),
+        ("CONFIRM_ENQUEUE_TO_APPLY_LATENCY", "commit → dequeued (queueing)"),
+        ("CONSENSUS_WAIT_TIME", "pre-prepare → executor (reference)"),
+    ]), "ns",
+        "CONFIRM_TO_REPLY_TIME is the headline preemptive-vs-baseline number. It spans the "
+        "same two points as EXECUTION_LATENCY + EXECUTION_TIME_TAKEN in the standard "
+        "executor's row, so the two are directly comparable: for the baseline it is queueing "
+        "plus a full batch execution, for a preemptive executor whose speculation hit it is "
+        "queueing plus a delta apply.\n\n"
+        "The gap between the first two series is what one speculation hit is worth. If they "
+        "converge, speculation is not paying for itself — check the hit rate."))
+    L.add(graph("Speculation hit rate", [
+        target(q("SPECULATION_HIT_RATE", 'mean("value") / 10'), "hit rate $tag_host", "A"),
+    ] if "SPECULATION_HIT_RATE" in E else [], "percent",
+        "Share of commits served from pre-computed replies. Stored as permille and divided "
+        "by ten here, because the Count kind averages integers.\n\n"
+        "Falling under load is the expected shape: speculation runs out of headroom before "
+        "consensus does. Pinned at zero is not a workload effect — it means the speculative "
+        "path never engaged, and nothing else on this dashboard should be believed until it "
+        "is explained. Cross-check against SPECULATION_FALLBACK_COUNT in the row above, "
+        "which counts the same misses."))
 
     L.row("Preemptive execution — the cost",
           "Speculation is only worth it while this row stays quiet.")
@@ -717,11 +752,20 @@ def crud_rows(L, E):
           "against the executor's EXECUTION_TIME_TAKEN: the gap is Atlas' per-batch "
           "overhead around the application.")
     L.add(graph("Application execution", series(E, [
-        ("CRUD_BATCH_EXEC_TIME", "batch"),
-        ("CRUD_OP_EXEC_TIME", "single op"),
+        ("CRUD_BATCH_EXEC_TIME", "batch (confirmed)"),
+        ("CRUD_OP_EXEC_TIME", "single op (confirmed)"),
+        ("CRUD_SPEC_OP_EXEC_TIME", "single op (speculative)"),
+        ("CRUD_UNORDERED_OP_EXEC_TIME", "single op (unordered)"),
     ]), "ns",
         "Workload shape (KEY_DISTRIBUTION, READ/CREATE/UPDATE/DELETE_RATIO, "
-        "EXPENSIVE_OP_SLEEP_MS) moves the single-op line directly."))
+        "EXPENSIVE_OP_SLEEP_MS) moves the single-op lines directly.\n\n"
+        "The confirmed and speculative lines are separate because a `dual_state` run "
+        "executes every operation on both paths while `baseline` executes it once — under "
+        "one shared name those two produced the same-looking average and the re-execution "
+        "cost was invisible. `baseline` draws only the confirmed line; the cache variants "
+        "draw the speculative one and leave the confirmed one near-empty (they apply a "
+        "delta instead of re-executing); `dual_state` draws both, and their sum is what an "
+        "operation really costs it."))
     L.add(graph("Application throughput and batch size", series(E, [
         ("CRUD_CLIENT_OPS_DONE", "client ops done/s"),
         ("CRUD_OPS_PER_BATCH", "ops per batch"),
@@ -741,6 +785,28 @@ def crud_rows(L, E):
         ], "ns",
             "A mean that stays flat while p99 climbs is the signature of a tail problem — "
             "queueing or a straggling replica — that an averaged metric would hide."), w=24)
+
+        kinds = [("CRUD_LATENCY_READ", "read"), ("CRUD_LATENCY_WRITE", "write"),
+                 ("CRUD_LATENCY_DELETE", "delete")]
+        present = [(m, lbl) for m, lbl in kinds if m in E]
+        if present:
+            L.add(graph("Latency p99 by operation kind", [
+                target(q(m, 'percentile("value", 99)'), f"{lbl} p99 $tag_host", _REFS[i])
+                for i, (m, lbl) in enumerate(present)
+            ], "ns",
+                "The aggregate above is whatever the mix says it is — at the default "
+                "70/15/10/5 it is mostly a read latency with the writes averaged into "
+                "invisibility. Speculation does different work per kind: a read is answered "
+                "from the accumulated cache, a write accumulates a delta, and the scalable "
+                "executor's collision detection is driven by writes alone. Split out, the "
+                "three lines say which kind the executor actually helped."), w=12)
+            L.add(graph("Latency mean by operation kind", [
+                target(q(m, 'mean("value")'), f"{lbl} mean $tag_host", _REFS[i])
+                for i, (m, lbl) in enumerate(present)
+            ], "ns",
+                "Same three series as the p99 panel, at the mean. A write mean that tracks "
+                "the read mean while its p99 runs away points at write-side queueing — "
+                "collisions or delta rebuild — rather than at consensus."), w=12)
 
     tracking = [m for m in ("RQ_CLIENT_TRACKING", "RQ_BATCH_TRACKING") if m in E]
     if tracking:
@@ -836,6 +902,17 @@ def headline(L, E, spec, name):
         L.add(stat("Consensus wait", q("CONSENSUS_WAIT_TIME", by_host=False), "ns",
                    desc="Pre-prepare → handed to the executor. Roughly a consensus round trip "
                         "for a standard executor, near zero for a preemptive one."), w=4, h=5)
+    if "SPECULATION_HIT_RATE" in E:
+        # Stored as permille so the Count kind can average integers; /10 gives percent.
+        L.add(stat("Speculation hit rate",
+                   q("SPECULATION_HIT_RATE", 'mean("value") / 10', by_host=False), "percent",
+                   desc="Share of committed batches whose replies were already computed when "
+                        "the commit arrived. This is the run's validity check before any other "
+                        "number on this dashboard is worth reading: speculation engages through "
+                        "Rust specialization, which fails silently, so a rate pinned at 0 means "
+                        "the replica quietly executed post-commit and the run measured the "
+                        "baseline against itself.\n\nBlank on a `baseline` build, which has no "
+                        "speculative path — that is correct, not a fault."), w=5, h=5)
 
     supp = spec["_suppressed"]
     note = [

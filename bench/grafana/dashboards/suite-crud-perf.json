@@ -300,6 +300,59 @@
       "id": 4
     },
     {
+      "type": "stat",
+      "title": "Speculation hit rate",
+      "description": "Share of committed batches whose replies were already computed when the commit arrived. This is the run's validity check before any other number on this dashboard is worth reading: speculation engages through Rust specialization, which fails silently, so a rate pinned at 0 means the replica quietly executed post-commit and the run measured the baseline against itself.\n\nBlank on a `baseline` build, which has no speculative path \u2014 that is correct, not a fault.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") / 10 FROM \"SPECULATION_HIT_RATE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 19,
+        "y": 0
+      },
+      "id": 5
+    },
+    {
       "type": "text",
       "title": "About this suite",
       "datasource": {
@@ -326,7 +379,7 @@
         "x": 0,
         "y": 5
       },
-      "id": 5
+      "id": 6
     },
     {
       "type": "row",
@@ -340,7 +393,7 @@
         "y": 30
       },
       "description": "febft-pbft-consensus: how batches get built before a round can start.",
-      "id": 6
+      "id": 7
     },
     {
       "type": "timeseries",
@@ -448,7 +501,7 @@
         "x": 0,
         "y": 31
       },
-      "id": 7
+      "id": 8
     },
     {
       "type": "timeseries",
@@ -556,7 +609,7 @@
         "x": 12,
         "y": 31
       },
-      "id": 8
+      "id": 9
     },
     {
       "type": "row",
@@ -570,7 +623,7 @@
         "y": 40
       },
       "description": "The pre-prepare \u2192 prepare \u2192 commit ladder. The two \u2192-transitions each contain a quorum-wide round trip, so under a WAN profile they are where the added latency lands; the phase latencies themselves stay local.",
-      "id": 9
+      "id": 10
     },
     {
       "type": "timeseries",
@@ -689,7 +742,7 @@
         "x": 0,
         "y": 41
       },
-      "id": 10
+      "id": 11
     },
     {
       "type": "timeseries",
@@ -775,7 +828,7 @@
         "x": 12,
         "y": 41
       },
-      "id": 11
+      "id": 12
     },
     {
       "type": "row",
@@ -789,7 +842,7 @@
         "y": 50
       },
       "description": "Empty on a healthy run. Anything here means the cluster stopped making progress under the current leader.",
-      "id": 12
+      "id": 13
     },
     {
       "type": "timeseries",
@@ -908,7 +961,7 @@
         "x": 0,
         "y": 51
       },
-      "id": 13
+      "id": 14
     },
     {
       "type": "timeseries",
@@ -983,7 +1036,7 @@
         "x": 12,
         "y": 51
       },
-      "id": 14
+      "id": 15
     },
     {
       "type": "row",
@@ -997,7 +1050,7 @@
         "y": 60
       },
       "description": "atlas-smr-execution: the baseline, which waits for the commit before touching application state.",
-      "id": 15
+      "id": 16
     },
     {
       "type": "timeseries",
@@ -1105,7 +1158,7 @@
         "x": 0,
         "y": 61
       },
-      "id": 16
+      "id": 17
     },
     {
       "type": "timeseries",
@@ -1180,7 +1233,7 @@
         "x": 12,
         "y": 61
       },
-      "id": 17
+      "id": 18
     },
     {
       "type": "row",
@@ -1194,7 +1247,7 @@
         "y": 70
       },
       "description": "atlas-smr-preemptive-execution: work starts on the proposal rather than the commit. Compare against CONSENSUS_WAIT_TIME \u2014 that dead window is exactly what speculation is trying to spend.",
-      "id": 18
+      "id": 19
     },
     {
       "type": "timeseries",
@@ -1266,6 +1319,17 @@
             "type": "influxdb",
             "uid": "atlas-influx"
           },
+          "query": "SELECT mean(\"value\") FROM \"SCALABLE_CONFIRM_APPLICATION_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "scalable confirm apply $tag_host"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
           "query": "SELECT mean(\"value\") FROM \"CACHE_UNORDERED_EXECUTION_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
           "rawQuery": true,
           "resultFormat": "time_series",
@@ -1313,12 +1377,12 @@
         "x": 0,
         "y": 71
       },
-      "id": 19
+      "id": 20
     },
     {
       "type": "timeseries",
-      "title": "Speculation-to-confirm latency",
-      "description": "",
+      "title": "Reply waiting on consensus (speculation-to-confirm)",
+      "description": "How long a reply sat finished, waiting only for consensus to commit the batch it belongs to. This is the win, measured directly: it is work that finished before it was needed, so every nanosecond here is latency the client did not pay.\n\nRead against the confirmation-path row below, which measures the opposite direction \u2014 consensus waiting on execution.",
       "datasource": {
         "type": "influxdb",
         "uid": "atlas-influx"
@@ -1352,13 +1416,24 @@
             "type": "influxdb",
             "uid": "atlas-influx"
           },
+          "query": "SELECT mean(\"value\") FROM \"SCALABLE_SPECULATION_TO_CONFIRM_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "scalable $tag_host"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
           "query": "SELECT mean(\"value\") FROM \"CONFIRMED_WORKER_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
           "rawQuery": true,
           "resultFormat": "time_series",
           "alias": "confirmed worker $tag_host"
         },
         {
-          "refId": "D",
+          "refId": "E",
           "datasource": {
             "type": "influxdb",
             "uid": "atlas-influx"
@@ -1410,7 +1485,182 @@
         "x": 12,
         "y": 71
       },
-      "id": 20
+      "id": 21
+    },
+    {
+      "type": "row",
+      "title": "Preemptive execution \u2014 the confirmation path",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "description": "The mirror image of the row above, and the same four measurements for all three variants rather than one name each. Every span starts when the ordering protocol hands the executor a commit.",
+      "id": 22
+    },
+    {
+      "type": "timeseries",
+      "title": "Post-commit critical path",
+      "description": "CONFIRM_TO_REPLY_TIME is the headline preemptive-vs-baseline number. It spans the same two points as EXECUTION_LATENCY + EXECUTION_TIME_TAKEN in the standard executor's row, so the two are directly comparable: for the baseline it is queueing plus a full batch execution, for a preemptive executor whose speculation hit it is queueing plus a delta apply.\n\nThe gap between the first two series is what one speculation hit is worth. If they converge, speculation is not paying for itself \u2014 check the hit rate.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONFIRM_TO_REPLY_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "commit \u2192 replies ready $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONFIRM_BLOCKED_ON_EXEC_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "\u2026when speculation missed $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONFIRM_ENQUEUE_TO_APPLY_LATENCY\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "commit \u2192 dequeued (queueing) $tag_host"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CONSENSUS_WAIT_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "pre-prepare \u2192 executor (reference) $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 81
+      },
+      "id": 23
+    },
+    {
+      "type": "timeseries",
+      "title": "Speculation hit rate",
+      "description": "Share of commits served from pre-computed replies. Stored as permille and divided by ten here, because the Count kind averages integers.\n\nFalling under load is the expected shape: speculation runs out of headroom before consensus does. Pinned at zero is not a workload effect \u2014 it means the speculative path never engaged, and nothing else on this dashboard should be believed until it is explained. Cross-check against SPECULATION_FALLBACK_COUNT in the row above, which counts the same misses.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") / 10 FROM \"SPECULATION_HIT_RATE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "hit rate $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 81
+      },
+      "id": 24
     },
     {
       "type": "row",
@@ -1421,10 +1671,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 80
+        "y": 90
       },
       "description": "Speculation is only worth it while this row stays quiet.",
-      "id": 21
+      "id": 25
     },
     {
       "type": "timeseries",
@@ -1530,9 +1780,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 91
       },
-      "id": 22
+      "id": 26
     },
     {
       "type": "timeseries",
@@ -1660,9 +1910,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 91
       },
-      "id": 23
+      "id": 27
     },
     {
       "type": "timeseries",
@@ -1724,9 +1974,9 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 90
+        "y": 100
       },
-      "id": 24
+      "id": 28
     },
     {
       "type": "row",
@@ -1737,15 +1987,15 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 97
+        "y": 107
       },
       "description": "The only suite with an instrumented application. Compare CRUD_OP_EXEC_TIME against the executor's EXECUTION_TIME_TAKEN: the gap is Atlas' per-batch overhead around the application.",
-      "id": 25
+      "id": 29
     },
     {
       "type": "timeseries",
       "title": "Application execution",
-      "description": "Workload shape (KEY_DISTRIBUTION, READ/CREATE/UPDATE/DELETE_RATIO, EXPENSIVE_OP_SLEEP_MS) moves the single-op line directly.",
+      "description": "Workload shape (KEY_DISTRIBUTION, READ/CREATE/UPDATE/DELETE_RATIO, EXPENSIVE_OP_SLEEP_MS) moves the single-op lines directly.\n\nThe confirmed and speculative lines are separate because a `dual_state` run executes every operation on both paths while `baseline` executes it once \u2014 under one shared name those two produced the same-looking average and the re-execution cost was invisible. `baseline` draws only the confirmed line; the cache variants draw the speculative one and leave the confirmed one near-empty (they apply a delta instead of re-executing); `dual_state` draws both, and their sum is what an operation really costs it.",
       "datasource": {
         "type": "influxdb",
         "uid": "atlas-influx"
@@ -1760,7 +2010,7 @@
           "query": "SELECT mean(\"value\") FROM \"CRUD_BATCH_EXEC_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
           "rawQuery": true,
           "resultFormat": "time_series",
-          "alias": "batch $tag_host"
+          "alias": "batch (confirmed) $tag_host"
         },
         {
           "refId": "B",
@@ -1771,7 +2021,29 @@
           "query": "SELECT mean(\"value\") FROM \"CRUD_OP_EXEC_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
           "rawQuery": true,
           "resultFormat": "time_series",
-          "alias": "single op $tag_host"
+          "alias": "single op (confirmed) $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CRUD_SPEC_OP_EXEC_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "single op (speculative) $tag_host"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CRUD_UNORDERED_OP_EXEC_TIME\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "single op (unordered) $tag_host"
         }
       ],
       "fieldConfig": {
@@ -1813,9 +2085,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 108
       },
-      "id": 26
+      "id": 30
     },
     {
       "type": "timeseries",
@@ -1888,9 +2160,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 108
       },
-      "id": 27
+      "id": 31
     },
     {
       "type": "row",
@@ -1901,10 +2173,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 107
+        "y": 117
       },
       "description": "CRUD_CLIENT_LATENCY is a CorrelationDurationTracker: one point per request rather than one average per second, which is what makes real percentiles possible here and nowhere else in the bench.",
-      "id": 28
+      "id": 32
     },
     {
       "type": "timeseries",
@@ -2010,9 +2282,181 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 118
       },
-      "id": 29
+      "id": 33
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p99 by operation kind",
+      "description": "The aggregate above is whatever the mix says it is \u2014 at the default 70/15/10/5 it is mostly a read latency with the writes averaged into invisibility. Speculation does different work per kind: a read is answered from the accumulated cache, a write accumulates a delta, and the scalable executor's collision detection is driven by writes alone. Split out, the three lines say which kind the executor actually helped.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT percentile(\"value\", 99) FROM \"CRUD_LATENCY_READ\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "read p99 $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT percentile(\"value\", 99) FROM \"CRUD_LATENCY_WRITE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "write p99 $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT percentile(\"value\", 99) FROM \"CRUD_LATENCY_DELETE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "delete p99 $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 127
+      },
+      "id": 34
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency mean by operation kind",
+      "description": "Same three series as the p99 panel, at the mean. A write mean that tracks the read mean while its p99 runs away points at write-side queueing \u2014 collisions or delta rebuild \u2014 rather than at consensus.",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "atlas-influx"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CRUD_LATENCY_READ\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "read mean $tag_host"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CRUD_LATENCY_WRITE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "write mean $tag_host"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "atlas-influx"
+          },
+          "query": "SELECT mean(\"value\") FROM \"CRUD_LATENCY_DELETE\" WHERE (\"host\" =~ /^$host$/ AND \"extra\" =~ /^$run$/) AND $timeFilter GROUP BY time($__interval), \"host\" fill(none)",
+          "rawQuery": true,
+          "resultFormat": "time_series",
+          "alias": "delete mean $tag_host"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 127
+      },
+      "id": 35
     },
     {
       "type": "row",
@@ -2023,10 +2467,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 117
+        "y": 136
       },
       "description": "atlas-core Correlation metrics, registered Disabled by default and raised to Debug by this suite alone (crud_perf_exec/src/replica.rs). Each point is one event in one request's life, tagged with the stage it reached.",
-      "id": 30
+      "id": 36
     },
     {
       "type": "timeseries",
@@ -2088,9 +2532,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 118
+        "y": 137
       },
-      "id": 31
+      "id": 37
     },
     {
       "type": "timeseries",
@@ -2152,9 +2596,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 118
+        "y": 137
       },
-      "id": 32
+      "id": 38
     },
     {
       "type": "timeseries",
@@ -2216,9 +2660,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 127
+        "y": 146
       },
-      "id": 33
+      "id": 39
     },
     {
       "type": "row",
@@ -2229,10 +2673,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 136
+        "y": 155
       },
       "description": "What the load generator sees. The only view that is not the system marking its own homework \u2014 if these and the replica-side numbers disagree, believe these.",
-      "id": 34
+      "id": 40
     },
     {
       "type": "timeseries",
@@ -2305,9 +2749,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 137
+        "y": 156
       },
-      "id": 35
+      "id": 41
     },
     {
       "type": "timeseries",
@@ -2402,9 +2846,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 137
+        "y": 156
       },
-      "id": 36
+      "id": 42
     },
     {
       "type": "timeseries",
@@ -2466,9 +2910,9 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 146
+        "y": 165
       },
-      "id": 37
+      "id": 43
     },
     {
       "type": "row",
@@ -2479,10 +2923,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 152
+        "y": 171
       },
       "description": "atlas-smr-core: the path from a client message arriving to a request being proposable. Where load sheds before consensus ever sees it.",
-      "id": 38
+      "id": 44
     },
     {
       "type": "timeseries",
@@ -2676,9 +3120,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 153
+        "y": 172
       },
-      "id": 39
+      "id": 45
     },
     {
       "type": "timeseries",
@@ -2784,9 +3228,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 153
+        "y": 172
       },
-      "id": 40
+      "id": 46
     },
     {
       "type": "row",
@@ -2797,10 +3241,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 162
+        "y": 181
       },
       "description": "atlas-smr-replica: the main loop that polls the ordering protocol, feeds the decision log and drains timeouts. Several of these are Trace-only.",
-      "id": 41
+      "id": 47
     },
     {
       "type": "timeseries",
@@ -2895,9 +3339,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 163
+        "y": 182
       },
-      "id": 42
+      "id": 48
     },
     {
       "type": "timeseries",
@@ -2981,9 +3425,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 163
+        "y": 182
       },
-      "id": 43
+      "id": 49
     },
     {
       "type": "timeseries",
@@ -3078,9 +3522,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 172
+        "y": 191
       },
-      "id": 44
+      "id": 50
     },
     {
       "type": "row",
@@ -3091,10 +3535,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 181
+        "y": 200
       },
       "description": "atlas-communication and atlas-comm-mio. Signing cost scales with batch size, so read this row next to the protocol's batch panel before blaming the network.",
-      "id": 45
+      "id": 51
     },
     {
       "type": "timeseries",
@@ -3178,9 +3622,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 182
+        "y": 201
       },
-      "id": 46
+      "id": 52
     },
     {
       "type": "timeseries",
@@ -3264,9 +3708,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 182
+        "y": 201
       },
-      "id": 47
+      "id": 53
     },
     {
       "type": "timeseries",
@@ -3339,9 +3783,9 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 191
+        "y": 210
       },
-      "id": 48
+      "id": 54
     },
     {
       "type": "row",
@@ -3352,10 +3796,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 198
+        "y": 217
       },
       "description": "Durable log and the three transfer protocols. Spikes here that line up with throughput dips are the usual explanation for a periodic sawtooth.",
-      "id": 49
+      "id": 55
     },
     {
       "type": "timeseries",
@@ -3417,9 +3861,9 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 199
+        "y": 218
       },
-      "id": 50
+      "id": 56
     },
     {
       "type": "timeseries",
@@ -3514,9 +3958,9 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 199
+        "y": 218
       },
-      "id": 51
+      "id": 57
     },
     {
       "type": "row",
@@ -3527,10 +3971,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 208
+        "y": 227
       },
       "description": "Written by the Atlas-Metrics OS thread every 250 ms. These bypass the metric registry and the level filter, so they are present in every suite.",
-      "id": 52
+      "id": 58
     },
     {
       "type": "timeseries",
@@ -3592,9 +4036,9 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 209
+        "y": 228
       },
-      "id": 53
+      "id": 59
     },
     {
       "type": "timeseries",
@@ -3656,9 +4100,9 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 209
+        "y": 228
       },
-      "id": 54
+      "id": 60
     },
     {
       "type": "timeseries",
@@ -3731,9 +4175,9 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 209
+        "y": 228
       },
-      "id": 55
+      "id": 61
     }
   ],
   "annotations": {
