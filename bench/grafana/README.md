@@ -150,9 +150,9 @@ is the *most* restrictive setting, not the least.
 |---|---|---|---|---|
 | microbenchmarks-async | `Debug` | `Info` | 89 | 16 |
 | app-scaling-tests | `Trace` | `Trace` | 99 | 2 |
-| preemptive_execution | `Debug` | `Info` | 107 | 16 |
+| preemptive_execution | `Debug` | `Info` | 113 | 16 |
 | microbenchmarks (legacy) | `Trace` | `Info` | 75 | 3 |
-| crud_perf | `Debug` (+ tracking) | `Info` | 119 | 14 |
+| crud_perf | `Debug` (+ tracking) | `Info` | 130 | 14 |
 | microbenchmark-hotstuff | `Debug` | `Info` | 73 | 16 |
 | microbenchmark-chainedhotstuff | `Debug` | `Info` | 73 | 16 |
 
@@ -174,6 +174,17 @@ Consequences worth knowing before you conclude something is broken:
 * **`RQ_CLIENT_TRACKING` / `RQ_BATCH_TRACKING` are registered `Disabled`.** crud_perf
   is the only suite that overrides them, which is why per-request tracking exists there
   and nowhere else.
+* **The confirmation-path metrics are the only cross-variant ones.** `CONFIRM_TO_REPLY_TIME`,
+  `CONFIRM_BLOCKED_ON_EXEC_TIME`, `CONFIRM_ENQUEUE_TO_APPLY_LATENCY` and
+  `SPECULATION_HIT_RATE` (IDs 828–831) carry the same name and meaning in all three
+  preemptive executors, so the "Preemptive execution — the confirmation path" row draws one
+  series per measurement rather than one per variant. Everything else in that row is
+  variant-named and leaves the other two variants' lines empty, which is correct.
+* **Check `SPECULATION_HIT_RATE` before reading anything else on a preemptive dashboard.**
+  Speculation engages through Rust specialization, which fails silently — a replica that has
+  quietly fallen back to post-commit execution still runs and still produces plausible
+  numbers. A hit rate pinned at 0 on a `crud_single` / `crud_scalable` / `dual_state` build
+  means the run measured the baseline against itself. It is blank on `baseline`, correctly.
 * **microbenchmarks (legacy) registers neither `atlas-smr-core` nor
   `atlas-smr-execution`**, so it has no `CONSENSUS_WAIT_TIME`, no request
   pre-processing row and no `OPERATIONS_EXECUTED_PER_SECOND`. Its throughput comes off
@@ -253,7 +264,16 @@ each kind should be read:
 
 The correlation kinds only carry data in crud_perf, and they are the only place a
 latency *distribution* exists — everything else has already been averaged into a
-one-second bucket before it reaches InfluxDB.
+one-second bucket before it reaches InfluxDB. crud_perf has four of them:
+`CRUD_CLIENT_LATENCY` for the whole workload, plus `CRUD_LATENCY_READ` / `_WRITE` /
+`_DELETE`, one of which each request also reports to. The aggregate is dominated by
+whichever kind the mix favours (reads, at the default 70/15/10/5), and speculation does
+materially different work per kind, so the per-kind panels are where a write-side effect
+becomes visible at all.
+
+`SPECULATION_HIT_RATE` and `SCALABLE_COLLISION_RATE` are `Count` metrics storing
+**permille** (×1000), because that kind averages integers. The panels divide by ten and
+render as `percent`; a raw query does not.
 
 Two measurement quirks are baked into the panel descriptions and worth repeating:
 
