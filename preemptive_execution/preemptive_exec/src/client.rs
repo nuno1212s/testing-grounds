@@ -46,7 +46,7 @@ pub(super) fn client_main() {
     let client_config = read_client_config().expect("Failed to load client config");
 
     if client_config.clients_to_run() > 1 {
-        multi_client_main(benchmark, client_config.clients_to_run());
+        multi_client_main(&benchmark, client_config.clients_to_run());
     } else {
         setup_and_run_client(benchmark);
     }
@@ -100,8 +100,8 @@ fn generate_network_config(index: u16, node_id: NodeId, network: MIOConfig) -> M
     }
 }
 
-pub(super) fn multi_client_main(benchmark: BenchmarkConfig, client_count: u16) {
-    let mut reconfig_config =
+pub(super) fn multi_client_main(benchmark: &BenchmarkConfig, client_count: u16) {
+    let reconfig_config =
         get_reconfig_config::<FlattenedPathConstructor>(Some("config/nodes.toml")).unwrap();
 
     let node_id = reconfig_config.node_id;
