@@ -1,8 +1,8 @@
-use config::Case::Upper;
 use config::FileFormat::Toml;
 use config::{Config, Environment, File, Source};
 use getset::CopyGetters;
 use serde::Deserialize;
+use std::time::Duration;
 use tracing::info;
 
 use crate::collision::{expected_collision_rate, key_space_for_collision_rate};
@@ -21,6 +21,20 @@ pub struct BenchmarkConfig {
     pub key_space_size: usize,
     #[get_copy = "pub"]
     pub expensive_op_sleep_ms: usize,
+    /// Per-operation cost in microseconds; overrides `expensive_op_sleep_ms` when non-zero.
+    #[get_copy = "pub"]
+    pub expensive_op_sleep_us: u64,
+
+    /// Time-based phases: when `measure_secs > 0`, warm up for `warmup_secs`, then measure for
+    /// `measure_secs`; `ops_number` is ignored.
+    #[get_copy = "pub"]
+    pub warmup_secs: u64,
+    #[get_copy = "pub"]
+    pub measure_secs: u64,
+
+    /// Whether each request also reports two points to InfluxDB (heavy at benchmark throughput).
+    #[get_copy = "pub"]
+    pub client_request_metrics: bool,
     #[get_copy = "pub"]
     pub force_ordered: bool,
     pub key_distribution: String,
@@ -51,6 +65,15 @@ pub struct BenchmarkConfig {
 }
 
 impl BenchmarkConfig {
+    /// Cost of one expensive operation.
+    pub fn op_cost(&self) -> Duration {
+        if self.expensive_op_sleep_us > 0 {
+            Duration::from_micros(self.expensive_op_sleep_us)
+        } else {
+            Duration::from_millis(self.expensive_op_sleep_ms as u64)
+        }
+    }
+
     /// Resolves the effective key space size.
     /// If `target_collision_rate > 0`, computes it from the birthday-problem model;
     /// otherwise returns the configured `key_space_size` directly.
@@ -83,6 +106,13 @@ pub struct ClientConfig {
     pub clients_to_run: u16,
 }
 
+/// Environment variables as overrides (`WORKLOAD_TYPE` -> `workload_type`). No case conversion:
+/// `Case::Upper` yields "UPPER CASE" with spaces, which matched no field and silently ignored
+/// every variable.
+fn env_source() -> Environment {
+    Environment::default()
+}
+
 pub fn read_benchmark_config() -> atlas_common::error::Result<BenchmarkConfig> {
     read_benchmark_configs(File::new("config/benchmark_config.toml", Toml))
 }
@@ -97,7 +127,7 @@ where
 {
     let client_config = Config::builder()
         .add_source(source)
-        .add_source(Environment::with_convert_case(Upper))
+        .add_source(env_source())
         .set_default("clients_to_run", 1)?
         .build()?;
 
@@ -111,10 +141,14 @@ where
 {
     let benchmark_config = Config::builder()
         .add_source(source)
-        .add_source(Environment::with_convert_case(Upper))
+        .add_source(env_source())
         .set_default("workload_type", "uniform_cheap")?
         .set_default("key_space_size", 1_000_000i64)?
         .set_default("expensive_op_sleep_ms", 10i64)?
+        .set_default("expensive_op_sleep_us", 0i64)?
+        .set_default("warmup_secs", 0i64)?
+        .set_default("measure_secs", 0i64)?
+        .set_default("client_request_metrics", true)?
         .set_default("force_ordered", false)?
         .set_default("key_distribution", "uniform")?
         .set_default("zipf_constant", 0.1f64)?
@@ -128,4 +162,47 @@ where
 
     let benchmark_config: BenchmarkConfig = benchmark_config.try_deserialize()?;
     Ok(benchmark_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOML: &str = "concurrent_rqs=7\nops_number=1000\nrequest_sleep_millis=0\n";
+
+    fn read() -> BenchmarkConfig {
+        read_benchmark_configs(File::from_str(TOML, Toml)).unwrap()
+    }
+
+    /// Environment variables are process-global, so everything that touches them is one test.
+    #[test]
+    fn environment_variables_reach_the_benchmark_config() {
+        let base = read();
+        assert_eq!(base.workload_type, "uniform_cheap");
+        assert_eq!(base.measure_secs(), 0);
+        assert_eq!(base.concurrent_rqs(), 7);
+
+        // SAFETY: no other test in this binary reads or writes the environment.
+        unsafe {
+            std::env::set_var("WORKLOAD_TYPE", "mixed_8020");
+            std::env::set_var("EXPENSIVE_OP_SLEEP_US", "250");
+            std::env::set_var("MEASURE_SECS", "15");
+            std::env::set_var("WARMUP_SECS", "5");
+            std::env::set_var("FORCE_ORDERED", "true");
+            std::env::set_var("CLIENT_REQUEST_METRICS", "0");
+            std::env::set_var("KEY_SPACE_SIZE", "4242");
+            std::env::set_var("CONCURRENT_RQS", "3");
+        }
+
+        let cfg = read();
+        assert_eq!(cfg.workload_type, "mixed_8020", "WORKLOAD_TYPE ignored");
+        assert_eq!(cfg.expensive_op_sleep_us(), 250, "EXPENSIVE_OP_SLEEP_US ignored");
+        assert_eq!(cfg.measure_secs(), 15, "MEASURE_SECS ignored");
+        assert_eq!(cfg.warmup_secs(), 5, "WARMUP_SECS ignored");
+        assert!(cfg.force_ordered(), "FORCE_ORDERED ignored");
+        assert!(!cfg.client_request_metrics(), "CLIENT_REQUEST_METRICS ignored");
+        assert_eq!(cfg.key_space_size(), 4242, "KEY_SPACE_SIZE ignored");
+        assert_eq!(cfg.concurrent_rqs(), 3, "an environment value must outrank the file");
+        assert_eq!(cfg.op_cost(), Duration::from_micros(250));
+    }
 }

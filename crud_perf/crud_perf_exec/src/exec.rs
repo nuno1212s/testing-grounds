@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_core::execution::requests::{IncrementableUpdateBatch, ReplyBatch, UpdateBatch};
@@ -8,6 +6,7 @@ use atlas_metrics::metrics::{
 };
 use atlas_smr_application::app::{Application, Reply, Request};
 
+use crate::knobs::{preload_keys, simulate_work};
 use crate::metric::{
     CRUD_BATCH_EXEC_TIME_ID, CRUD_OP_EXEC_TIME_ID, CRUD_OPS_PER_BATCH_ID,
     CRUD_SPEC_OP_EXEC_TIME_ID, CRUD_UNORDERED_OP_EXEC_TIME_ID,
@@ -32,7 +31,7 @@ impl Application<State> for Microbenchmark {
     type AppData = MicrobenchmarkData;
 
     fn initial_state() -> Result<State> {
-        Ok(State::new())
+        Ok(State::preloaded(preload_keys()))
     }
 
     fn unordered_execution(
@@ -50,9 +49,7 @@ impl Application<State> for Microbenchmark {
 
         metric_local_duration_end(CRUD_UNORDERED_OP_EXEC_TIME_ID, start);
 
-        if sleep_duration > Duration::ZERO {
-            std::thread::sleep(sleep_duration);
-        }
+        simulate_work(sleep_duration);
 
         reply
     }
@@ -70,9 +67,7 @@ impl Application<State> for Microbenchmark {
 
         metric_local_duration_end(CRUD_OP_EXEC_TIME_ID, start);
 
-        if sleep_duration > Duration::ZERO {
-            std::thread::sleep(sleep_duration);
-        }
+        simulate_work(sleep_duration);
 
         reply
     }
@@ -142,9 +137,7 @@ impl CRUDApplication<State> for Microbenchmark {
         // of work and hide the re-execution cost this benchmark is trying to price.
         metric_local_duration_end(CRUD_SPEC_OP_EXEC_TIME_ID, start);
 
-        if sleep_duration > Duration::ZERO {
-            std::thread::sleep(sleep_duration);
-        }
+        simulate_work(sleep_duration);
 
         reply
     }

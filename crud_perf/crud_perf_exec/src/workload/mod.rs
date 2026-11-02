@@ -1,13 +1,12 @@
 use std::time::Duration;
 
-use rand::SeedableRng;
 use rand::distributions::Distribution;
+use rand::{Rng, SeedableRng};
 use rand_distr::{Uniform, WeightedIndex, Zipf};
 use rand_xoshiro::SplitMix64;
 
+use crate::knobs::VALUE_LEN;
 use crate::serialize::{CRUDRequestType, Key};
-
-const VALUE_LEN: usize = 64;
 
 #[derive(Debug, Clone)]
 pub enum WorkloadType {
@@ -72,7 +71,7 @@ impl WorkloadGenerator {
         workload_type: WorkloadType,
         distribution: KeyDistributionKind,
         zipf_constant: f64,
-        expensive_op_sleep_ms: u64,
+        op_cost: Duration,
         read_ratio: u32,
         create_ratio: u32,
         update_ratio: u32,
@@ -96,7 +95,7 @@ impl WorkloadGenerator {
             uniform_dist,
             zipf_dist,
             op_weights,
-            expensive_sleep: Duration::from_millis(expensive_op_sleep_ms),
+            expensive_sleep: op_cost,
             workload_type,
             rng: SplitMix64::seed_from_u64(client_seed),
             payload: vec![0u8; VALUE_LEN],
@@ -156,16 +155,16 @@ impl WorkloadGenerator {
             WorkloadType::UniformCheap => Duration::ZERO,
             WorkloadType::UniformExpensive => self.expensive_sleep,
             WorkloadType::Mixed8020 => {
-                // 20% of ops are expensive
-                if fastrand::u8(0..10) < 2 {
+                // 20% of ops are expensive; seeded so every run sees the same stream.
+                if self.rng.gen_range(0..10u8) < 2 {
                     self.expensive_sleep
                 } else {
                     Duration::ZERO
                 }
             }
             WorkloadType::Adversarial => {
-                // 5% of ops are very long (10x expensive sleep)
-                if fastrand::u8(0..20) == 0 {
+                // 5% of ops are very long (10x).
+                if self.rng.gen_range(0..20u8) == 0 {
                     self.expensive_sleep * 10
                 } else {
                     Duration::ZERO
@@ -173,5 +172,70 @@ impl WorkloadGenerator {
             }
             WorkloadType::CRUDProportional => Duration::ZERO,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stream(kind: WorkloadType, seed: u64, n: usize) -> Vec<(Vec<u8>, Duration, bool)> {
+        let mut generator = WorkloadGenerator::new(
+            seed,
+            1_000_000,
+            kind,
+            KeyDistributionKind::Uniform,
+            0.1,
+            Duration::from_micros(250),
+            70,
+            15,
+            10,
+            5,
+        );
+
+        (0..n)
+            .map(|_| {
+                let op = generator.next_op(false);
+                let bytes = bincode::serde::encode_to_vec(&op.request_type, bincode::config::standard())
+                    .unwrap();
+                (bytes, op.time_delay, op.is_ordered)
+            })
+            .collect()
+    }
+
+    /// Mixed/adversarial delays once came from an unseeded RNG, so a seed gave a different stream.
+    #[test]
+    fn every_workload_is_reproducible_from_its_seed() {
+        for kind in [
+            WorkloadType::UniformCheap,
+            WorkloadType::UniformExpensive,
+            WorkloadType::Mixed8020,
+            WorkloadType::Adversarial,
+            WorkloadType::CRUDProportional,
+        ] {
+            assert_eq!(
+                stream(kind.clone(), 7919, 5_000),
+                stream(kind.clone(), 7919, 5_000),
+                "{kind:?} is not deterministic"
+            );
+        }
+    }
+
+    #[test]
+    fn different_seeds_give_different_streams() {
+        assert_ne!(
+            stream(WorkloadType::Mixed8020, 1, 1_000),
+            stream(WorkloadType::Mixed8020, 2, 1_000)
+        );
+    }
+
+    #[test]
+    fn mixed_workload_actually_mixes_costs() {
+        let costs: std::collections::HashSet<Duration> = stream(WorkloadType::Mixed8020, 3, 2_000)
+            .into_iter()
+            .map(|(_, d, _)| d)
+            .collect();
+
+        assert_eq!(costs.len(), 2, "expected exactly {{0, cost}}, got {costs:?}");
     }
 }

@@ -72,22 +72,9 @@ pub fn init_mon_replica_conf(
     })
 }
 
-/// Raises the per-request correlation trackers above `MetricLevel::Disabled`, but only when
-/// `RQ_TRACKING=1` is set.
-///
-/// `atlas-core` registers `RQ_CLIENT_TRACKING` (32) and `RQ_BATCH_TRACKING` (33) as `Disabled`,
-/// and that default exists for a good reason: they are `MetricKind::Correlation`, which emits
-/// one InfluxDB point *per request per call site*. There are four `RQ_CLIENT_TRACKING` sites on
-/// the ordered path, so at the ~16k ops/s this benchmark sustains each replica produces ~80k
-/// points/s -- about 11M points per replica over a two-minute run. That is far more than
-/// InfluxDB will absorb, and because a node writes every one of its metrics from a single
-/// thread on a 1s cadence, the overrun starves everything else on that node: the run that
-/// exposed this had `RQ_CLIENT_TRACK_GLOBAL` down to ~110 samples in two minutes.
-///
-/// Nothing in `analysis/compare_variants.py` reads either metric -- it uses
-/// `RQ_CLIENT_TRACK_GLOBAL` (34) and `CLIENT_RQ_LATENCY` (301), neither of which is touched
-/// here -- so leaving them off costs the variant comparison nothing. Turn them on deliberately,
-/// for a low-rate debugging run where the per-request breakdown is the point.
+/// Enables the per-request correlation trackers only when `RQ_TRACKING=1`. They emit one
+/// InfluxDB point per request per call site (~80k points/s per replica), starving the node's
+/// other metrics; nothing in `analysis/` reads them.
 fn enable_request_tracking(metrics: Vec<MetricRegistry>) -> Vec<MetricRegistry> {
     let enabled = std::env::var("RQ_TRACKING")
         .map(|x| x == "1")
@@ -97,10 +84,7 @@ fn enable_request_tracking(metrics: Vec<MetricRegistry>) -> Vec<MetricRegistry> 
         return metrics;
     }
 
-    info!(
-        "RQ_TRACKING=1: enabling per-request correlation trackers. Expect ~80k InfluxDB \
-         points/s per replica at full throughput, and degraded resolution on every other metric."
-    );
+    info!("RQ_TRACKING=1: per-request trackers on (~80k InfluxDB points/s per replica)");
 
     override_metric_levels(
         metrics,
@@ -161,6 +145,8 @@ pub(super) fn run_replica() {
     setup_metrics(influx);
 
     let _log_guard = generate_log(node_id.0);
+
+    crate::knobs::announce("replica");
 
     info!("Initializing node with config {:?}", reconfiguration_cfg);
 
