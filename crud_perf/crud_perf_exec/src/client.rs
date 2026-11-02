@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use config::File;
 use config::FileFormat::Toml;
@@ -28,6 +28,7 @@ use crate::common::{BFT, ClientNode, ReconfProtocol, SMRClient, generate_log};
 use crate::config::benchmark_configs::{
     BenchmarkConfig, read_benchmark_config, read_client_config,
 };
+use crate::histogram::LatencyHistogram;
 use crate::metric::{
     CRUD_CLIENT_LATENCY_ID, CRUD_CLIENT_OPS_DONE_ID, CRUD_LATENCY_DELETE_ID, CRUD_LATENCY_READ_ID,
     CRUD_LATENCY_WRITE_ID,
@@ -213,10 +214,86 @@ fn setup_and_run_client(benchmark_config: BenchmarkConfig) {
     run_client(client, benchmark_config);
 }
 
+/// A phase length: a number of operations, or a duration.
+#[derive(Clone, Copy)]
+enum Limit {
+    Ops(usize),
+    For(Duration),
+}
+
+impl Limit {
+    fn reached(self, issued: usize, started: Instant) -> bool {
+        match self {
+            Limit::Ops(n) => issued >= n,
+            Limit::For(d) => started.elapsed() >= d,
+        }
+    }
+
+    /// End of the measurement window, if time-bounded; later completions are drained, not counted.
+    fn window_end(self, started: Instant) -> Option<Instant> {
+        match self {
+            Limit::Ops(_) => None,
+            Limit::For(d) => Some(started + d),
+        }
+    }
+}
+
+impl std::fmt::Display for Limit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Limit::Ops(n) => write!(f, "{n} ops"),
+            Limit::For(d) => write!(f, "{d:?}"),
+        }
+    }
+}
+
+/// `(warm-up, measurement)` limits; `measure_secs > 0` selects time-based phases.
+fn phase_limits(config: &BenchmarkConfig) -> (Limit, Limit) {
+    if config.measure_secs() > 0 {
+        (
+            Limit::For(Duration::from_secs(config.warmup_secs())),
+            Limit::For(Duration::from_secs(config.measure_secs())),
+        )
+    } else {
+        (
+            Limit::Ops(config.ops_number() / 2),
+            Limit::Ops(config.ops_number() / 2),
+        )
+    }
+}
+
+/// Measurement-window results, shared with the reply callbacks.
+struct Measurement {
+    ordered: LatencyHistogram,
+    unordered: LatencyHistogram,
+    completed: AtomicU64,
+    window_end: Option<Instant>,
+}
+
+impl Measurement {
+    fn record(&self, ordered: bool, issued_at: Instant) {
+        let now = Instant::now();
+
+        if self.window_end.is_some_and(|end| now > end) {
+            return;
+        }
+
+        let histogram = if ordered {
+            &self.ordered
+        } else {
+            &self.unordered
+        };
+
+        histogram.record(now.duration_since(issued_at).as_nanos() as u64);
+        self.completed.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
 fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     let concurrent_rqs = benchmark_config.concurrent_rqs();
     let id = u32::from(client.id());
     let force_ordered = benchmark_config.force_ordered();
+    let track_requests = benchmark_config.client_request_metrics();
 
     let workload_type = WorkloadType::from_str(&benchmark_config.workload_type);
     let key_dist = KeyDistributionKind::from_str(&benchmark_config.key_distribution);
@@ -228,7 +305,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
         workload_type,
         key_dist,
         benchmark_config.zipf_constant(),
-        benchmark_config.expensive_op_sleep_ms() as u64,
+        benchmark_config.op_cost(),
         benchmark_config.read_ratio(),
         benchmark_config.create_ratio(),
         benchmark_config.update_ratio(),
@@ -238,15 +315,22 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     let concurrent_client = ConcurrentClient::from_client(client, concurrent_rqs).unwrap();
     let semaphore = Arc::new(RawSemaphore::new(concurrent_rqs));
 
+    let (warmup_limit, measure_limit) = phase_limits(&benchmark_config);
+
     // ── Warm-up phase ──
-    info!("Warm up ({} ops)...", benchmark_config.ops_number() / 2);
+    info!("Warm up ({warmup_limit})...");
+    // WARN so it survives RUST_LOG=warn; parsed by `parse_phases` in suite/run_suite.py.
+    warn!("PHASE warmup_start client={id}");
 
     let warmup_sem = semaphore.clone();
     let warmup_callback = Arc::new(move |_reply| {
         warmup_sem.release();
     });
 
-    for _ in 0..(benchmark_config.ops_number() / 2) {
+    let warmup_started = Instant::now();
+    let mut issued = 0usize;
+
+    while !warmup_limit.reached(issued, warmup_started) {
         semaphore.acquire();
         let op = generator.next_op(force_ordered);
         let request = CRUDRequest::new(op.time_delay, op.request_type);
@@ -260,6 +344,8 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
                 .update_imm_callback::<Unordered>(request, warmup_callback.clone())
                 .unwrap();
         }
+
+        issued += 1;
     }
 
     // drain warm-up
@@ -276,19 +362,26 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     }
 
     // ── Measurement phase ──
-    info!(
-        "Executing experiment ({} ops)...",
-        benchmark_config.ops_number() / 2
-    );
+    info!("Executing experiment ({measure_limit})...");
+    warn!("PHASE measure_start client={id}");
 
     let start = Instant::now();
+    let measurement = Arc::new(Measurement {
+        ordered: LatencyHistogram::new(),
+        unordered: LatencyHistogram::new(),
+        completed: AtomicU64::new(0),
+        window_end: measure_limit.window_end(start),
+    });
     let seq = Arc::new(AtomicU64::new(0));
     let meas_sem = semaphore.clone();
 
-    for _ in 0..(benchmark_config.ops_number() / 2) {
+    let mut issued = 0usize;
+
+    while !measure_limit.reached(issued, start) {
         semaphore.acquire();
 
         let op = generator.next_op(force_ordered);
+        let is_ordered = op.is_ordered;
 
         // Which per-kind tracker this request also reports to. The aggregate
         // CRUD_CLIENT_LATENCY is dominated by whichever kind the mix favours (reads, at the
@@ -303,24 +396,33 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
             CRUDRequestType::Delete { .. } => CRUD_LATENCY_DELETE_ID,
         };
 
-        let correlation_id = format!("{}-{}", id, seq.fetch_add(1, Ordering::Relaxed));
+        let correlation_id = track_requests
+            .then(|| format!("{}-{}", id, seq.fetch_add(1, Ordering::Relaxed)));
 
-        metric_correlation_time_start(CRUD_CLIENT_LATENCY_ID, &correlation_id);
-        metric_correlation_time_start(kind_metric_id, &correlation_id);
+        if let Some(correlation_id) = &correlation_id {
+            metric_correlation_time_start(CRUD_CLIENT_LATENCY_ID, correlation_id);
+            metric_correlation_time_start(kind_metric_id, correlation_id);
+        }
 
         let sem_clone = meas_sem.clone();
-        let corr_clone = correlation_id.clone();
+        let measurement = measurement.clone();
+        let issued_at = Instant::now();
 
         let callback = Arc::new(move |_reply| {
-            metric_correlation_time_end(CRUD_CLIENT_LATENCY_ID, &corr_clone);
-            metric_correlation_time_end(kind_metric_id, &corr_clone);
+            measurement.record(is_ordered, issued_at);
+
+            if let Some(correlation_id) = &correlation_id {
+                metric_correlation_time_end(CRUD_CLIENT_LATENCY_ID, correlation_id);
+                metric_correlation_time_end(kind_metric_id, correlation_id);
+            }
+
             metric_increment(CRUD_CLIENT_OPS_DONE_ID, Some(1));
             sem_clone.release();
         });
 
         let request = CRUDRequest::new(op.time_delay, op.request_type);
 
-        if op.is_ordered {
+        if is_ordered {
             concurrent_client
                 .update_imm_callback::<Ordered>(request, callback)
                 .unwrap();
@@ -329,6 +431,8 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
                 .update_imm_callback::<Unordered>(request, callback)
                 .unwrap();
         }
+
+        issued += 1;
     }
 
     // drain measurement
@@ -337,12 +441,47 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
     }
 
     let time_passed = start.elapsed();
-    let ops_done = benchmark_config.ops_number() / 2;
+    let completed = measurement.completed.load(Ordering::Relaxed);
+
+    let window = match measure_limit {
+        Limit::For(d) => d,
+        Limit::Ops(_) => time_passed,
+    };
+    let throughput = completed as f64 / window.as_secs_f64();
 
     warn!(
-        "{:?} // Done in {:?}. ({} ops/s)",
+        "{:?} // Done in {:?}. ({:.0} ops/s)",
         concurrent_client.id(),
         time_passed,
-        (ops_done * 1_000_000) / time_passed.as_micros() as usize
+        throughput
+    );
+
+    // Primary result of a run: one line per client, with sparse histograms the runner merges.
+    warn!(
+        "RESULT {{\"schema\":1,\"client\":{},\"mode\":\"{}\",\"warmup_s\":{:.3},\"measure_s\":{:.3},\
+         \"elapsed_s\":{:.3},\"ops\":{},\"throughput\":{:.2},\"concurrent_rqs\":{},\
+         \"force_ordered\":{},\"workload\":\"{}\",\"op_cost_us\":{},\"key_space\":{},\
+         \"ordered\":{},\"unordered\":{}}}",
+        id,
+        if benchmark_config.measure_secs() > 0 {
+            "duration"
+        } else {
+            "ops"
+        },
+        match warmup_limit {
+            Limit::For(d) => d.as_secs_f64(),
+            Limit::Ops(_) => 0.0,
+        },
+        window.as_secs_f64(),
+        time_passed.as_secs_f64(),
+        completed,
+        throughput,
+        concurrent_rqs,
+        force_ordered,
+        benchmark_config.workload_type,
+        benchmark_config.op_cost().as_micros(),
+        key_space,
+        measurement.ordered.to_json(),
+        measurement.unordered.to_json(),
     );
 }

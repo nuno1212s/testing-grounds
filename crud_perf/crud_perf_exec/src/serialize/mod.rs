@@ -66,7 +66,7 @@ pub enum CRUDRequestType {
     Delete { key: Key },
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum CRUDReply {
     ReadResult { data: Option<Vec<u8>> },
     WriteResult { previous_value: Option<Vec<u8>> },
@@ -79,10 +79,35 @@ pub struct State {
 }
 
 impl State {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             inner: HashMap::default(),
         }
+    }
+
+    /// Keys `0..keys`, each mapped to `VALUE_LEN` zero bytes; identical on every replica.
+    pub fn preloaded(keys: u64) -> Self {
+        Self::preloaded_with(keys, crate::knobs::VALUE_LEN)
+    }
+
+    /// As [`State::preloaded`], with a chosen value size.
+    pub fn preloaded_with(keys: u64, value_len: usize) -> Self {
+        let mut inner = HashMap::default();
+
+        if keys > 0 {
+            inner.reserve(keys as usize);
+            for k in 0..keys {
+                inner.insert(Key::from_index(k), vec![0u8; value_len]);
+            }
+        }
+
+        Self { inner }
+    }
+
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        self.inner.len()
     }
 
     pub fn get(&self, key: &Key) -> Option<Vec<u8>> {

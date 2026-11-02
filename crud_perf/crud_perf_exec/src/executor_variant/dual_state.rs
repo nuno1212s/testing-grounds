@@ -8,12 +8,6 @@
 //! The trade-off versus the cache-based variants: it needs only `Application<State>` (no CRUD
 //! interface), but pays two full state copies in memory, a full re-execution per confirmed
 //! batch, and a state clone on every backtrack.
-//!
-//! Known gap: `single_thread_double_state/preemptive_worker` still has a `todo!()` on the
-//! path that handles a confirmed-worker message while in state-transfer mode. It is off the
-//! steady-state path, but a run that triggers state transfer (replica crash-and-rejoin, log
-//! watermark overflow, partition-induced CST) can panic. Keep steady-state latency runs free
-//! of forced state transfer.
 
 use atlas_metrics::MetricRegistry;
 use atlas_smr_preemptive_execution::MonolithicPreemptiveExecutor;

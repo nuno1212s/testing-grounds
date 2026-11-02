@@ -76,7 +76,9 @@ they never waited on consensus, so they contribute no sample.
 End-to-end latency needs no new instrumentation — both systems share the reply path, so
 `CLIENT_RQ_LATENCY` (client-observed) and `RQ_CLIENT_TRACK_GLOBAL` (server-side, per-request)
 already cover both. The per-request correlation trackers are registered `Disabled` upstream
-and are re-enabled here in `replica.rs::enable_request_tracking`.
+and are re-enabled in `replica.rs::enable_request_tracking` **only when `RQ_TRACKING=1`**: they
+emit ~80k InfluxDB points/s per replica at benchmark throughput, which starves every other metric
+on the node. Nothing in `analysis/` reads them.
 
 ### Who waited for whom
 
@@ -161,18 +163,33 @@ Two guards:
   preemptive build means the run is measuring the baseline against itself; blank on
   `baseline` is correct, since it has no speculative path.
 
-## Known gap: dual-state and state transfer
+## Known issues: dual-state
 
-`single_thread_double_state/preemptive_worker/mod.rs` still has a `todo!()` on the path that
-handles a message from the confirmed worker while in state-transfer mode. It is not on the
-steady-state execution path, but a `dual_state` run that triggers state transfer (replica
-crash-and-rejoin, log watermark overflow, partition-induced CST) can panic. Keep steady-state
-latency runs free of forced state transfer; fixing it is a prerequisite only for benchmarking
-preemptive execution under faults.
+A backtrack arriving while confirmations were queued at the confirmed worker used to kill the
+executor; fixed, see [`suite/FINDINGS.md`](suite/FINDINGS.md) item 7. Two further ways to kill the
+preemptive worker are pinned by `#[ignore]`d tests in
+`single_thread_double_state/tests/execution.rs` (see the crate's `CLAUDE.md`).
 
 ## Workload knobs
 
-See `bench/bench.env` — key space (drives collision/backtrack rate), key distribution
-(uniform/zipf), CRUD operation mix, injected per-op cost, and forced-ordered mode. Backtrack
-and collision rates are workload-dependent, so a single configuration proves little; sweep
-request rate, batch size, client count, and contention.
+See `bench/bench.env`: key space (drives collision rate), key distribution (uniform/zipf), CRUD
+operation mix, per-op cost (`EXPENSIVE_OP_SLEEP_MS`, or `_US` for sub-millisecond), forced-ordered
+mode, state preload (`PRELOAD_KEYS`), cost model (`PROCESSING_MODE=sleep|spin`) and time-based
+phases (`WARMUP_SECS`/`MEASURE_SECS`).
+
+Two things that were silently wrong until 2026-10-31 and are worth knowing if you are reading
+older results: **no environment variable ever reached the benchmark config** (the reader's case
+conversion turned `WORKLOAD_TYPE` into a key that matches no field), and a command-line override
+such as `make crud_perf local WORKLOAD_TYPE=x` never reached the containers at all. Every run
+before that date used the built-in defaults whatever `bench.env` said, which equal the shipped
+values, so results are affected only if someone had edited those knobs. Both are fixed, and a test
+(`environment_variables_reach_the_benchmark_config`) now covers the first.
+
+## The experiment suite
+
+`suite/` holds the plans, runners and analysis for the latency-by-processing-cost study and the
+backtrack-recovery study: see [`suite/README.md`](suite/README.md). In short: `run_suite.py` runs
+the four variants over a randomised-block design with tc/netem between replicas; `recovery_bench`
+measures how long each speculative executor takes to recover from a backtrack as the state grows.
+Backtrack and collision rates are workload-dependent, so a single configuration proves little;
+that is what the sweeps are for.
