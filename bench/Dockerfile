@@ -83,8 +83,12 @@ RUN --mount=type=cache,target=/root/.rustup/toolchains \
 # it did before this stage existed.
 FROM debian:bullseye-slim AS final-wan
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends iproute2 iputils-ping && \
+# Bullseye moved to archive.debian.org after LTS ended (Aug 2026); its Release files are
+# expired, hence Check-Valid-Until=false. Keeps the glibc match with the build stage.
+RUN sed -i -e "s|http://deb.debian.org/debian-security|http://archive.debian.org/debian-security|" \
+           -e "s|http://deb.debian.org/debian|http://archive.debian.org/debian|" /etc/apt/sources.list && \
+    apt-get -o Acquire::Check-Valid-Until=false update && \
+    apt-get -o Acquire::Check-Valid-Until=false install -y --no-install-recommends iproute2 iputils-ping && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /bin/server /usr/app/server

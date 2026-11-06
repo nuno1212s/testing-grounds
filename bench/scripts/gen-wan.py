@@ -340,7 +340,8 @@ def scale_timeouts(generated, config_base, scale):
         m = pattern.search(open(base_path).read())
         if not m:
             continue
-        scaled = int(int(m.group(2).replace("_", "")) * scale)
+        base = os.environ.get("REQUEST_TIMEOUT_MICROS") if name == "febft.toml" else None
+        scaled = int(int(base or m.group(2).replace("_", "")) * scale)
 
         for cfg in ("config-replicas", "config-clients"):
             path = os.path.join(generated, cfg, name)

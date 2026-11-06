@@ -196,8 +196,9 @@ mod tests {
         (0..n)
             .map(|_| {
                 let op = generator.next_op(false);
-                let bytes = bincode::serde::encode_to_vec(&op.request_type, bincode::config::standard())
-                    .unwrap();
+                let bytes =
+                    bincode::serde::encode_to_vec(&op.request_type, bincode::config::standard())
+                        .unwrap();
                 (bytes, op.time_delay, op.is_ordered)
             })
             .collect()
@@ -236,6 +237,10 @@ mod tests {
             .map(|(_, d, _)| d)
             .collect();
 
-        assert_eq!(costs.len(), 2, "expected exactly {{0, cost}}, got {costs:?}");
+        assert_eq!(
+            costs.len(),
+            2,
+            "expected exactly {{0, cost}}, got {costs:?}"
+        );
     }
 }

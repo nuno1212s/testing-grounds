@@ -178,6 +178,10 @@ gen-configs: gen-ca-root
 	    $(GENERATED)/config-clients/benchmark_config.toml
 	@$(SED_I) "s|CLIENTS_TO_RUN_PLACEHOLDER|$(N_CLIENTS)|g" \
 	    $(GENERATED)/config-clients/client_config.toml
+ifneq ($(REQUEST_TIMEOUT_MICROS),)
+	@$(SED_I) "s|^timeout_duration = .*|timeout_duration = $(REQUEST_TIMEOUT_MICROS)|" \
+	    $(GENERATED)/config-replicas/febft.toml $(GENERATED)/config-clients/febft.toml
+endif
 	@echo "Configs generated in $(GENERATED)/config-{replicas,clients}/"
 
 # ── Lockfile ───────────────────────────────────────────────────────────────────────
@@ -332,7 +336,8 @@ wan-plan:
 # correct and shaping will still fail without it, so check before a long build.
 wan-check:
 	@mkdir -p $(GENERATED)/wan
-	@printf 'FROM debian:bullseye-slim\nRUN apt-get update && apt-get install -y --no-install-recommends iproute2 && rm -rf /var/lib/apt/lists/*\n' \
+	@# bullseye is on archive.debian.org; see the final-wan stage of Dockerfile.
+	@printf 'FROM debian:bullseye-slim\nRUN sed -i -e "s|http://deb.debian.org/debian-security|http://archive.debian.org/debian-security|" -e "s|http://deb.debian.org/debian|http://archive.debian.org/debian|" /etc/apt/sources.list && apt-get -o Acquire::Check-Valid-Until=false update && apt-get -o Acquire::Check-Valid-Until=false install -y --no-install-recommends iproute2 && rm -rf /var/lib/apt/lists/*\n' \
 	    > $(GENERATED)/wan/Dockerfile.probe
 	@echo "Building netem probe image..."
 	@$(DOCKER) build -t $(NETEM_PROBE_IMAGE) -f $(GENERATED)/wan/Dockerfile.probe $(GENERATED)/wan >/dev/null
