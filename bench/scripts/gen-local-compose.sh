@@ -36,6 +36,17 @@
 #   WAN_SUBNET        - subnet for static addressing (default 10.90.0.0/24)
 #   WAN_IFACE         - interface shaped inside the container (default eth0)
 #   WAN_SHAPE_CLIENTS - 0 to shape replica<->replica links only
+# Run-time knob passthrough (optional):
+#   RUNTIME_ENV_PASSTHROUGH - variable names to copy into every service's `environment:`.
+#                          `env_file:` is read from the file, so a command-line override
+#                          (`make ... X=1`) never reaches the containers without this;
+#                          `environment:` outranks `env_file:`. Projects opt in by listing names.
+#
+# CPU pinning (optional):
+#   PIN_CPUS=1 gives each node a private `cpuset:` (replica i: [OFFSET + i*REPLICA_CORES, +REPLICA_CORES),
+#   clients after). A cpuset rather than a `cpus:` quota, whose throttling looks like latency.
+#   REPLICA_CORES / CLIENT_CORES, PIN_CPU_OFFSET (default 0)
+#
 #   IMAGE_NAME_EFFECTIVE - image tag to use. The Makefile appends the Cargo feature
 #                          list and, in WAN mode, -wan, so images built from
 #                          different sources cannot collide in the local cache.
@@ -61,6 +72,11 @@ set -euo pipefail
 : "${WAN_SUBNET:=10.90.0.0/24}"
 : "${WAN_IFACE:=eth0}"
 : "${WAN_SHAPE_CLIENTS:=1}"
+: "${RUNTIME_ENV_PASSTHROUGH:=}"
+: "${PIN_CPUS:=0}"
+: "${PIN_CPU_OFFSET:=0}"
+: "${REPLICA_CORES:=0}"
+: "${CLIENT_CORES:=0}"
 
 IMAGE="${IMAGE_NAME_EFFECTIVE:-$IMAGE_NAME}"
 
@@ -91,6 +107,40 @@ if [ "$LOCAL_INFLUXDB" = "1" ]; then
            "$GENERATED/config-clients/influx_db.toml"; do
     [ -f "$f" ] && _sed_i 's|ip = ".*"|ip = "http://influxdb:8086"|' "$f"
   done
+fi
+
+# Emit `NAME: "value"` for each set, non-empty name in RUNTIME_ENV_PASSTHROUGH.
+_emit_passthrough() {
+  local name val
+  for name in $RUNTIME_ENV_PASSTHROUGH; do
+    val="${!name:-}"
+    [ -n "$val" ] || continue
+    val="${val//\\/\\\\}"
+    val="${val//\"/\\\"}"
+    printf '      %s: "%s"\n' "$name" "$val"
+  done
+}
+
+# `cpuset:` line for cores [start, start+count), if pinning is on.
+_emit_cpuset() {
+  [ "$PIN_CPUS" = "1" ] || return 0
+  printf '    cpuset: "%s-%s"\n' "$1" "$(( $1 + $2 - 1 ))"
+}
+
+if [ "$PIN_CPUS" = "1" ]; then
+  if [ "$REPLICA_CORES" -lt 1 ] || [ "$CLIENT_CORES" -lt 1 ]; then
+    echo "ERROR: PIN_CPUS=1 needs REPLICA_CORES and CLIENT_CORES >= 1" \
+         "(got REPLICA_CORES=$REPLICA_CORES CLIENT_CORES=$CLIENT_CORES)" >&2
+    exit 1
+  fi
+  _need=$(( PIN_CPU_OFFSET + N_REPLICAS * REPLICA_CORES + N_CLIENT_MACHINES * CLIENT_CORES ))
+  _have=$(nproc)
+  if [ "$_need" -gt "$_have" ]; then
+    echo "ERROR: CPU pinning needs $_need cores ($N_REPLICAS replicas x $REPLICA_CORES +" \
+         "$N_CLIENT_MACHINES clients x $CLIENT_CORES, from core $PIN_CPU_OFFSET) but this" \
+         "host has $_have." >&2
+    exit 1
+  fi
 fi
 
 {
@@ -131,6 +181,7 @@ EOF
       - ${GENERATED}/logs:/usr/app/logs
 EOF
     [ "$WAN_ENABLED" = "1" ] && echo "      - ${GENERATED}/wan:/wan:ro"
+    _emit_cpuset $(( PIN_CPU_OFFSET + i * REPLICA_CORES )) "$REPLICA_CORES"
     cat <<EOF
     environment:
       ID: ${i}
@@ -142,6 +193,7 @@ EOF
       RUST_BACKTRACE: full
 EOF
     [ -n "$INFLUX_EXTRA" ] && echo "      INFLUX_EXTRA: \"${INFLUX_EXTRA}\""
+    _emit_passthrough
     if [ "$WAN_ENABLED" = "1" ]; then
       cat <<EOF
       WAN_NODE: "replica-${i}"
@@ -197,6 +249,7 @@ EOF
       - ${GENERATED}/logs:/usr/app/logs
 EOF
     [ "$CLIENT_SHAPED" = "1" ] && echo "      - ${GENERATED}/wan:/wan:ro"
+    _emit_cpuset $(( PIN_CPU_OFFSET + N_REPLICAS * REPLICA_CORES + i * CLIENT_CORES )) "$CLIENT_CORES"
     cat <<EOF
     environment:
       ID: ${NODE_ID}
@@ -209,6 +262,7 @@ EOF
       RUST_BACKTRACE: full
 EOF
     [ -n "$INFLUX_EXTRA" ] && echo "      INFLUX_EXTRA: \"${INFLUX_EXTRA}\""
+    _emit_passthrough
     if [ "$CLIENT_SHAPED" = "1" ]; then
       cat <<EOF
       WAN_NODE: "client-${i}"

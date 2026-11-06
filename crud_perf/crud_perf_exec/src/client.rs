@@ -9,7 +9,6 @@ use tracing::{info, warn};
 
 use atlas_client::client;
 use atlas_client::client::ClientConfig;
-use atlas_client::client::ordered_client::Ordered;
 use atlas_client::client::unordered_client::{Unordered, UnorderedClientMode};
 use atlas_client::concurrent_client::ConcurrentClient;
 use atlas_comm_mio::config::MIOConfig;
@@ -28,6 +27,7 @@ use crate::common::{BFT, ClientNode, ReconfProtocol, SMRClient, generate_log};
 use crate::config::benchmark_configs::{
     BenchmarkConfig, read_benchmark_config, read_client_config,
 };
+use crate::fault::FaultyOrdered;
 use crate::histogram::LatencyHistogram;
 use crate::metric::{
     CRUD_CLIENT_LATENCY_ID, CRUD_CLIENT_OPS_DONE_ID, CRUD_LATENCY_DELETE_ID, CRUD_LATENCY_READ_ID,
@@ -337,7 +337,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
         if op.is_ordered {
             concurrent_client
-                .update_imm_callback::<Ordered>(request, warmup_callback.clone())
+                .update_imm_callback::<FaultyOrdered>(request, warmup_callback.clone())
                 .unwrap();
         } else {
             concurrent_client
@@ -396,8 +396,8 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
             CRUDRequestType::Delete { .. } => CRUD_LATENCY_DELETE_ID,
         };
 
-        let correlation_id = track_requests
-            .then(|| format!("{}-{}", id, seq.fetch_add(1, Ordering::Relaxed)));
+        let correlation_id =
+            track_requests.then(|| format!("{}-{}", id, seq.fetch_add(1, Ordering::Relaxed)));
 
         if let Some(correlation_id) = &correlation_id {
             metric_correlation_time_start(CRUD_CLIENT_LATENCY_ID, correlation_id);
@@ -424,7 +424,7 @@ fn run_client(client: SMRClient, benchmark_config: BenchmarkConfig) {
 
         if is_ordered {
             concurrent_client
-                .update_imm_callback::<Ordered>(request, callback)
+                .update_imm_callback::<FaultyOrdered>(request, callback)
                 .unwrap();
         } else {
             concurrent_client

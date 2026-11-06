@@ -11,6 +11,7 @@ mod common;
 mod config;
 mod exec;
 mod executor_variant;
+mod fault;
 mod histogram;
 mod knobs;
 mod metric;

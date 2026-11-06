@@ -196,13 +196,24 @@ mod tests {
 
         let cfg = read();
         assert_eq!(cfg.workload_type, "mixed_8020", "WORKLOAD_TYPE ignored");
-        assert_eq!(cfg.expensive_op_sleep_us(), 250, "EXPENSIVE_OP_SLEEP_US ignored");
+        assert_eq!(
+            cfg.expensive_op_sleep_us(),
+            250,
+            "EXPENSIVE_OP_SLEEP_US ignored"
+        );
         assert_eq!(cfg.measure_secs(), 15, "MEASURE_SECS ignored");
         assert_eq!(cfg.warmup_secs(), 5, "WARMUP_SECS ignored");
         assert!(cfg.force_ordered(), "FORCE_ORDERED ignored");
-        assert!(!cfg.client_request_metrics(), "CLIENT_REQUEST_METRICS ignored");
+        assert!(
+            !cfg.client_request_metrics(),
+            "CLIENT_REQUEST_METRICS ignored"
+        );
         assert_eq!(cfg.key_space_size(), 4242, "KEY_SPACE_SIZE ignored");
-        assert_eq!(cfg.concurrent_rqs(), 3, "an environment value must outrank the file");
+        assert_eq!(
+            cfg.concurrent_rqs(),
+            3,
+            "an environment value must outrank the file"
+        );
         assert_eq!(cfg.op_cost(), Duration::from_micros(250));
     }
 }
