@@ -1,0 +1,26 @@
+name: r2_confirmed_backlog
+scenario: recovery
+description: >
+  R2 -- backtrack with confirmations still in flight. In dual_state the confirmed worker
+  re-executes confirmed batches asynchronously, so under load it routinely has batches queued
+  when a backtrack asks it for a state copy. `backlogs` batches are confirmed in a burst just
+  before the re-proposal; `pre_trigger_wait_ms` is the control that lets that work drain first.
+  The result of interest is not a time but whether the executor survives: each trial that does
+  not complete is reported as a wedge, and the executor is replaced.
+seed: 20261031
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [10000]
+  value_bytes: [64]
+  pre_trigger_wait_ms: [0, 2, 10, 50]
+bench_args:
+  depths: [24]
+  positions: [head, tail]
+  backlogs: [0, 4, 16]
+  batch_sizes: [100]
+  op_cost_us: [0, 20]
+  write_pct: 50
+  reproposal: one
+  trials: 20
+  timeout_s: 5
+cpus: "40-47"

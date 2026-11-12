@@ -1,0 +1,21 @@
+name: r4_batch_size
+scenario: recovery
+description: >
+  R4 -- recovery against batch size. The pending deltas the CRUD executors re-merge grow with
+  the operations per batch; the kept batches dual_state re-executes do too. Fixed state.
+seed: 20261031
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [100000]
+  value_bytes: [64]
+bench_args:
+  depths: [32]
+  positions: [head, tail]
+  backlogs: [0]
+  batch_sizes: [10, 100, 500, 2000]
+  op_cost_us: [0, 20]
+  write_pct: 50
+  reproposal: one
+  trials: 30
+  timeout_s: 60
+cpus: "40-47"

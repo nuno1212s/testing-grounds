@@ -1,0 +1,15 @@
+name: e2_load_scaling
+extends: _base.yml
+description: >
+  E2 -- how the benefit scales with load. Sweeps offered load (outstanding requests per
+  client, 5 clients) under four network/processing conditions, giving throughput-latency curves
+  per variant. At low load speculation hides latency; at saturation the question becomes whether
+  its extra work (re-execution in dual_state, delta bookkeeping in the CRUD variants) costs
+  throughput. Run to saturation: the point of interest is where each curve bends.
+
+repetitions: 2
+
+factors:
+  rtt_ms: [0.4, 50]
+  op_cost_us: [0, 1000]
+  CONCURRENT_RQS: [1, 2, 4, 8, 32, 128]

@@ -1,0 +1,20 @@
+name: e4_contention
+extends: _base.yml
+description: >
+  E4 -- sensitivity to key contention. crud_scalable executes a batch in parallel and then
+  re-executes colliding operations sequentially, so its advantage should shrink as the key
+  space does; the other variants are unaffected by collisions. A write-heavy mix is used so
+  that collisions actually occur. Fixed at a middling network and cost, where E1 shows the
+  executors separating.
+
+fixed:
+  WAN_PROFILE: uniform-rtt-50ms
+  EXPENSIVE_OP_SLEEP_US: 1000
+  EXPENSIVE_OP_SLEEP_MS: 0
+  READ_RATIO: 30
+  CREATE_RATIO: 5
+  UPDATE_RATIO: 60
+  DELETE_RATIO: 5
+
+factors:
+  KEY_SPACE_SIZE: [1000000, 1000, 100, 10]

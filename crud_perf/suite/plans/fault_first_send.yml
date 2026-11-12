@@ -1,0 +1,31 @@
+name: fault_first_send
+extends: _base.yml
+description: >
+  Does the replicas' own request timeout recover a request the client sent to too few replicas?
+  Client 1000's first CONCURRENT_RQS sends go only to the leader, only to one non-leader replica, or to
+  nobody; replicas time out after REQUEST_TIMEOUT_MICROS. Expected: leader and all recover at
+  once, non_leader after about one timeout, nobody never (clients do not retransmit). Short LAN
+  runs; the numbers are recovery delays, not performance.
+
+variants: [crud_single]
+repetitions: 1
+order: sequential
+stall_grace_s: 20
+phase_grace_s: 15
+
+fixed:
+  WAN_ENABLED: 0
+  PIN_CPUS: 0
+  WORKLOAD_TYPE: uniform_cheap
+  WARMUP_SECS: 3
+  MEASURE_SECS: 5
+  PRELOAD_KEYS: 10000
+  KEY_SPACE_SIZE: 10000
+  CONCURRENT_RQS: 3
+  RUST_LOG: info
+  REQUEST_TIMEOUT_MICROS: 1000000
+  CLIENT_FAULT_CLIENT: 1000
+  CLIENT_FAULT_SENDS: 3
+
+factors:
+  CLIENT_FAULT_SENDS_TO: [all, leader, non_leader, nobody]

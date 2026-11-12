@@ -1,0 +1,17 @@
+name: smoke
+extends: _base.yml
+description: >
+  Pipeline check: every variant, one cell, short phases. Takes ~15 minutes and exercises the
+  whole path (build, WAN shaping, pinning, results, InfluxDB pull). The numbers mean nothing.
+
+repetitions: 1
+
+fixed:
+  WARMUP_SECS: 5
+  MEASURE_SECS: 15
+  PRELOAD_KEYS: 10000
+  KEY_SPACE_SIZE: 10000
+
+factors:
+  rtt_ms: [20]
+  op_cost_us: [1000]

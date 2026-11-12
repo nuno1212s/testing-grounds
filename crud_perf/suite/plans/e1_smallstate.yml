@@ -1,0 +1,19 @@
+name: e1_smallstate
+extends: _base.yml
+description: >
+  Control for e1_short. The same cells at RTT 50 ms with 1,000 preloaded keys instead of 1M,
+  so a snapshot costs about 0.2 ms, not about 150 ms. If the p99 and mean gaps of
+  baseline/crud_* against dual_state vanish here, they were checkpoint stalls and not
+  speculation; the p50 comparison does not depend on state size.
+
+repetitions: 2
+
+fixed:
+  WARMUP_SECS: 5
+  MEASURE_SECS: 20
+  CONCURRENT_RQS: 1
+  PRELOAD_KEYS: 1000
+
+factors:
+  rtt_ms: [50]
+  op_cost_us: [0, 1000, 5000]

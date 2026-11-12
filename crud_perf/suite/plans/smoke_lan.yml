@@ -1,0 +1,18 @@
+name: smoke_lan
+extends: _base.yml
+description: >
+  Pipeline check without WAN emulation, so it needs no change to atlas_network and leaves a
+  running metrics stack alone. Short phases, one cell. Exercises build, knob passthrough, CPU
+  pinning, time-based phases, the RESULT line and the InfluxDB pull. The numbers mean nothing.
+
+repetitions: 1
+
+fixed:
+  WAN_ENABLED: 0
+  WARMUP_SECS: 5
+  MEASURE_SECS: 15
+  PRELOAD_KEYS: 10000
+  KEY_SPACE_SIZE: 10000
+
+factors:
+  op_cost_us: [1000]

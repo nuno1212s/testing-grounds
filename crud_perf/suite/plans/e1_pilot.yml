@@ -1,0 +1,12 @@
+name: e1_pilot
+extends: _base.yml
+description: >
+  A coarse, single-repetition cut of E1 (3 x 3 cells) for a first look at the shape of the
+  result before committing to the full grid. Not for publication: one repetition gives no
+  confidence interval.
+
+repetitions: 1
+
+factors:
+  rtt_ms: [5, 50, 200]
+  op_cost_us: [0, 1000, 20000]

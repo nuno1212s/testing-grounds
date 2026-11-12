@@ -1,0 +1,19 @@
+name: r5_snapshot
+scenario: snapshot
+description: >
+  R5 -- the cost of taking an application-state snapshot (a checkpoint), and whether it stalls
+  speculation. Both designs clone the confirmed state, but dual_state does it on the confirmed
+  worker, off the speculating thread, while the CRUD executors do it on their single worker --
+  so a probe batch queued behind the snapshot request shows the stall directly.
+seed: 20261031
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [1000, 10000, 100000, 1000000]
+  value_bytes: [64]
+bench_args:
+  batch_sizes: [100]
+  op_cost_us: [0]
+  write_pct: 50
+  trials: 30
+  timeout_s: 60
+cpus: "40-47"

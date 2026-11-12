@@ -1,0 +1,19 @@
+name: e1_short
+extends: _base.yml
+description: >
+  A shortened E1: replica RTT x request cost with 5 clients x 1 outstanding request (5 in
+  flight) so the executor queue stays at most 4 x cost, 5 s warm-up, 20 s windows, 2
+  repetitions. The 20 ms cost is in e1_heavy, which needs a single request in flight to avoid
+  queueing altogether. Windows are short, so tail percentiles are coarse; use E1 for final
+  figures.
+
+repetitions: 2
+
+fixed:
+  WARMUP_SECS: 5
+  MEASURE_SECS: 20
+  CONCURRENT_RQS: 1
+
+factors:
+  rtt_ms: [5, 50, 200]
+  op_cost_us: [0, 1000, 5000]
