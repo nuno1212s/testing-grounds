@@ -1,0 +1,14 @@
+name: e3_cost_model
+extends: _base.yml
+description: >
+  E3 -- sensitivity to how processing cost is modelled. `sleep` costs latency but no CPU, so a
+  parallel executor scales as far as its thread pool allows; `spin` holds a core, so
+  parallelism is bounded by the cores actually available. If the conclusions differ between the
+  two, they depend on an assumption about the application rather than on the executors.
+
+fixed:
+  WAN_PROFILE: uniform-rtt-50ms
+
+factors:
+  PROCESSING_MODE: [sleep, spin]
+  op_cost_us: [100, 1000, 5000]

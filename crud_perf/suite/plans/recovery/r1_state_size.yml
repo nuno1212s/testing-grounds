@@ -1,0 +1,28 @@
+name: r1_state_size
+scenario: recovery
+description: >
+  R1 -- recovery time against state size. Each executor is made to backtrack with `depth`
+  batches speculated ahead of confirmation, either at the oldest unconfirmed batch (head: nothing
+  is kept) or the newest (tail: everything older is kept), while the application state holds
+  1e3 .. 1e6 keys. dual_state recovers by cloning the whole confirmed state and re-executing the
+  kept batches, so its time should grow with the state and, at tail, with processing cost. The
+  CRUD executors discard deltas and re-merge the survivors, so theirs should depend on the
+  pending entries and not on the state at all. Run twice over cost 0 and 20 us/op to separate
+  the clone from the re-execution.
+seed: 20261031
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [1000, 10000, 100000, 1000000]
+  value_bytes: [64]
+bench_args:
+  depths: [8, 32, 128]
+  positions: [head, tail]
+  backlogs: [0]
+  batch_sizes: [100]
+  op_cost_us: [0, 20]
+  write_pct: 50
+  reproposal: one
+  trials: 30
+  timeout_s: 60
+# Pin the benchmark away from the cores a cluster run uses (0-39); see suite/README.md.
+cpus: "40-47"

@@ -1,0 +1,22 @@
+name: r3_value_size
+scenario: recovery
+description: >
+  R3 -- the same experiment with state size varied through the VALUE size at a fixed key
+  count, separating "more entries" (more allocations to clone, a bigger hash table) from "more
+  bytes". 100k keys x 16 B .. 4 KiB is 1.6 MB .. 400 MB of values.
+seed: 20261031
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [100000]
+  value_bytes: [16, 64, 256, 1024, 4096]
+bench_args:
+  depths: [32]
+  positions: [head, tail]
+  backlogs: [0]
+  batch_sizes: [100]
+  op_cost_us: [0]
+  write_pct: 50
+  reproposal: one
+  trials: 30
+  timeout_s: 60
+cpus: "40-47"

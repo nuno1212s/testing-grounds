@@ -1,0 +1,16 @@
+name: recovery_smoke
+scenario: recovery
+description: Pipeline check -- tiny state, few trials. The numbers mean nothing.
+seed: 1
+executors: [dual_state, crud_single, crud_scalable]
+process_factors:
+  state_keys: [1000]
+  value_bytes: [64]
+bench_args:
+  depths: [8]
+  positions: [head, tail]
+  backlogs: [0]
+  batch_sizes: [20]
+  op_cost_us: [0]
+  trials: 4
+  timeout_s: 10

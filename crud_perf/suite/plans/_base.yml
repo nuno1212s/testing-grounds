@@ -1,0 +1,73 @@
+# Settings shared by every experiment. Plans `extends:` this file and override what they vary.
+#
+# Everything here is a CONTROL, held identical across the variants being compared:
+#
+#   cluster         4 replicas (f = 1), one client container running N_CLIENTS logical clients.
+#                   N_CLIENTS is 5, the repo default, because the PKI under bench/generated/ca-root
+#                   holds keys for exactly the nodes it was generated for (clients 1000-1004);
+#                   more clients need `make crud_perf regen-ca-root N_CLIENTS=<n>` first.
+#   hardware        every node pinned to a private block of cores (PIN_CPUS), identical for all
+#                   variants: 8 per replica, 8 for the client container = 40 of the host's cores.
+#                   crud_scalable's execution pool is a hard-coded 4 threads, so 8 cores leaves
+#                   it room to actually run 4-wide beside the consensus threads.
+#   request stream  FORCE_ORDERED sends every request through consensus (an unordered read
+#                   bypasses it and is untouched by speculation, which would dilute the effect
+#                   being measured). The generator is seeded per client, so every variant
+#                   receives byte-identical requests.
+#   starting state  PRELOAD_KEYS makes the state size a fixed input instead of a function of how
+#                   fast the variant warmed up.
+#   cost model      PROCESSING_MODE: spin charges each request's cost to a core. `sleep` would
+#                   let crud_scalable's parallelism scale regardless of cores.
+#   measurement     time-based phases, so runs of very different throughput get equally long
+#                   windows; CLIENT_REQUEST_METRICS: 0 because the in-process histogram is the
+#                   result and the per-request InfluxDB points would only load the node.
+#   network         jitter 0, loss 0 (netem reorders under jitter), clients 0.4ms from every
+#                   replica; only the replica<->replica round trip varies.
+
+variants: [baseline, dual_state, crud_single, crud_scalable]
+repetitions: 3
+order: randomized-blocks
+seed: 20261031
+
+# Per-run budget = startup + warm-up + measure + drain, counted from when the client container
+# is up (image builds are timed separately by build_timeout_s). A run that exceeds it, or whose
+# stragglers are silent stall_grace_s after the first client finishes, is failed and retried.
+startup_timeout_s: 240
+drain_timeout_s: 90
+stall_grace_s: 90
+build_timeout_s: 1800
+# Hang detection from the clients' phase markers: bootstrap must finish within boot_grace_s of the
+# cluster coming up (raise for very high RTT), and each later phase boundary within phase_grace_s
+# of when it is due.
+boot_grace_s: 180
+phase_grace_s: 45
+
+fixed:
+  N_REPLICAS: 4
+  N_CLIENT_MACHINES: 1
+  N_CLIENTS: 5
+  CONCURRENT_RQS: 3
+
+  WARMUP_SECS: 10
+  MEASURE_SECS: 45
+  CLIENT_REQUEST_METRICS: 0
+  RUST_LOG: warn
+
+  WORKLOAD_TYPE: uniform_expensive
+  FORCE_ORDERED: "true"
+  KEY_DISTRIBUTION: uniform
+  KEY_SPACE_SIZE: 1000000
+  PRELOAD_KEYS: 1000000
+  READ_RATIO: 70
+  CREATE_RATIO: 15
+  UPDATE_RATIO: 10
+  DELETE_RATIO: 5
+  PROCESSING_MODE: spin
+
+  WAN_ENABLED: 1
+  WAN_SHAPE_CLIENTS: 1
+  WAN_TIMEOUT_SCALE: 1
+
+  PIN_CPUS: 1
+  REPLICA_CORES: 8
+  CLIENT_CORES: 8

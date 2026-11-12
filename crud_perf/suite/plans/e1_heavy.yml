@@ -1,0 +1,20 @@
+name: e1_heavy
+extends: _base.yml
+description: >
+  The expensive end of E1 without queueing: one client with one outstanding request, so a
+  request never waits behind another and the model saving, min(execution time, replica RTT),
+  is tested directly at a 20 ms cost. With 15 requests in flight a 20 ms executor is
+  saturated (p50 ~ 15 x 20 ms) and that queue hides what speculation saves
+  (results/e1_short.saturated).
+
+repetitions: 2
+
+fixed:
+  N_CLIENTS: 1
+  CONCURRENT_RQS: 1
+  WARMUP_SECS: 5
+  MEASURE_SECS: 30
+
+factors:
+  rtt_ms: [5, 50, 200]
+  op_cost_us: [20000]
